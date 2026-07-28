@@ -22,3 +22,14 @@ test("generateSlmResponse synthesizes grounded responses with SLM metadata", () 
   assert.equal(result.sources[0].id, 102);
   assert.match(result.answer, /Synthesized on-device by SLM-Lite/);
 });
+
+test("rejects out-of-domain queries that are unrelated to career/vacancies", () => {
+  for (const offTopicPrompt of ["recipe for chocolate cake", "solve 5x + 3 = 12", "who won the world cup", "tell me a joke"]) {
+    const intent = extractSlmIntent(offTopicPrompt);
+    assert.equal(intent.intent, "OUT_OF_DOMAIN");
+
+    const response = generateSlmResponse(offTopicPrompt, sampleJobs);
+    assert.match(response.answer, /Query Rejected: Out of Domain/i);
+    assert.deepEqual(response.sources, []);
+  }
+});

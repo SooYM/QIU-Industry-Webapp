@@ -33,7 +33,8 @@ export type SlmIntent =
   | "SALARY_COMPARISON" 
   | "INTERNSHIP_SEARCH" 
   | "ACADEMIC_MATCH" 
-  | "VACANCY_SEARCH";
+  | "VACANCY_SEARCH"
+  | "OUT_OF_DOMAIN";
 
 export interface SlmExtractedIntent {
   intent: SlmIntent;
@@ -61,23 +62,29 @@ export function extractSlmIntent(prompt: string): SlmExtractedIntent {
     return { intent: "GREETING", isInternship: false, confidence: 0.99 };
   }
 
-  // 3. Salary comparison intent
+  // 3. Out-of-Domain intent rejection (recipes, sports, general trivia, weather, math, movies, non-career questions)
+  const OUT_OF_DOMAIN_REGEX = /\b(recipe|cake|cook|bake|weather|forecast|math|solve|equation|prime minister|president|world cup|football|soccer|joke|poem|story|movie|film|game|playstation|xbox|car repair|tire|medical advice|symptom|doctor|disease)\b/i;
+  if (OUT_OF_DOMAIN_REGEX.test(p)) {
+    return { intent: "OUT_OF_DOMAIN", isInternship: false, confidence: 0.99 };
+  }
+
+  // 4. Salary comparison intent
   if (/\b(highest salary|best pay|top salary|compare salar|salary range|earn the most|highest paying)\b/i.test(p)) {
     return { intent: "SALARY_COMPARISON", isInternship: false, confidence: 0.92 };
   }
 
-  // 4. Internship intent
+  // 5. Internship intent
   const isInternship = /\b(intern|internship|practical|industrial training)\b/i.test(p);
   if (isInternship) {
     return { intent: "INTERNSHIP_SEARCH", isInternship: true, confidence: 0.95 };
   }
 
-  // 5. Academic / Field of study match intent
-  if (/\b(student|gpa|cgpa|major|degree|diploma|computer science|finance|engineering|accounting|biotech|my results|recommend)\b/i.test(p)) {
+  // 6. Academic / Field of study match intent
+  if (/\b(student|gpa|cgpa|major|degree|diploma|computer science|culinary|finance|engineering|accounting|biotech|my results|recommend)\b/i.test(p)) {
     return { intent: "ACADEMIC_MATCH", isInternship: false, confidence: 0.90 };
   }
 
-  // 6. Default vacancy search
+  // 7. Default vacancy search
   return { intent: "VACANCY_SEARCH", isInternship, confidence: 0.85 };
 }
 
@@ -86,6 +93,15 @@ export function extractSlmIntent(prompt: string): SlmExtractedIntent {
  */
 export function generateSlmResponse(prompt: string, jobs: JobRecord[]): { answer: string; sources: JobRecord[]; modelInfo: SlmModelMeta } {
   const parsedIntent = extractSlmIntent(prompt);
+
+  // Out of Domain Query Rejection
+  if (parsedIntent.intent === "OUT_OF_DOMAIN") {
+    return {
+      answer: "⚠️ **Query Rejected: Out of Domain**\n\nI am specialized solely as the **VacancyPortal Job & Career Assistant**. I cannot assist with general off-topic questions (e.g., recipes, sports, general trivia, math, or entertainment).\n\nPlease ask me about:\n• **Job Opportunities** (e.g., *Software Engineer, Marketing Intern, Accountant*)\n• **Salary Analysis** (e.g., *Highest paying jobs, RM3000 monthly*)\n• **Academic Matching** (e.g., *I study Computer Science, Culinary Arts, Finance*)\n• **Locations** (e.g., *Vacancies in Selangor, Penang, Kuala Lumpur*)",
+      sources: [],
+      modelInfo: SLM_MODEL_INFO,
+    };
+  }
 
   // Conversational Intent Handling
   if (parsedIntent.intent === "TIME_DATE") {
