@@ -30,3 +30,13 @@ test("answers from newly loaded Firestore records", () => {
   assert.match(result.answer, /Accounts Assistant at Ledger Sdn Bhd/);
   assert.equal(result.sources[0].id, 3);
 });
+
+test("handles conversational time and greeting intents gracefully without false job matches", () => {
+  const timeResult = answerFromJobs("what is the time now", jobs);
+  assert.match(timeResult.answer, /current local time/i);
+  assert.deepEqual(timeResult.sources, []);
+
+  const greetingResult = answerFromJobs("hi", jobs);
+  assert.match(greetingResult.answer, /Hello! I am your VacancyPortal AI Assistant/i);
+  assert.deepEqual(greetingResult.sources, []);
+});
