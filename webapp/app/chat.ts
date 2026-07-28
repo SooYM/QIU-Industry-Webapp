@@ -1,3 +1,5 @@
+import { generateSlmResponse, SLM_MODEL_INFO } from "./slm-engine";
+
 export type JobRecord = {
   id: number;
   title: string;
@@ -106,30 +108,5 @@ export function retrieveJobs(question: string, jobs: JobRecord[]) {
 }
 
 export function answerFromJobs(question: string, jobs: JobRecord[]) {
-  const conversational = checkConversationalIntent(question);
-  if (conversational.isConversational && conversational.response) {
-    return {
-      answer: conversational.response,
-      sources: []
-    };
-  }
-
-  const results = retrieveJobs(question, jobs);
-  if (!results.length) {
-    return {
-      answer: "I couldn’t find matching job vacancies for your query. Try searching by job title (e.g. 'Software Engineer'), specialization (e.g. 'Finance'), location, minimum salary, or internship type.",
-      sources: []
-    };
-  }
-
-  const intro = isComputingStudyArea(question)
-    ? "Based on the study area you mentioned, these supplied vacancies have the closest specialization match:"
-    : /intern/i.test(question)
-    ? "Here are the closest internship records I found:"
-    : "Here are the closest matching vacancy records:";
-
-  return {
-    answer: `${intro}\n\n${results.slice(0, 5).map((job) => `• ${job.title} at ${job.company} — ${job.salaryLabel} ${job.payFrequency}, ${job.location}, ${job.minimumRequirement} minimum`).join("\n")}\n\nThis response is generated directly from the supplied records.`,
-    sources: results.slice(0, 5),
-  };
+  return generateSlmResponse(question, jobs);
 }
