@@ -11,6 +11,7 @@ import {
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import {
+  isAllowedAccessEmail,
   isAllowedQiuEmail,
   normalizeEmail,
   roleForEmail,
@@ -35,16 +36,23 @@ type UserRecord = {
   role: UserRole;
 };
 
+type WhitelistedEmailRecord = {
+  id: string;
+  email: string;
+  role: UserRole;
+  addedBy?: string;
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ hd: "qiu.edu.my", prompt: "select_account" });
+provider.setCustomParameters({ prompt: "select_account" });
 
 function readableAuthError(error: unknown) {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
   if (code.includes("popup-closed-by-user")) return "Sign-in window closed before completion.";
   if (code.includes("popup-blocked")) return "Browser blocked the sign-in window. Allow pop-ups and try again.";
   if (code.includes("network-request-failed")) return "Could not reach Google sign-in. Check your connection and try again.";
-  return "Sign-in failed. Try again with your QIU Google account.";
+  return "Sign-in failed. Try again with your Google account.";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -68,11 +76,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!nextUser.emailVerified || !isAllowedQiuEmail(nextUser.email)) {
+      let whitelisted: string[] = [];
+      try {
+        const whitelistSnap = await getDocs(collection(activeDb, "whitelisted_emails"));
+        whitelisted = whitelistSnap.docs.map((doc) => normalizeEmail(doc.data().email || doc.id));
+      } catch {
+        // Fallback to empty whitelist if network fails
+      }
+
+      if (!nextUser.emailVerified || !isAllowedAccessEmail(nextUser.email, whitelisted)) {
         await firebaseSignOut(activeAuth);
         setUser(null);
         setRole(null);
-        setError("Access is limited to verified @qiu.edu.my Google accounts.");
+        setError("Access is limited to verified @qiu.edu.my accounts or accounts approved by the Super Admin.");
         setLoading(false);
         return;
       }
@@ -80,7 +96,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const userRef = doc(activeDb, "users", nextUser.uid);
         const snapshot = await getDoc(userRef);
-        const nextRole = roleForEmail(nextUser.email, snapshot.data()?.role);
+        
+        // Check if there is a whitelisted role override
+        let defaultRole: UserRole = "user";
+        try {
+          const whitelistDoc = await getDoc(doc(activeDb, "whitelisted_emails", normalizeEmail(nextUser.email)));
+          if (whitelistDoc.exists() && whitelistDoc.data()?.role) {
+            defaultRole = whitelistDoc.data()?.role as UserRole;
+          }
+        } catch {
+          // Keep default
+        }
+
+        const nextRole = roleForEmail(nextUser.email, snapshot.data()?.role || defaultRole);
         const profile = {
           displayName: nextUser.displayName ?? "",
           photoURL: nextUser.photoURL ?? "",
@@ -143,15 +171,15 @@ export function useAuth() {
 export function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading, error, signIn } = useAuth();
 
-  if (loading) return <AuthStatus title="Checking access" detail="Confirming your QIU account and permissions…" loading />;
+  if (loading) return <AuthStatus title="Checking access" detail="Confirming your account permissions…" loading />;
   if (!user) {
     return <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
         <a className="brand auth-brand" href="#" aria-label="VacancyPortal"><span className="brand-mark">VP</span><span>Vacancy<span>Portal</span></span><small>POC</small></a>
-        <div className="auth-copy"><span className="detail-label">QIU PRIVATE ACCESS</span><h1 id="auth-title">Sign in to browse vacancies</h1><p>Use your verified QIU Google account. Other email domains cannot view vacancy or company information.</p></div>
+        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to browse vacancies</h1><p>Use your @qiu.edu.my Google account or a Superadmin approved external account.</p></div>
         {error && <p className="auth-error" role="alert">{error}</p>}
-        <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with QIU Google account</button>
-        <small className="auth-boundary">Allowed domain: @qiu.edu.my</small>
+        <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with Google account</button>
+        <small className="auth-boundary">Allowed: @qiu.edu.my or Superadmin Whitelisted Accounts</small>
       </section>
     </main>;
   }
@@ -170,34 +198,51 @@ export function AuthAccount() {
   if (!user || !role) return null;
   return <div className="auth-account">
     <span className="auth-avatar" aria-hidden="true">{(user.displayName || user.email || "Q").charAt(0).toUpperCase()}</span>
-    <span><strong>{user.displayName || user.email}</strong><small>{role === "superadmin" ? "Super admin" : role}</small></span>
+    <span><strong>{user.displayName || user.email}</strong><small>{role === "superadmin" ? "Super admin" : role === "employer" ? "Employer" : role}</small></span>
     <button type="button" onClick={signOut}>Sign out</button>
   </div>;
 }
 
 export function RoleManager() {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [whitelistedEmails, setWhitelistedEmails] = useState<WhitelistedEmailRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState<UserRole>("employer");
 
   useEffect(() => {
     if (role !== "superadmin" || !db) return;
-    getDocs(collection(db, "users"))
-      .then((snapshot) => setUsers(snapshot.docs.map((entry) => ({
+    const activeDb = db;
+
+    const loadUsers = getDocs(collection(activeDb, "users")).then((snapshot) =>
+      setUsers(snapshot.docs.map((entry) => ({
         uid: entry.id,
         email: entry.data().email ?? "",
         displayName: entry.data().displayName ?? "",
         photoURL: entry.data().photoURL ?? "",
         role: roleForEmail(entry.data().email, entry.data().role),
-      })).sort((a, b) => a.email.localeCompare(b.email))))
-      .catch(() => setMessage("Could not load user roles."))
+      })).sort((a, b) => a.email.localeCompare(b.email)))
+    );
+
+    const loadWhitelist = getDocs(collection(activeDb, "whitelisted_emails")).then((snapshot) =>
+      setWhitelistedEmails(snapshot.docs.map((entry) => ({
+        id: entry.id,
+        email: entry.data().email ?? entry.id,
+        role: (entry.data().role as UserRole) || "employer",
+        addedBy: entry.data().addedBy ?? "",
+      })))
+    );
+
+    Promise.all([loadUsers, loadWhitelist])
+      .catch(() => setMessage("Could not load account management data."))
       .finally(() => setLoading(false));
   }, [role]);
 
   if (role !== "superadmin") return null;
 
-  async function assignRole(record: UserRecord, nextRole: "user" | "admin") {
+  async function assignRole(record: UserRecord, nextRole: UserRole) {
     if (!db || normalizeEmail(record.email) === SUPERADMIN_EMAIL) return;
     setMessage("");
     try {
@@ -209,15 +254,122 @@ export function RoleManager() {
     }
   }
 
-  return <section className="role-manager" aria-labelledby="role-manager-title">
-    <div className="role-manager-head"><div><span className="detail-label">ACCESS CONTROL</span><h3 id="role-manager-title">QIU user roles</h3></div><small>{users.length} accounts</small></div>
-    <p>Users can browse. Admins can add, edit, and remove vacancies. Superadmin identity is fixed.</p>
-    {loading ? <p className="role-manager-state" role="status">Loading accounts…</p> : <div className="role-list">{users.map((record) => {
-      const fixed = normalizeEmail(record.email) === SUPERADMIN_EMAIL;
-      return <div className="role-row" key={record.uid}><span className="auth-avatar" aria-hidden="true">{(record.displayName || record.email || "Q").charAt(0).toUpperCase()}</span><span><strong>{record.displayName || record.email}</strong>{record.displayName && <small>{record.email}</small>}</span>{fixed ? <span className="fixed-role">Super admin</span> : <label><span className="sr-only">Role for {record.email}</span><select value={record.role} onChange={(event) => assignRole(record, event.target.value as "user" | "admin")}><option value="user">User</option><option value="admin">Admin</option></select></label>}</div>;
-    })}</div>}
-    {message && <p className="role-manager-message" role="status" aria-live="polite">{message}</p>}
-  </section>;
+  async function addWhitelistedEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!db || !newEmail.trim()) return;
+    const emailToSave = normalizeEmail(newEmail);
+    setMessage("");
+    try {
+      await setDoc(doc(db, "whitelisted_emails", emailToSave), {
+        email: emailToSave,
+        role: newRole,
+        addedBy: normalizeEmail(user?.email),
+        createdAt: serverTimestamp(),
+      });
+      setWhitelistedEmails((prev) => [...prev.filter((item) => item.id !== emailToSave), { id: emailToSave, email: emailToSave, role: newRole }]);
+      setNewEmail("");
+      setMessage(`Whitelisted non-QIU account ${emailToSave} with role ${newRole}.`);
+    } catch {
+      setMessage(`Could not whitelist ${emailToSave}.`);
+    }
+  }
+
+  async function removeWhitelistedEmail(emailId: string) {
+    if (!db) return;
+    setMessage("");
+    try {
+      await setDoc(doc(db, "whitelisted_emails", emailId), { active: false }, { merge: true });
+      // Delete doc
+      setWhitelistedEmails((prev) => prev.filter((item) => item.id !== emailId));
+      setMessage(`Removed ${emailId} from whitelist.`);
+    } catch {
+      setMessage(`Could not remove ${emailId}.`);
+    }
+  }
+
+  return (
+    <section className="role-manager space-y-6" aria-labelledby="role-manager-title">
+      <div className="role-manager-head">
+        <div>
+          <span className="detail-label">SUPERADMIN ACCESS CONTROL</span>
+          <h3 id="role-manager-title">Portal User Roles & Whitelisted Accounts</h3>
+        </div>
+        <small>{users.length} registered accounts</small>
+      </div>
+
+      {/* Whitelist non-QIU Email Manager */}
+      <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
+        <h4 className="font-bold text-sm text-indigo-900 dark:text-indigo-200">➕ Approve Non-@qiu.edu.my Account</h4>
+        <p className="text-xs text-slate-600 dark:text-slate-400">By default, non-QIU emails cannot log in. Superadmin can approve external emails (e.g. Employers or External Admins) here.</p>
+        <form onSubmit={addWhitelistedEmail} className="flex flex-wrap gap-2 items-center">
+          <input
+            type="email"
+            required
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="e.g. employer@company.com"
+            className="flex-1 min-w-[200px] px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+          />
+          <select
+            value={newRole}
+            onChange={(e) => setNewRole(e.target.value as UserRole)}
+            className="px-2.5 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+          >
+            <option value="employer">Employer (Own Jobs Only)</option>
+            <option value="admin">Admin (All Jobs)</option>
+            <option value="user">User / Student (Browse Only)</option>
+          </select>
+          <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors shadow-sm">
+            Approve External Email
+          </button>
+        </form>
+
+        {whitelistedEmails.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Approved External Accounts ({whitelistedEmails.length}):</span>
+            <div className="space-y-1">
+              {whitelistedEmails.map((item) => (
+                <div key={item.id} className="flex items-center justify-between px-3 py-1.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
+                  <span className="font-medium text-slate-800 dark:text-slate-200">{item.email} <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">{item.role}</span></span>
+                  <button type="button" onClick={() => removeWhitelistedEmail(item.id)} className="text-[11px] text-rose-600 hover:text-rose-700 dark:text-rose-400 font-semibold">Revoke</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed.</p>
+      {loading ? (
+        <p className="role-manager-state" role="status">Loading accounts…</p>
+      ) : (
+        <div className="role-list">
+          {users.map((record) => {
+            const fixed = normalizeEmail(record.email) === SUPERADMIN_EMAIL;
+            return (
+              <div className="role-row" key={record.uid}>
+                <span className="auth-avatar" aria-hidden="true">{(record.displayName || record.email || "Q").charAt(0).toUpperCase()}</span>
+                <span><strong>{record.displayName || record.email}</strong>{record.displayName && <small>{record.email}</small>}</span>
+                {fixed ? (
+                  <span className="fixed-role">Super admin</span>
+                ) : (
+                  <label>
+                    <span className="sr-only">Role for {record.email}</span>
+                    <select value={record.role} onChange={(event) => assignRole(record, event.target.value as UserRole)}>
+                      <option value="user">User / Student</option>
+                      <option value="employer">Employer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </label>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {message && <p className="role-manager-message" role="status" aria-live="polite">{message}</p>}
+    </section>
+  );
 }
 
 function GoogleMark() {

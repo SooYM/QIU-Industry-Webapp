@@ -14,6 +14,8 @@ export type JobRecord = {
   minimumRequirement: string;
   email: string;
   companySummary: string;
+  youtubeUrl?: string;
+  createdBy?: string;
 };
 
 const stopWords = new Set([

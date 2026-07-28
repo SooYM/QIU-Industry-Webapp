@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, PointerEvent, us
 import type { CSSProperties } from "react";
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { AuthAccount, RoleManager, useAuth } from "./auth-context";
+import { canEditOrDeleteJob, DEFAULT_YOUTUBE_PLACEHOLDER, getYouTubeEmbedUrl, normalizeEmail } from "./auth-policy";
 import { answerFromJobs } from "./chat";
 import type { JobRecord } from "./chat";
 import { db } from "./firebase-client";
@@ -44,13 +45,14 @@ type AdminDraft = Pick<Job, "title" | "company" | "type" | "specialization" | "v
   locationMode: "malaysia" | "international";
   state: string;
   country: string;
+  youtubeUrl?: string;
   mapX?: number;
   mapY?: number;
 };
 
 const DOSM_SOURCE = "https://www.dosm.gov.my/portal-main/release-content/salaries-and-wages-survey-report-2024";
 const PREFS_KEY = "vacancyportal-view-prefs";
-const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "" };
+const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "", youtubeUrl: DEFAULT_YOUTUBE_PLACEHOLDER };
 const malaysiaStates = ["Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang", "Pulau Pinang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu", "W.P. Kuala Lumpur", "W.P. Labuan", "W.P. Putrajaya"];
 const malaysiaStateAliases: Record<string, string> = { "Kuala Lumpur": "W.P. Kuala Lumpur" };
 
@@ -337,6 +339,13 @@ export default function Home() {
     const salary = draft.salary === "" ? 0 : Number(draft.salary);
     const isEditing = editingId !== null;
     const existingJob = isEditing ? customJobs.find((job) => job.id === editingId) : undefined;
+
+    if (isEditing && existingJob && !canEditOrDeleteJob(existingJob, user.email, role)) {
+      setAdminMessage("You can only edit vacancies created by your employer account.");
+      return;
+    }
+
+    const userEmail = normalizeEmail(user.email);
     const newJob: Job = {
       ...draft,
       id: editingId ?? Date.now(),
@@ -347,12 +356,14 @@ export default function Home() {
       detailsLink: existingJob?.detailsLink ?? "",
       companySummary: existingJob?.companySummary ?? "",
       companySources: existingJob?.companySources ?? [],
+      youtubeUrl: draft.youtubeUrl || DEFAULT_YOUTUBE_PLACEHOLDER,
+      createdBy: existingJob?.createdBy ?? userEmail,
       isCustom: true,
     };
     try {
       const jobData = { ...JSON.parse(JSON.stringify(newJob)) as Job, updatedAt: serverTimestamp(), isCustom: true };
       if (isEditing) await updateDoc(doc(db, "vacancies", String(newJob.id)), jobData);
-      else await setDoc(doc(db, "vacancies", String(newJob.id)), { ...jobData, createdBy: user.uid, createdAt: serverTimestamp() });
+      else await setDoc(doc(db, "vacancies", String(newJob.id)), { ...jobData, createdBy: userEmail, createdAt: serverTimestamp() });
       setDraft(emptyDraft);
       setEditingId(null);
       if (isEditing) setAdminMessage("Vacancy updated.");
@@ -361,7 +372,12 @@ export default function Home() {
   }
 
   async function removeCustomJob(id: number) {
-    if (!canManageJobs || !db) return;
+    if (!canManageJobs || !db || !user) return;
+    const targetJob = customJobs.find((j) => j.id === id);
+    if (targetJob && !canEditOrDeleteJob(targetJob, user.email, role)) {
+      setAdminMessage("You can only remove vacancies created by your employer account.");
+      return;
+    }
     try {
       await deleteDoc(doc(db, "vacancies", String(id)));
       if (editingId === id) { setEditingId(null); setDraft(emptyDraft); }
@@ -387,7 +403,8 @@ export default function Home() {
           locationMode: malaysiaState ? "malaysia" : "international",
           state: malaysiaState ?? "",
           country: malaysiaState ? "" : job.location,
-          createdBy: user.uid,
+          youtubeUrl: job.youtubeUrl ?? DEFAULT_YOUTUBE_PLACEHOLDER,
+          createdBy: normalizeEmail(user.email),
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -398,6 +415,10 @@ export default function Home() {
   }
 
   function editCustomJob(job: Job) {
+    if (!canEditOrDeleteJob(job, user?.email, role)) {
+      setAdminMessage("Employers can only edit their own created vacancies.");
+      return;
+    }
     const inferredMalaysia = job.locationMode === "malaysia" || (!job.locationMode && malaysiaStates.includes(job.location));
     setEditingId(job.id);
     setDraft({
@@ -413,7 +434,8 @@ export default function Home() {
       salary: job.salary ? String(job.salary) : "",
       vacancies: job.vacancies,
       minimumRequirement: job.minimumRequirement,
-      email: job.email,
+      email: job.email ?? "",
+      youtubeUrl: job.youtubeUrl ?? DEFAULT_YOUTUBE_PLACEHOLDER,
     });
     setAdminMessage("Editing vacancy. Save to apply changes.");
   }
@@ -576,6 +598,23 @@ export default function Home() {
                 )}
                 <section><span className="detail-label">LISTING DETAILS</span><dl><div><dt>Specialization</dt><dd>{selectedJob.specialization}</dd></div><div><dt>Minimum requirement</dt><dd>{selectedJob.minimumRequirement}</dd></div><div><dt>Available places</dt><dd>{selectedJob.vacancies}</dd></div><div><dt>Pay frequency</dt><dd>{selectedJob.payFrequency}</dd></div></dl></section>
                 {selectedJob.companySummary && <section><span className="detail-label">SUPPLIED COMPANY DISCUSSION</span><p className="company-context">{selectedJob.companySummary}</p><small className="caution">Unverified supplied snippets; confirm independently.</small></section>}
+                <section className="mt-4">
+                  <span className="detail-label flex items-center gap-1.5 text-indigo-700 dark:text-indigo-400">
+                    🎬 CORPORATE INTRO VIDEO
+                  </span>
+                  <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-sm mt-1.5">
+                    <iframe
+                      src={getYouTubeEmbedUrl(selectedJob.youtubeUrl)}
+                      title={`${selectedJob.company} Corporate Video`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full aspect-video rounded-xl border-0"
+                    />
+                  </div>
+                  <small className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 block">
+                    Corporate video preview supplied for {selectedJob.company}.
+                  </small>
+                </section>
               </div>
               <aside className="market-card"><span className="detail-label">MALAYSIA MARKET CONTEXT</span><strong>RM {benchmarkFor(selectedJob).amount.toLocaleString()}</strong><p>{benchmarkFor(selectedJob).label}, monthly, DOSM Salaries & Wages Survey 2024.</p>{selectedJob.type.toLowerCase().includes("intern") && <div className="benchmark-note">This workforce benchmark is not an internship allowance estimate.</div>}<a href={DOSM_SOURCE} target="_blank" rel="noreferrer">View official source ↗</a><hr/><span className="detail-label">CONTACT</span>{selectedJob.email ? <a className="enquire-main" href={`mailto:${selectedJob.email}?subject=${encodeURIComponent(`Enquiry: ${selectedJob.title}`)}`}>Email employer →</a> : <p>No enquiry email supplied.</p>}</aside>
             </div>
@@ -590,8 +629,8 @@ export default function Home() {
         <form onSubmit={saveVacancy} className="admin-form"><label>Job title<input required value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })}/></label><label>Company<input required value={draft.company} onChange={e => setDraft({ ...draft, company: e.target.value })}/></label><label>Type<select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })}><option>Permanent</option><option>Internship</option><option>Contract</option><option>Part-time</option></select></label><label>Specialization<select required value={draft.specialization} onChange={e => setDraft({ ...draft, specialization: e.target.value })}><option value="" disabled>Select specialization</option>{specializations.filter(item => item !== "All specializations").map(item => <option key={item} value={item}>{item}</option>)}</select></label>
           <fieldset className="location-choice full"><legend>Location type</legend><label><input type="radio" name="location-mode" checked={draft.locationMode === "malaysia"} onChange={() => setDraft({ ...draft, locationMode: "malaysia", country: "", mapX: undefined, mapY: undefined })}/> Malaysia</label><label><input type="radio" name="location-mode" checked={draft.locationMode === "international"} onChange={() => setDraft({ ...draft, locationMode: "international", state: "" })}/> International</label></fieldset>
           {draft.locationMode === "malaysia" ? <label className="full">Malaysian state<select required value={draft.state} onChange={e => setDraft({ ...draft, state: e.target.value })}><option value="" disabled>Select state or federal territory</option>{malaysiaStates.map(state => <option key={state} value={state}>{state}</option>)}</select></label> : <div className="international-location full"><label>Exact country<input required list="world-country-list" value={draft.country} placeholder="e.g. Singapore" onChange={e => setDraft({ ...draft, country: e.target.value })}/><datalist id="world-country-list">{countryShapes.map(country => <option key={country.name} value={country.name}/>)}</datalist></label><span className="map-instruction">Hover to identify a country. Click it to select and highlight the country.</span><button ref={worldMapRef} type="button" className="world-map" onClick={pinpointCountry} onPointerMove={moveCountryLabel} onPointerLeave={() => setHoveredCountry(null)} aria-label={`World map country location picker${hoveredCountry ? `: ${hoveredCountry.name}` : ""}`}><svg viewBox="0 0 1000 500" role="img" aria-label="Interactive world countries">{countryShapes.map(country => <path key={country.name} d={country.path} data-country={country.name} className={selectedMapCountry === country.name ? "selected-country" : undefined}/>)}</svg>{!countryShapes.length && <span className="map-loading">Loading countries…</span>}{hoveredCountry && <span ref={countryTooltipRef} className="country-tooltip" style={{ left: tooltipPosition.left, top: tooltipPosition.top }}>{hoveredCountry.name}</span>}</button><small>{selectedMapCountry ? `${selectedMapCountry} selected and highlighted.` : "No country selected yet."}</small><a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Public-domain boundaries: Natural Earth ↗</a></div>}
-          <label>Monthly salary (RM)<input type="number" min="0" step="1" placeholder="e.g. 1800" value={draft.salary} onChange={e => setDraft({ ...draft, salary: e.target.value })}/></label><label>Vacancies<input type="number" min="1" value={draft.vacancies} onChange={e => setDraft({ ...draft, vacancies: Number(e.target.value) })}/></label><label>Minimum requirement<select value={draft.minimumRequirement} onChange={e => setDraft({ ...draft, minimumRequirement: e.target.value })}><option>SPM</option><option>Certificate</option><option>Diploma</option><option>Degree</option><option>Post-graduate</option></select></label><label><span className="field-label">Enquiry email <small>Optional</small></span><input type="email" value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })}/></label><div className="admin-form-footer full">{adminMessage && <p className={`admin-message ${adminMessageIsError ? "error" : ""}`} role="status" aria-live="polite">{adminMessage}</p>}<div className="admin-submit">{editingId && <button type="button" className="cancel-edit" onClick={() => { setEditingId(null); setDraft(emptyDraft); setAdminMessage(""); }}>Cancel edit</button>}<button className="save-job" type="submit">{editingId ? "Save changes" : "Add vacancy"}</button></div></div></form>
-        {customJobs.length > 0 && <section className="local-jobs" aria-labelledby="admin-vacancies-title"><div className="local-jobs-head"><div><span className="detail-label">VACANCIES</span><h3 id="admin-vacancies-title">Manage vacancies</h3></div><strong aria-live="polite">{adminFilteredJobs.length} of {customJobs.length}</strong></div><div className="admin-job-filters"><label className="admin-job-search"><span>Search vacancies</span><input type="search" value={adminQuery} onChange={e => setAdminQuery(e.target.value)} placeholder="Title, company or location"/></label><label><span>Company</span><select value={adminCompany} onChange={e => setAdminCompany(e.target.value)}>{companies.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Specialization</span><select value={adminSpecialization} onChange={e => setAdminSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Opportunity type</span><select value={adminType} onChange={e => setAdminType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label><button type="button" className="reset-admin-filters" onClick={resetAdminFilters}>Reset filters</button></div>{adminFilteredJobs.length > 0 ? <div className="local-job-list">{adminFilteredJobs.map(job => <div className="local-job" key={job.id}><span><b>{job.title}</b><small>{job.company} · {job.location}</small></span><div className="local-job-actions"><button className="edit-local" onClick={() => editCustomJob(job)}>Edit</button><button className="delete-local" onClick={() => removeCustomJob(job.id)}>Delete</button></div></div>)}</div> : <div className="admin-jobs-empty"><strong>No vacancies match these filters.</strong><p>Try another search or clear the filters.</p><button type="button" onClick={resetAdminFilters}>Reset filters</button></div>}</section>}
+          <label>Monthly salary (RM)<input type="number" min="0" step="1" placeholder="e.g. 1800" value={draft.salary} onChange={e => setDraft({ ...draft, salary: e.target.value })}/></label><label>Vacancies<input type="number" min="1" value={draft.vacancies} onChange={e => setDraft({ ...draft, vacancies: Number(e.target.value) })}/></label><label>Minimum requirement<select value={draft.minimumRequirement} onChange={e => setDraft({ ...draft, minimumRequirement: e.target.value })}><option>SPM</option><option>Certificate</option><option>Diploma</option><option>Degree</option><option>Post-graduate</option></select></label><label><span className="field-label">Enquiry email <small>Optional</small></span><input type="email" value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })}/></label><label className="full"><span className="field-label">Corporate YouTube Video URL <small>Optional placeholder</small></span><input type="url" value={draft.youtubeUrl ?? ""} placeholder="e.g. https://www.youtube.com/watch?v=5qap5aO4i9A" onChange={e => setDraft({ ...draft, youtubeUrl: e.target.value })}/></label><div className="admin-form-footer full">{adminMessage && <p className={`admin-message ${adminMessageIsError ? "error" : ""}`} role="status" aria-live="polite">{adminMessage}</p>}<div className="admin-submit">{editingId && <button type="button" className="cancel-edit" onClick={() => { setEditingId(null); setDraft(emptyDraft); setAdminMessage(""); }}>Cancel edit</button>}<button className="save-job" type="submit">{editingId ? "Save changes" : "Add vacancy"}</button></div></div></form>
+        {customJobs.length > 0 && <section className="local-jobs" aria-labelledby="admin-vacancies-title"><div className="local-jobs-head"><div><span className="detail-label">VACANCIES</span><h3 id="admin-vacancies-title">Manage vacancies</h3></div><strong aria-live="polite">{adminFilteredJobs.length} of {customJobs.length}</strong></div><div className="admin-job-filters"><label className="admin-job-search"><span>Search vacancies</span><input type="search" value={adminQuery} onChange={e => setAdminQuery(e.target.value)} placeholder="Title, company or location"/></label><label><span>Company</span><select value={adminCompany} onChange={e => setAdminCompany(e.target.value)}>{companies.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Specialization</span><select value={adminSpecialization} onChange={e => setAdminSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Opportunity type</span><select value={adminType} onChange={e => setAdminType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label><button type="button" className="reset-admin-filters" onClick={resetAdminFilters}>Reset filters</button></div>{adminFilteredJobs.length > 0 ? <div className="local-job-list">{adminFilteredJobs.map(job => { const editable = canEditOrDeleteJob(job, user?.email, role); return <div className="local-job" key={job.id}><span><b>{job.title}</b><small>{job.company} · {job.location} {job.createdBy && `(by ${job.createdBy})`}</small></span><div className="local-job-actions">{editable ? <><button className="edit-local" onClick={() => editCustomJob(job)}>Edit</button><button className="delete-local" onClick={() => removeCustomJob(job.id)}>Delete</button></> : <span className="text-xs text-slate-400 italic">Created by another account</span>}</div></div>; })}</div> : <div className="admin-jobs-empty"><strong>No vacancies match these filters.</strong><p>Try another search or clear the filters.</p><button type="button" onClick={resetAdminFilters}>Reset filters</button></div>}</section>}
       </section></div>}
 
       {chatOpen && <div className="chat-shell" role="dialog" aria-label="Grounded job assistant"><div className="chat-head"><div><span className="chat-icon" aria-hidden="true">✦</span><div><strong>Job Assistant <span className="ml-1 rounded bg-indigo-100 dark:bg-indigo-950 px-1.5 py-0.5 text-[9px] font-extrabold text-indigo-700 dark:text-indigo-300">⚡ SLM-Lite v1.0</span></strong><small><i></i> On-Device Small Language Model RAG</small></div></div><button onClick={() => setChatOpen(false)} aria-label="Close assistant">×</button></div><div className="chat-messages" ref={chatMessagesRef} aria-live="polite">{messages.map((message, index) => <div key={index} className={`message ${message.role}`}><RichText content={message.content} />{message.sources && message.sources.length > 0 && <div className="sources"><span>Sources</span>{message.sources.slice(0, 3).map(source => <button key={source.id} onClick={() => { setSelectedJob(source); setChatOpen(false); }}>{source.title} · {source.company}</button>)}</div>}</div>)}</div><form className="chat-form" onSubmit={askAssistant}><input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Ask about jobs, salaries, internships…" aria-label="Your question"/><button disabled={!chatInput.trim()} aria-label="Send question">↑</button></form><div className="chat-boundary">Powered by SLM-Lite v1.0 (On-Device RAG Transformer)</div></div>}
