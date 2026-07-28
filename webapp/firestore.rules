@@ -1,0 +1,121 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isQiuUser() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email.matches('^[^@]+@qiu[.]edu[.]my$');
+    }
+
+    function isSuperAdmin() {
+      return isQiuUser() && request.auth.token.email == 'ai@qiu.edu.my';
+    }
+
+    function isAdmin() {
+      return isQiuUser()
+        && (isSuperAdmin()
+          || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function validUser(data, uid) {
+      return data.keys().hasAll(['email', 'role', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'displayName', 'photoURL', 'role', 'createdAt', 'updatedAt'])
+        && data.email is string
+        && data.email.matches('^[^@]+@qiu[.]edu[.]my$')
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 2048))
+        && (!('createdAt' in data) || data.createdAt is timestamp)
+        && data.updatedAt is timestamp
+        && ((data.email == 'ai@qiu.edu.my' && data.role == 'superadmin'
+            && isSuperAdmin() && uid == request.auth.uid)
+          || (data.email != 'ai@qiu.edu.my' && data.role in ['user', 'admin']));
+    }
+
+    function validVacancy(data) {
+      return data.keys().hasAll([
+          'id', 'title', 'company', 'type', 'specialization', 'vacancies', 'location',
+          'salaryLabel', 'salary', 'payFrequency', 'minimumRequirement',
+          'detailsLink', 'email', 'companySummary', 'companySources', 'isCustom',
+          'locationMode', 'state', 'country', 'createdBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'title', 'company', 'type', 'specialization', 'vacancies', 'location',
+          'salaryLabel', 'salary', 'payFrequency', 'minimumRequirement',
+          'detailsLink', 'email', 'companySummary', 'companySources', 'isCustom',
+          'locationMode', 'state', 'country', 'mapX', 'mapY', 'createdBy',
+          'createdAt', 'updatedAt'
+        ])
+        && data.id is int && data.id > 0
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 160
+        && data.company is string && data.company.size() > 0 && data.company.size() <= 160
+        && data.type in ['Permanent', 'Internship', 'Contract', 'Part-time']
+        && data.specialization is string && data.specialization.size() > 0 && data.specialization.size() <= 160
+        && data.vacancies is int && data.vacancies >= 1 && data.vacancies <= 10000
+        && data.location is string && data.location.size() > 0 && data.location.size() <= 160
+        && data.salaryLabel is string && data.salaryLabel.size() <= 80
+        && data.salary is number && data.salary >= 0 && data.salary <= 1000000
+        && data.payFrequency in ['Monthly', 'Annually', 'Weekly', 'Daily']
+        && data.minimumRequirement in ['SPM', 'Certificate', 'Diploma', 'Degree', 'Post-graduate']
+        && data.detailsLink is string && data.detailsLink.size() <= 2048
+        && data.email is string && data.email.size() <= 254
+        && (data.email == '' || data.email.matches('^[^@ ]+@[^@ ]+[.][^@ ]+$'))
+        && data.companySummary is string && data.companySummary.size() <= 5000
+        && data.companySources is list && data.companySources.size() <= 20
+        && data.isCustom == true
+        && data.locationMode in ['malaysia', 'international']
+        && data.state is string && data.state.size() <= 80
+        && data.country is string && data.country.size() <= 80
+        && ((data.locationMode == 'malaysia' && data.state.size() > 0 && data.location == data.state)
+          || (data.locationMode == 'international' && data.country.size() > 0 && data.location == data.country))
+        && (!('mapX' in data) || (data.mapX is number && data.mapX >= 0 && data.mapX <= 1000))
+        && (!('mapY' in data) || (data.mapY is number && data.mapY >= 0 && data.mapY <= 500))
+        && data.createdBy is string && data.createdBy.size() > 0
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{uid} {
+      allow read: if isQiuUser() && (request.auth.uid == uid || isSuperAdmin());
+
+      allow create: if validUser(request.resource.data, uid)
+        && ((request.auth.uid == uid
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.role == (isSuperAdmin() ? 'superadmin' : 'user'))
+          || isSuperAdmin());
+
+      allow update: if validUser(request.resource.data, uid)
+        && ((request.auth.uid == uid
+            && request.resource.data.email == resource.data.email
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['displayName', 'photoURL', 'updatedAt']))
+          || isSuperAdmin());
+
+      allow delete: if isSuperAdmin() && resource.data.email != 'ai@qiu.edu.my';
+    }
+
+    match /vacancies/{vacancyId} {
+      allow read: if isQiuUser();
+      allow create: if isAdmin()
+        && validVacancy(request.resource.data)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isAdmin()
+        && validVacancy(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
