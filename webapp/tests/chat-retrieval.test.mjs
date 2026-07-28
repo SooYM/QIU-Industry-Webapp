@@ -40,3 +40,15 @@ test("handles conversational time and greeting intents gracefully without false 
   assert.match(greetingResult.answer, /Hello! I am your VacancyPortal AI Assistant/i);
   assert.deepEqual(greetingResult.sources, []);
 });
+
+test("matches culinary art queries to F&B/Culinary vacancies without false matching 'art' inside 'Smart'", () => {
+  const testJobs = [
+    { id: 10, title: "Culinary Intern", company: "Parkroyal Hotel", type: "Internship", specialization: "Hotel/Restaurant", vacancies: 1, location: "Kedah", salary: 400, salaryLabel: "MYR400", payFrequency: "Monthly", minimumRequirement: "Diploma", email: "", companySummary: "" },
+    { id: 11, title: "Kindergarten Teacher", company: "Smart Talent Junior", type: "Permanent", specialization: "Education", vacancies: 1, location: "Perak", salary: 2000, salaryLabel: "MYR2000", payFrequency: "Monthly", minimumRequirement: "Diploma", email: "", companySummary: "" },
+  ];
+
+  const result = answerFromJobs("i study culinary art", testJobs);
+  assert.equal(result.sources.length, 1);
+  assert.equal(result.sources[0].id, 10);
+  assert.doesNotMatch(result.answer, /Kindergarten Teacher/);
+});
