@@ -9,11 +9,15 @@ export function VacancyModal({
   job,
   isStudent,
   currentStudent,
+  applied = false,
+  onApply,
   onClose,
 }: {
   job: Job;
   isStudent: boolean;
   currentStudent: StudentProfile;
+  applied?: boolean;
+  onApply?: () => void;
   onClose: () => void;
 }) {
   const rec = isStudent ? evaluateJobForStudent(job, currentStudent) : null;
@@ -65,7 +69,19 @@ export function VacancyModal({
             </small>
           </section>
         </div>
-        <aside className="market-card"><span className="detail-label">MALAYSIA MARKET CONTEXT</span><strong>RM {benchmark.amount.toLocaleString()}</strong><p>{benchmark.label}, monthly, DOSM Salaries & Wages Survey 2024.</p>{job.type.toLowerCase().includes("intern") && <div className="benchmark-note">This workforce benchmark is not an internship allowance estimate.</div>}<a href={DOSM_SOURCE} target="_blank" rel="noreferrer">View official source ↗</a><hr/><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email employer →</a> : <p>No enquiry email supplied.</p>}</aside>
+        <aside className="market-card"><span className="detail-label">MALAYSIA MARKET CONTEXT</span><strong>RM {benchmark.amount.toLocaleString()}</strong><p>{benchmark.label}, monthly, DOSM Salaries & Wages Survey 2024.</p>{job.type.toLowerCase().includes("intern") && <div className="benchmark-note">This workforce benchmark is not an internship allowance estimate.</div>}<a href={DOSM_SOURCE} target="_blank" rel="noreferrer">View official source ↗</a><hr/><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email employer →</a> : <p>No enquiry email supplied.</p>}
+        {isStudent && (
+          <>
+            <hr/>
+            <span className="detail-label">APPLICATION</span>
+            {applied ? (
+              <p className="rounded-lg px-3 py-2 text-xs font-bold tone-success" role="status">✓ Applied — saved to your History.</p>
+            ) : (
+              <button type="button" className="enquire-main" onClick={onApply}>Apply to this vacancy →</button>
+            )}
+            <small className="text-accent">Applying records your interest and attaches your submitted resume if available.</small>
+          </>
+        )}</aside>
       </div>
     </Modal>
   );

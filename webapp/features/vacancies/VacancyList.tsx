@@ -38,6 +38,7 @@ export function VacancyList({
               key={job.id}
               job={job}
               rec={isStudent ? evaluateJobForStudent(job, currentStudent) : null}
+              showStatus={!isStudent}
               onGlow={onGlow}
               onOpen={onSelect}
             />

@@ -1,19 +1,22 @@
 import type { PointerEvent } from "react";
 import type { Job } from "../../lib/data/types";
 import type { JobRecommendationResult } from "../../app/recommendation";
-import { formatSalary } from "./vacancy-utils";
+import { formatSalary, jobStatusMeta } from "./vacancy-utils";
 
 export function VacancyCard({
   job,
   rec,
+  showStatus = false,
   onGlow,
   onOpen,
 }: {
   job: Job;
   rec: JobRecommendationResult | null;
+  showStatus?: boolean;
   onGlow: (event: PointerEvent<HTMLElement>) => void;
   onOpen: (job: Job) => void;
 }) {
+  const status = showStatus ? jobStatusMeta(job) : null;
   return (
     <article className="job-card" tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
       <div className="card-top">
@@ -28,6 +31,9 @@ export function VacancyCard({
             <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-danger">
               ⚠️ Low Grade
             </span>
+          )}
+          {status && (
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${status.tone}`}>{status.label}</span>
           )}
         </div>
         <span className="vacancies">{job.vacancies} {job.vacancies === 1 ? "place" : "places"}</span>

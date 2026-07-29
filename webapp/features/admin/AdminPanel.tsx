@@ -4,14 +4,17 @@ import type { Job } from "../../lib/data/types";
 import { RoleManager, useAuth } from "../../app/auth-context";
 import { canEditOrDeleteJob, canManageVacancies, DEFAULT_YOUTUBE_PLACEHOLDER, normalizeEmail } from "../../app/auth-policy";
 import { db } from "../../app/firebase-client";
-import { deleteJob, saveJob } from "../../lib/data/firestore";
+import { deleteJob, isApproved, saveJob, stageJobEdit } from "../../lib/data/firestore";
 import { positionTooltip } from "../../app/map-tooltip";
 import type { TooltipPosition } from "../../app/map-tooltip";
 import { Modal } from "../../components/Modal";
 import {
-  benchmarkFor, countryPath, emptyDraft, malaysiaStateAliases, malaysiaStates,
+  benchmarkFor, countryPath, emptyDraft, jobStatusMeta, malaysiaStateAliases, malaysiaStates,
   type AdminDraft, type CountryShape, type GeoFeature,
 } from "../vacancies/vacancy-utils";
+import { ApprovalQueue } from "./ApprovalQueue";
+import { ResumeViewer } from "./ResumeViewer";
+import { ChatHistory } from "./ChatHistory";
 
 const PREDEFINED_SPECS = [
   "IT - Software", "IT - Network/Sys/DB Admin", "IT - Hardware", "Accounting/Finance",
@@ -38,6 +41,8 @@ export function AdminPanel({
 }) {
   const { user, role } = useAuth();
   const canManageJobs = canManageVacancies(role);
+  const isApprover = role === "admin" || role === "superadmin";
+  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats">("manage");
   const [draft, setDraft] = useState<AdminDraft>(emptyDraft);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [adminMessage, setAdminMessage] = useState("");
@@ -87,6 +92,11 @@ export function AdminPanel({
     );
   }, [customJobs, adminQuery, adminCompany, adminSpecialization, adminType]);
 
+  const myCompanies = useMemo(() => {
+    const email = normalizeEmail(user?.email);
+    return Array.from(new Set(customJobs.filter((job) => normalizeEmail(job.createdBy) === email).map((job) => job.company).filter(Boolean)));
+  }, [customJobs, user]);
+
   const selectedMapCountry = countryShapes.find((country) => country.name.toLocaleLowerCase() === draft.country.trim().toLocaleLowerCase())?.name;
   const adminMessageIsError = adminMessage.startsWith("Complete") || adminMessage.includes("could not");
   const draftBenchmark = useMemo(() => {
@@ -133,12 +143,27 @@ export function AdminPanel({
       createdBy: existingJob?.createdBy ?? userEmail,
       isCustom: true,
     };
+    // Approval workflow: employers publish as pending; admins publish live.
+    // An employer editing an already-approved job stages the change instead of
+    // overwriting the live snapshot.
+    if (isEditing && existingJob && role === "employer" && isApproved(existingJob)) {
+      try {
+        await stageJobEdit(existingJob.id, newJob);
+        setDraft(emptyDraft);
+        setEditingId(null);
+        setAdminMessage("Edit submitted — awaiting admin approval.");
+      } catch { setAdminMessage("Vacancy could not be saved."); }
+      return;
+    }
+
+    newJob.status = isApprover ? "approved" : "pending";
     try {
       await saveJob(newJob, isEditing, userEmail);
       setDraft(emptyDraft);
       setEditingId(null);
-      if (isEditing) setAdminMessage("Vacancy updated.");
-      else { setAdminMessage(""); onCreated(); }
+      if (isEditing) setAdminMessage(isApprover ? "Vacancy updated." : "Vacancy updated — awaiting admin approval.");
+      else if (isApprover) { setAdminMessage(""); onCreated(); }
+      else setAdminMessage("Vacancy submitted — awaiting admin approval.");
     } catch { setAdminMessage("Vacancy could not be saved."); }
   }
 
@@ -235,9 +260,34 @@ export function AdminPanel({
 
   if (!open || !canManageJobs) return null;
 
+  const tabs: { key: typeof adminView; label: string }[] = [
+    { key: "manage", label: "Vacancies" },
+    ...(isApprover ? [{ key: "approvals" as const, label: "Approvals" }] : []),
+    { key: "resumes", label: "Resumes" },
+    { key: "chats", label: "Chats" },
+  ];
+  const viewTitle = adminView === "manage" ? (editingId ? "Edit vacancy" : "Add a vacancy")
+    : adminView === "approvals" ? "Approval queue"
+    : adminView === "resumes" ? "Student resumes"
+    : "Assistant chats";
+
   return (
     <Modal className="admin-panel" labelledBy="admin-title" closeLabel="Close admin tools" onClose={onClose}>
-      <span className="detail-label">ADMIN</span><h2 id="admin-title">{editingId ? "Edit vacancy" : "Add a vacancy"}</h2><p className="admin-intro">Changes are shared with signed-in VacancyPortal users.</p>
+      <span className="detail-label">ADMIN</span><h2 id="admin-title">{viewTitle}</h2><p className="admin-intro">Changes are shared with signed-in QIU Industry Day 2026 users.</p>
+
+      <div className="flex flex-wrap gap-1 border-b border-token my-3" role="tablist" aria-label="Admin sections">
+        {tabs.map((tab) => (
+          <button key={tab.key} type="button" role="tab" aria-selected={adminView === tab.key}
+            className={`px-3 py-2 text-xs font-bold rounded-t-md ${adminView === tab.key ? "tone-accent" : "text-accent"}`}
+            onClick={() => setAdminView(tab.key)}>{tab.label}</button>
+        ))}
+      </div>
+
+      {adminView === "approvals" && isApprover && <ApprovalQueue jobs={customJobs} />}
+      {adminView === "resumes" && <ResumeViewer />}
+      {adminView === "chats" && (isApprover ? <ChatHistory mode="all" /> : <ChatHistory mode="company" companies={myCompanies} />)}
+
+      {adminView === "manage" && <>
       {role === "superadmin" && <label className="import-vacancies">Initial data import<input type="file" accept="application/json,.json" onChange={importVacancies}/><small>Select private vacancy JSON. File stays local and only its records are uploaded to Firestore.</small></label>}
       {role === "superadmin" && <RoleManager />}
       <form onSubmit={saveVacancy} className="admin-form"><label>Job title<input required value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })}/></label><label>Company<input required value={draft.company} onChange={e => setDraft({ ...draft, company: e.target.value })}/></label><label>Type<select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })}><option>Permanent</option><option>Internship</option><option>Contract</option><option>Part-time</option></select></label><label>Specialization<select required value={draft.specialization} onChange={e => setDraft({ ...draft, specialization: e.target.value })}><option value="" disabled>Select specialization</option>{specializations.filter(item => item !== "All specializations").map(item => <option key={item} value={item}>{item}</option>)}<option value="Other">Other (Specify below)</option></select></label>
@@ -265,7 +315,8 @@ export function AdminPanel({
           </div>
         )}
         <label>Monthly salary (RM)<input type="number" min="0" step="1" placeholder="e.g. 1800" value={draft.salary} onChange={e => setDraft({ ...draft, salary: e.target.value })}/></label><label>Vacancies<input type="number" min="1" value={draft.vacancies} onChange={e => setDraft({ ...draft, vacancies: Number(e.target.value) })}/></label><label>Minimum requirement<select value={draft.minimumRequirement} onChange={e => setDraft({ ...draft, minimumRequirement: e.target.value })}><option>SPM</option><option>Certificate</option><option>Diploma</option><option>Degree</option><option>Post-graduate</option></select></label><label><span className="field-label">Enquiry email <small>Optional</small></span><input type="email" value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })}/></label><label className="full"><span className="field-label">Corporate YouTube Video URL <small>Optional placeholder</small></span><input type="url" value={draft.youtubeUrl ?? ""} placeholder="e.g. https://www.youtube.com/watch?v=5qap5aO4i9A" onChange={e => setDraft({ ...draft, youtubeUrl: e.target.value })}/></label><div className="admin-form-footer full">{adminMessage && <p className={`admin-message ${adminMessageIsError ? "error" : ""}`} role="status" aria-live="polite">{adminMessage}</p>}<div className="admin-submit">{editingId && <button type="button" className="cancel-edit" onClick={() => { setEditingId(null); setDraft(emptyDraft); setAdminMessage(""); }}>Cancel edit</button>}<button className="save-job" type="submit">{editingId ? "Save changes" : "Add vacancy"}</button></div></div></form>
-      {customJobs.length > 0 && <section className="local-jobs" aria-labelledby="admin-vacancies-title"><div className="local-jobs-head"><div><span className="detail-label">VACANCIES</span><h3 id="admin-vacancies-title">Manage vacancies</h3></div><strong aria-live="polite">{adminFilteredJobs.length} of {customJobs.length}</strong></div><div className="admin-job-filters"><label className="admin-job-search"><span>Search vacancies</span><input type="search" value={adminQuery} onChange={e => setAdminQuery(e.target.value)} placeholder="Title, company or location"/></label><label><span>Company</span><select value={adminCompany} onChange={e => setAdminCompany(e.target.value)}>{companies.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Specialization</span><select value={adminSpecialization} onChange={e => setAdminSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Opportunity type</span><select value={adminType} onChange={e => setAdminType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label><button type="button" className="reset-admin-filters" onClick={resetAdminFilters}>Reset filters</button></div>{adminFilteredJobs.length > 0 ? <div className="local-job-list">{adminFilteredJobs.map(job => { const editable = canEditOrDeleteJob(job, user?.email, role); return <div className="local-job" key={job.id}><span><b>{job.title}</b><small>{job.company} · {job.location} {job.createdBy && `(by ${job.createdBy})`}</small></span><div className="local-job-actions">{editable ? <><button className="edit-local" onClick={() => editCustomJob(job)}>Edit</button><button className="delete-local" onClick={() => removeCustomJob(job.id)}>Delete</button></> : <span className="text-xs text-accent italic">Created by another account</span>}</div></div>; })}</div> : <div className="admin-jobs-empty"><strong>No vacancies match these filters.</strong><p>Try another search or clear the filters.</p><button type="button" onClick={resetAdminFilters}>Reset filters</button></div>}</section>}
+      {customJobs.length > 0 && <section className="local-jobs" aria-labelledby="admin-vacancies-title"><div className="local-jobs-head"><div><span className="detail-label">VACANCIES</span><h3 id="admin-vacancies-title">Manage vacancies</h3></div><strong aria-live="polite">{adminFilteredJobs.length} of {customJobs.length}</strong></div><div className="admin-job-filters"><label className="admin-job-search"><span>Search vacancies</span><input type="search" value={adminQuery} onChange={e => setAdminQuery(e.target.value)} placeholder="Title, company or location"/></label><label><span>Company</span><select value={adminCompany} onChange={e => setAdminCompany(e.target.value)}>{companies.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Specialization</span><select value={adminSpecialization} onChange={e => setAdminSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Opportunity type</span><select value={adminType} onChange={e => setAdminType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label><button type="button" className="reset-admin-filters" onClick={resetAdminFilters}>Reset filters</button></div>{adminFilteredJobs.length > 0 ? <div className="local-job-list">{adminFilteredJobs.map(job => { const editable = canEditOrDeleteJob(job, user?.email, role); const meta = jobStatusMeta(job); return <div className="local-job" key={job.id}><span><b>{job.title} <span className={`ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}>{meta.label}</span></b><small>{job.company} · {job.location} {job.createdBy && `(by ${job.createdBy})`}</small></span><div className="local-job-actions">{editable ? <><button className="edit-local" onClick={() => editCustomJob(job)}>Edit</button><button className="delete-local" onClick={() => removeCustomJob(job.id)}>Delete</button></> : <span className="text-xs text-accent italic">Created by another account</span>}</div></div>; })}</div> : <div className="admin-jobs-empty"><strong>No vacancies match these filters.</strong><p>Try another search or clear the filters.</p><button type="button" onClick={resetAdminFilters}>Reset filters</button></div>}</section>}
+      </>}
     </Modal>
   );
 }

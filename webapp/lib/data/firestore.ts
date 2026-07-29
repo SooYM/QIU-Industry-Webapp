@@ -104,6 +104,12 @@ export function subscribeResumes(onData: (rows: Resume[]) => void) {
     (snap) => onData(snap.docs.map((d) => d.data() as Resume)));
 }
 
+/** Student view: watch only their own resume doc (id === uid). */
+export function subscribeMyResume(uid: string, onData: (resume: Resume | null) => void) {
+  return onSnapshot(doc(requireDb(), COLLECTIONS.resumes, uid),
+    (snap) => onData(snap.exists() ? (snap.data() as Resume) : null));
+}
+
 // ---- Chat logs -------------------------------------------------------------
 
 export async function logChat(entry: ChatLog) {

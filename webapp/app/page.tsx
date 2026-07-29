@@ -4,8 +4,12 @@ import { PointerEvent, useEffect, useMemo, useState } from "react";
 import { AuthAccount, useAuth } from "./auth-context";
 import { canManageVacancies } from "./auth-policy";
 import { db } from "./firebase-client";
-import { subscribeVacancies } from "../lib/data/firestore";
-import type { Job } from "../lib/data/types";
+import {
+  isApproved, recordApplication, recordView,
+  subscribeApplications, subscribeMyResume, subscribeVacancies, subscribeViews,
+} from "../lib/data/firestore";
+import type { Application, Job, Resume, ViewEvent } from "../lib/data/types";
+import { courseToSpecializationPattern, resolveCourse } from "../lib/data/course-map";
 import { StudentProfile, sampleStudentProfiles } from "./student-data";
 import { evaluateJobForStudent } from "./recommendation";
 import { CvGeneratorModal } from "./cv-generator";
@@ -15,11 +19,17 @@ import { VacancyList } from "../features/vacancies/VacancyList";
 import { VacancyModal } from "../features/vacancies/VacancyModal";
 import { AdminPanel } from "../features/admin/AdminPanel";
 import { ChatAssistant } from "../features/chat/ChatAssistant";
+import { StudentHistory } from "../features/student/StudentHistory";
+import { StudentResume } from "../features/student/StudentResume";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
 
 export default function Home() {
-  const { user, role } = useAuth();
+  const { user, role, course } = useAuth();
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
+  const [studentTab, setStudentTab] = useState<"vacancies" | "history" | "resume">("vacancies");
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
+  const [myViews, setMyViews] = useState<ViewEvent[]>([]);
+  const [myResume, setMyResume] = useState<Resume | null>(null);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [company, setCompany] = useState("All companies");
@@ -63,6 +73,15 @@ export default function Home() {
     });
   }, [user]);
 
+  // Student history + resume streams (their own records only).
+  useEffect(() => {
+    if (!user || !db || canManageVacancies(role)) return;
+    const unsubApps = subscribeApplications(setMyApplications, user.uid);
+    const unsubViews = subscribeViews(setMyViews, user.uid);
+    const unsubResume = subscribeMyResume(user.uid, setMyResume);
+    return () => { unsubApps(); unsubViews(); unsubResume(); };
+  }, [user, role]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -77,6 +96,15 @@ export default function Home() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, []);
+
+  // Log a view whenever a student opens a job detail (card, history, or chat source).
+  useEffect(() => {
+    if (!selectedJob || !user || canManageVacancies(role)) return;
+    recordView({
+      id: `${user.uid}_${selectedJob.id}`, studentUid: user.uid,
+      jobId: selectedJob.id, jobTitle: selectedJob.title, company: selectedJob.company,
+    }).catch(() => { /* View logging is best-effort. */ });
+  }, [selectedJob, user, role]);
 
   const isAnyModalOpen = Boolean(selectedJob || adminOpen || studentModalOpen || cvModalOpen);
 
@@ -99,48 +127,47 @@ export default function Home() {
     };
   }, [isAnyModalOpen]);
 
-  const jobs = customJobs;
   const canManageJobs = canManageVacancies(role);
   const isStudent = !canManageJobs;
+  // Students browse only approved vacancies; managers see every record.
+  const jobs = useMemo(() => (isStudent ? customJobs.filter(isApproved) : customJobs), [customJobs, isStudent]);
+  const appliedJobIds = useMemo(() => new Set(myApplications.map((a) => a.jobId)), [myApplications]);
+  const programme = useMemo(() => (course ? resolveCourse(course) : null), [course]);
   const companies = useMemo(() => ["All companies", ...Array.from(new Set(jobs.map((job) => job.company))).filter(Boolean).sort()], [jobs]);
   const specializations = useMemo(() => ["All specializations", ...Array.from(new Set(jobs.map((job) => job.specialization))).filter(Boolean).sort()], [jobs]);
   const types = useMemo(() => ["All opportunities", ...Array.from(new Set(jobs.map((job) => job.type))).filter(Boolean).sort()], [jobs]);
 
   useEffect(() => {
-    if (!isStudent || !currentStudent || specializations.length <= 1) return;
-    const haystack = `${currentStudent.major} ${currentStudent.faculty}`.toLowerCase();
+    if (!isStudent || specializations.length <= 1) return;
 
+    // Prefer the student's real Workspace programme; fall back to the sample
+    // profile's faculty/major when the directory course is unavailable.
     let targetPattern: RegExp | null = null;
-    if (/computer science|information technology|artificial intelligence|cybersecurity|software|computing/i.test(haystack)) {
-      targetPattern = /^IT\b|IT\s*-|Software/i;
-    } else if (/accountancy|accounting|finance|acca/i.test(haystack)) {
-      targetPattern = /accounting|finance/i;
-    } else if (/business|administration/i.test(haystack)) {
-      targetPattern = /marketing\/business|business/i;
-    } else if (/hospitality|hotel|culinary/i.test(haystack)) {
-      targetPattern = /hotel|tourism|food/i;
-    } else if (/communication|advertising|journalism|media/i.test(haystack)) {
-      targetPattern = /digital marketing|advertising|creative|journalist/i;
-    } else if (/mechatronics|engineering|electronics/i.test(haystack)) {
-      targetPattern = /manufacturing|engineering/i;
-    } else if (/food science|biotechnology|environmental|life sciences|pharmacy|biomedical/i.test(haystack)) {
-      targetPattern = /food tech|nutritionist|manufacturing/i;
-    } else if (/education|tesl|special needs|early childhood/i.test(haystack)) {
-      targetPattern = /education/i;
-    } else if (/psychology/i.test(haystack)) {
-      targetPattern = /human resources|education/i;
+    if (course) {
+      targetPattern = courseToSpecializationPattern(course);
+    } else if (currentStudent) {
+      const haystack = `${currentStudent.major} ${currentStudent.faculty}`.toLowerCase();
+      if (/computer science|information technology|artificial intelligence|cybersecurity|software|computing/i.test(haystack)) targetPattern = /^IT\b|IT\s*-|Software/i;
+      else if (/accountancy|accounting|finance|acca/i.test(haystack)) targetPattern = /accounting|finance/i;
+      else if (/business|administration/i.test(haystack)) targetPattern = /marketing\/business|business/i;
+      else if (/hospitality|hotel|culinary/i.test(haystack)) targetPattern = /hotel|tourism|food/i;
+      else if (/communication|advertising|journalism|media/i.test(haystack)) targetPattern = /digital marketing|advertising|creative|journalist/i;
+      else if (/mechatronics|engineering|electronics/i.test(haystack)) targetPattern = /manufacturing|engineering/i;
+      else if (/food science|biotechnology|environmental|life sciences|pharmacy|biomedical/i.test(haystack)) targetPattern = /food tech|nutritionist|manufacturing/i;
+      else if (/education|tesl|special needs|early childhood/i.test(haystack)) targetPattern = /education/i;
+      else if (/psychology/i.test(haystack)) targetPattern = /human resources|education/i;
     }
 
     if (targetPattern) {
       const matchedSpec = specializations.find((s) => targetPattern!.test(s));
       if (matchedSpec) {
-        // Derive the default specialization from the active student profile once loaded.
+        // Derive the default specialization from the resolved programme once loaded.
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setSpecialization(matchedSpec);
         setPage(1);
       }
     }
-  }, [isStudent, currentStudent, specializations]);
+  }, [isStudent, course, currentStudent, specializations]);
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
@@ -173,6 +200,16 @@ export default function Home() {
   const visibleJobs = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
   const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setPage(1); };
 
+  function applyToJob(job: Job) {
+    if (!user) return;
+    recordApplication({
+      id: `${user.uid}_${job.id}`, studentUid: user.uid,
+      studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Student",
+      jobId: job.id, jobTitle: job.title, company: job.company,
+      resumeId: myResume ? user.uid : undefined,
+    }).catch(() => { /* Application logging is best-effort. */ });
+  }
+
   function glow(event: PointerEvent<HTMLElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--mouse-x", `${event.clientX - rect.left}px`);
@@ -198,6 +235,17 @@ export default function Home() {
         </div>
       </header>
 
+      {isStudent && (
+        <nav className="utility-bar" aria-label="Student sections" style={{ minHeight: "auto", gap: ".5rem" }}>
+          {([["vacancies", "Vacancies"], ["history", "History"], ["resume", "My Resume"]] as const).map(([key, label]) => (
+            <button key={key} type="button" aria-current={studentTab === key ? "page" : undefined}
+              className={`px-3.5 py-2 text-sm font-bold rounded-lg ${studentTab === key ? "tone-accent" : "text-accent"}`}
+              onClick={() => setStudentTab(key)}>{label}</button>
+          ))}
+        </nav>
+      )}
+
+      {(!isStudent || studentTab === "vacancies") && <>
       <section className="utility-bar" aria-label="Vacancy display settings">
         <div><strong>Browse vacancies</strong><span>{jobsLoading ? "Loading records…" : `${jobs.length} records available`}</span></div>
         <button className="mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls="vacancy-filters" onClick={() => setMobileFiltersOpen((open) => !open)}>{mobileFiltersOpen ? "Hide filters" : "Filter results"}</button>
@@ -210,6 +258,7 @@ export default function Home() {
         <VacancyFilters
           isStudent={isStudent}
           currentStudent={currentStudent}
+          programmeLabel={programme ? `${programme.name}${programme.level ? ` · ${programme.level}` : ""}` : undefined}
           recommendationMode={recommendationMode}
           onRecommendationMode={(mode) => { setRecommendationMode(mode); setPage(1); }}
           query={query}
@@ -248,6 +297,19 @@ export default function Home() {
           />
         </section>
       </section>
+      </>}
+
+      {isStudent && studentTab === "history" && (
+        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
+          <StudentHistory jobs={jobs} applications={myApplications} views={myViews} onOpen={setSelectedJob} />
+        </section>
+      )}
+
+      {isStudent && studentTab === "resume" && user && (
+        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
+          <StudentResume user={user} course={course} myResume={myResume} onOpenCvGenerator={() => setCvModalOpen(true)} />
+        </section>
+      )}
 
       <footer><a className="brand" href="#top"><span className="brand-mark">QIU</span><span>Industry <span>Day 2026</span></span></a><p>QIU Industry Day 2026. Verify vacancy details directly with the employer.</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
 
@@ -256,6 +318,8 @@ export default function Home() {
           job={selectedJob}
           isStudent={isStudent}
           currentStudent={currentStudent}
+          applied={appliedJobIds.has(selectedJob.id)}
+          onApply={() => applyToJob(selectedJob)}
           onClose={() => setSelectedJob(null)}
         />
       )}

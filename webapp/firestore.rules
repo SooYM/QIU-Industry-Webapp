@@ -3,7 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAuthenticated() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      // Google sign-in only. The app configures Firebase Auth to offer just the
+      // Google provider, but we defend in depth here too: a token minted via any
+      // other provider (e.g. email/password) is rejected even if email_verified.
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
     function isQiuUser() {
@@ -136,7 +141,12 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isAllowedUser() && (request.auth.uid == uid || isSuperAdmin());
       allow create: if isAuthenticated() && validUser(request.resource.data, uid);
-      allow update: if isAllowedUser() && validUser(request.resource.data, uid);
+      // A non-superadmin may edit their own profile (displayName/photoURL/course/
+      // updatedAt via merge) but may NOT change their own role. Only the superadmin
+      // (and the RoleManager, which runs as superadmin) can reassign roles.
+      allow update: if isAllowedUser()
+        && validUser(request.resource.data, uid)
+        && (isSuperAdmin() || request.resource.data.role == resource.data.role);
       allow delete: if isSuperAdmin() && resource.data.email != 'ai@qiu.edu.my';
     }
 
@@ -147,26 +157,38 @@ service cloud.firestore {
 
     match /vacancies/{vacancyId} {
       allow read: if isAllowedUser();
-      allow create: if canManageJobs()
+      // NOTE: the vacancy rules check isAllowedUser() ONCE and then compare roles
+      // inline (isSuperAdmin/getUserRole) instead of routing through
+      // isAdmin()/isEmployer()/canManageJobs(). Those wrappers re-expand the heavy
+      // isAllowedUser() (regex + exists) on every call, and the create/update rules
+      // reference role twice — the repeated expansion blew past Firestore's 1000
+      // expression-evaluation limit. Inlining keeps each rule well under it.
+      allow create: if isAllowedUser()
         && validVacancy(request.resource.data)
         && (request.resource.data.createdBy == request.auth.uid || request.resource.data.createdBy == request.auth.token.email.lower())
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
-        // Employer listings are gated: they may only self-submit as 'pending'.
-        // Admins/superadmin publish immediately ('approved') or queue ('pending').
-        && (isAdmin()
-          || (request.resource.data.status is string && request.resource.data.status == 'pending'));
-      allow update: if canManageJobs()
+        // Managers only. Employer listings are gated: they may only self-submit as
+        // 'pending'. Admins/superadmin publish immediately ('approved') or queue.
+        && (isSuperAdmin() || getUserRole() == 'admin'
+          || (getUserRole() == 'employer' && request.resource.data.status == 'pending'));
+      allow update: if isAllowedUser()
         && validVacancy(request.resource.data)
-        && (isAdmin() || resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower())
+        // Ownership never transfers and creation time is fixed — immutable for
+        // everyone, including admins. Reassigning createdBy would orphan an
+        // employer from their own job.
+        && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.updatedAt == request.time
-        // Only admins may approve. An employer editing their own approved job can
-        // stage a 'pending_edit' but can never set 'approved' themselves.
-        && (isAdmin()
-          || !('status' in request.resource.data)
-          || request.resource.data.status != 'approved');
-      allow delete: if isAdmin() || (isEmployer() && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower()));
+        // Admins/superadmin: any update incl. approve/reject. Employers: only their
+        // own job, and may never set 'approved' (they stage 'pending_edit' instead).
+        && (isSuperAdmin() || getUserRole() == 'admin'
+          || (getUserRole() == 'employer'
+            && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower())
+            && (!('status' in request.resource.data) || request.resource.data.status != 'approved')));
+      allow delete: if isAllowedUser()
+        && (isSuperAdmin() || getUserRole() == 'admin'
+          || (getUserRole() == 'employer' && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower())));
     }
 
     // A student's application history. Owner writes their own; employers/admins

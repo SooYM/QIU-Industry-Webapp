@@ -1,5 +1,5 @@
 /**
- * Small Language Model (SLM) AI Engine — VacancyPortal SLM-Lite v1.0
+ * Small Language Model (SLM) AI Engine — QIU Industry Day SLM-Lite v1.0
  * 
  * Implements an on-device Small Language Model pipeline with:
  * 1. Intent Extraction & Entity Recognition (NLP / SLM Tokenizer)
@@ -97,7 +97,7 @@ export function generateSlmResponse(prompt: string, jobs: JobRecord[]): { answer
   // Out of Domain Query Rejection
   if (parsedIntent.intent === "OUT_OF_DOMAIN") {
     return {
-      answer: "⚠️ **Query Rejected: Out of Domain**\n\nI am specialized solely as the **VacancyPortal Job & Career Assistant**. I cannot assist with general off-topic questions (e.g., recipes, sports, general trivia, math, or entertainment).\n\nPlease ask me about:\n• **Job Opportunities** (e.g., *Software Engineer, Marketing Intern, Accountant*)\n• **Salary Analysis** (e.g., *Highest paying jobs, RM3000 monthly*)\n• **Academic Matching** (e.g., *I study Computer Science, Culinary Arts, Finance*)\n• **Locations** (e.g., *Vacancies in Selangor, Penang, Kuala Lumpur*)",
+      answer: "⚠️ **Query Rejected: Out of Domain**\n\nI am specialized solely as the **QIU Industry Day Job & Career Assistant**. I cannot assist with general off-topic questions (e.g., recipes, sports, general trivia, math, or entertainment).\n\nPlease ask me about:\n• **Job Opportunities** (e.g., *Software Engineer, Marketing Intern, Accountant*)\n• **Salary Analysis** (e.g., *Highest paying jobs, RM3000 monthly*)\n• **Academic Matching** (e.g., *I study Computer Science, Culinary Arts, Finance*)\n• **Locations** (e.g., *Vacancies in Selangor, Penang, Kuala Lumpur*)",
       sources: [],
       modelInfo: SLM_MODEL_INFO,
     };
@@ -117,7 +117,7 @@ export function generateSlmResponse(prompt: string, jobs: JobRecord[]): { answer
 
   if (parsedIntent.intent === "GREETING") {
     return {
-      answer: `Hello! I am your VacancyPortal AI Assistant, powered by an on-device **Small Language Model (${SLM_MODEL_INFO.name} ${SLM_MODEL_INFO.version})**.\n\nHere is how I can assist you:\n• **Find Opportunities**: Search by title, specialization, state, or company.\n• **Salary Analysis**: Identify highest-paying roles or internship allowances.\n• **Academic Match**: Recommend jobs tailored to your university field of study & grades.\n\nWhat role or industry would you like to explore?`,
+      answer: `Hello! I am your QIU Industry Day AI Assistant, powered by an on-device **Small Language Model (${SLM_MODEL_INFO.name} ${SLM_MODEL_INFO.version})**.\n\nHere is how I can assist you:\n• **Find Opportunities**: Search by title, specialization, state, or company.\n• **Salary Analysis**: Identify highest-paying roles or internship allowances.\n• **Academic Match**: Recommend jobs tailored to your university field of study & grades.\n\nWhat role or industry would you like to explore?`,
       sources: [],
       modelInfo: SLM_MODEL_INFO,
     };

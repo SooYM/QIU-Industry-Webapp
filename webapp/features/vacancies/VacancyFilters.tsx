@@ -5,6 +5,7 @@ type RecommendationMode = "all" | "recommended" | "excluded";
 export function VacancyFilters({
   isStudent,
   currentStudent,
+  programmeLabel,
   recommendationMode,
   onRecommendationMode,
   query,
@@ -27,6 +28,7 @@ export function VacancyFilters({
 }: {
   isStudent: boolean;
   currentStudent: StudentProfile;
+  programmeLabel?: string;
   recommendationMode: RecommendationMode;
   onRecommendationMode: (mode: RecommendationMode) => void;
   query: string;
@@ -60,6 +62,7 @@ export function VacancyFilters({
             </div>
             <div className="mt-1 text-xs font-bold">{currentStudent.fullName}</div>
             <div className="text-[11px] font-medium text-accent">{currentStudent.major} • CGPA {currentStudent.cgpa.toFixed(2)}</div>
+            {programmeLabel && <div className="mt-1 text-[11px] font-bold text-success">🎓 {programmeLabel}</div>}
           </div>
 
           <label className="field">

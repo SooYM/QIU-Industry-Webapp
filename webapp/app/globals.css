@@ -91,7 +91,7 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 @media (hover:none) { .job-card:before,.job-card:after { display:none; } }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; }.job-card,.intern-shortcut,.icon-button,.admin-button,.assistant-button { transition:none; } }
 
-/* Auth inherits VacancyPortal surfaces and typography. */
+/* Auth inherits QIU Industry Day surfaces and typography. */
 .auth-screen { min-height:100dvh; display:grid; place-items:center; padding:1.5rem; background:var(--bg); }
 .auth-card { width:min(29rem,100%); background:var(--surface); border:1px solid var(--line); border-radius:1rem; padding:clamp(1.5rem,5vw,2.5rem); box-shadow:var(--shadow); }
 .auth-brand { display:inline-flex; margin-bottom:clamp(3rem,10vh,5.5rem); }

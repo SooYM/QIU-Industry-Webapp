@@ -19,6 +19,16 @@ export type AdminDraft = Pick<Job, "title" | "company" | "type" | "specializatio
   mapY?: number;
 };
 
+/** Badge label + token tone class for a vacancy's approval status (managers only). */
+export function jobStatusMeta(job: Job): { label: string; tone: string } {
+  switch (job.status) {
+    case "pending": return { label: "Pending", tone: "tone-neutral" };
+    case "pending_edit": return { label: "Pending edit", tone: "tone-accent" };
+    case "rejected": return { label: "Rejected", tone: "tone-danger" };
+    default: return { label: "Approved", tone: "tone-success" }; // legacy/absent = approved
+  }
+}
+
 export const DOSM_SOURCE = "https://www.dosm.gov.my/portal-main/release-content/salaries-and-wages-survey-report-2024";
 export const PREFS_KEY = "vacancyportal-view-prefs";
 export const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", customSpecialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "", youtubeUrl: DEFAULT_YOUTUBE_PLACEHOLDER };

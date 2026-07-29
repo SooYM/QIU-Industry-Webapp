@@ -155,7 +155,15 @@ test("users can bootstrap a user profile but cannot elevate their own role", asy
   const profileRef = doc(user.firestore(), "users", "user-1");
 
   await assertSucceeds(setDoc(profileRef, profile("user@qiu.edu.my", "user")));
+  // Self-elevation to admin/employer is rejected.
   await assertFails(updateDoc(profileRef, { role: "admin", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(profileRef, { role: "employer", updatedAt: serverTimestamp() }));
+  // Normal sign-in merge (displayName/photoURL/updatedAt, role unchanged) still succeeds.
+  await assertSucceeds(updateDoc(profileRef, {
+    displayName: "Updated Name",
+    photoURL: "https://example.com/a.png",
+    updatedAt: serverTimestamp(),
+  }));
   assert.equal((await getDoc(profileRef)).data().role, "user");
 });
 

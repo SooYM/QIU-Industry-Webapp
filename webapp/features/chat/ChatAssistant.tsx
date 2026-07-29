@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import type { Job } from "../../lib/data/types";
 import { answerFromJobs } from "../../app/chat";
+import { useAuth } from "../../app/auth-context";
+import { logChat } from "../../lib/data/firestore";
 import { RichText } from "../../app/RichText";
 import type { ChatMessage } from "../vacancies/vacancy-utils";
 
@@ -15,6 +17,7 @@ export function ChatAssistant({
   onClose: () => void;
   onSelectSource: (job: Job) => void;
 }) {
+  const { user } = useAuth();
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Ask me to compare jobs, find internships, or explain a listed company profile. I only use the supplied vacancy records." },
@@ -37,6 +40,20 @@ export function ChatAssistant({
     setMessages((current) => [...current, { role: "user", content: question }]);
     const result = answerFromJobs(question, jobs);
     setMessages((current) => [...current, { role: "assistant", content: result.answer, sources: result.sources as Job[] }]);
+    // Persist the turn for the admin/employer chat viewers. Company is derived from
+    // the top retrieved source job so employers can scope to their own listings.
+    if (user) {
+      const company = (result.sources as Job[])?.[0]?.company ?? null;
+      logChat({
+        id: `${user.uid}_${Date.now()}`,
+        studentUid: user.uid,
+        studentEmail: user.email ?? "",
+        studentName: user.displayName || user.email || "Anonymous",
+        company,
+        question,
+        answer: result.answer,
+      }).catch(() => { /* Logging is best-effort; never block the chat. */ });
+    }
   }
 
   if (!open) return null;
