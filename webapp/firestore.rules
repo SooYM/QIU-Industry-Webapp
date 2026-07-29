@@ -45,10 +45,6 @@ service cloud.firestore {
       return isAllowedUser() && getUserRole() == 'employer';
     }
 
-    function canManageJobs() {
-      return isAdmin() || isEmployer();
-    }
-
     function validUser(data, uid) {
       return data.keys().hasAll(['email', 'role', 'updatedAt'])
         && data.keys().hasOnly(['email', 'displayName', 'photoURL', 'role', 'course', 'courseCode', 'createdAt', 'updatedAt'])
