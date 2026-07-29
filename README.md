@@ -5,7 +5,7 @@ VacancyPortal is a **proof-of-concept (POC)** vacancy discovery portal built for
 > [!IMPORTANT]
 > **Privacy & Security Boundary:** Private source files (CSV, XLSX, XLS, TSV) and generated vacancy files (`data/jobs.json`) are strictly excluded from version control and static website export bundles. Shared vacancy and application records are securely managed in Cloud Firestore and protected by server-enforced Firestore Security Rules (`firestore.rules`).
 
-![VacancyPortal social preview](public/og.png)
+![VacancyPortal social preview](webapp/public/og.png)
 
 ## Core Features
 
@@ -180,25 +180,27 @@ git ls-files -- data/jobs.json '*.csv' '*.xlsx' '*.xls' '*.tsv' '.env' '.env.loc
 
 ```text
 VacancyPortal/
-├── app/
-│   ├── auth-context.tsx         # Auth state, Google sign-in gate, role manager
-│   ├── auth-policy.ts           # Email whitelist & role verification helpers
-│   ├── chat.ts                  # Grounded assistant retrieval logic
-│   ├── firebase-client.ts       # Firebase SDK setup (Auth, Firestore, Storage)
-│   ├── globals.css              # Tailwind v4 styling & dark mode system
-│   ├── layout.tsx               # Root layout & providers
-│   └── page.tsx                 # Portal dashboard, vacancy listing & modals
-├── components/                  # UI components (Modals, Dashboards, Assistant)
-├── docs/                        # Project & software documentation
-├── public/                      # Static assets & QIU branding logos
-├── scripts/                     # Data processing scripts (generate_data.py)
-├── tests/                       # Unit, regression, and Firestore rules tests
-├── firebase.json                # Firebase Hosting and emulator configuration
-├── firestore.indexes.json       # Composite index definitions
-├── firestore.rules              # Security rules for Firestore collections
-├── storage.rules                # Security rules for Firebase Storage
-├── next.config.ts               # Next.js config (output: 'export')
-└── package.json                 # Dependencies & scripts
+├── webapp/
+│   ├── app/
+│   │   ├── auth-context.tsx         # Auth state, Google sign-in gate, role manager
+│   │   ├── auth-policy.ts           # Email whitelist & role verification helpers
+│   │   ├── chat.ts                  # Grounded assistant retrieval logic
+│   │   ├── firebase-client.ts       # Firebase SDK setup (Auth, Firestore, Storage)
+│   │   ├── globals.css              # Tailwind v4 styling & dark mode system
+│   │   ├── layout.tsx               # Root layout & providers
+│   │   └── page.tsx                 # Portal dashboard, vacancy listing & modals
+│   ├── components/                  # UI components (Modals, Dashboards, Assistant)
+│   ├── docs/                        # Project & software documentation
+│   ├── public/                      # Static assets & QIU branding logos
+│   ├── scripts/                     # Data processing scripts (generate_data.py)
+│   ├── tests/                       # Unit, regression, and Firestore rules tests
+│   ├── firebase.json                # Firebase Hosting and emulator configuration
+│   ├── firestore.indexes.json       # Composite index definitions
+│   ├── firestore.rules              # Security rules for Firestore collections
+│   ├── storage.rules                # Security rules for Firebase Storage
+│   ├── next.config.ts               # Next.js config (output: 'export')
+│   └── package.json                 # Dependencies & scripts
+└── README.md                        # Repository homepage documentation
 ```
 
 ---
