@@ -21,7 +21,7 @@ test("vacancies load and mutate through shared Firestore", () => {
 });
 
 test("only privileged roles see vacancy management and superadmin imports private JSON", () => {
-  assert.match(page, /role === "admin" \|\| role === "superadmin"/);
+  assert.match(page, /canManageVacancies\(role\)|role === "admin" \|\| role === "superadmin"/);
   assert.match(page, /role === "superadmin".*Initial data import/);
   assert.match(page, /writeBatch\(activeDb\)/);
 });
