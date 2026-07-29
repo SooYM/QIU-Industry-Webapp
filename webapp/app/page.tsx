@@ -1,14 +1,15 @@
 "use client";
 
-import { PointerEvent, useEffect, useMemo, useState } from "react";
+import { PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AuthAccount, useAuth } from "./auth-context";
 import { canManageVacancies } from "./auth-policy";
 import { db } from "./firebase-client";
 import {
-  isApproved, recordApplication, recordView,
-  subscribeApplications, subscribeMyResume, subscribeVacancies, subscribeViews,
+  checkInAttendance, checkOutAttendance, getMyAttendance, isApproved,
+  recordApplication, recordView, subscribeApplications, subscribeAttendance,
+  subscribeEvents, subscribeMyResume, subscribeVacancies, subscribeViews,
 } from "../lib/data/firestore";
-import type { Application, Job, Resume, ViewEvent } from "../lib/data/types";
+import type { Application, Attendance, EventItem, Job, Resume, ViewEvent } from "../lib/data/types";
 import { jobMatchesCourse, resolveCourse } from "../lib/data/course-map";
 import { VacancyFilters } from "../features/vacancies/VacancyFilters";
 import { VacancyList } from "../features/vacancies/VacancyList";
@@ -16,6 +17,7 @@ import { VacancyModal } from "../features/vacancies/VacancyModal";
 import { AdminPanel } from "../features/admin/AdminPanel";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
+import { EventsView } from "../features/events/EventsView";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
 
 export default function Home() {
@@ -40,6 +42,11 @@ export default function Home() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
+  const [mainView, setMainView] = useState<"vacancies" | "events">("vacancies");
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [myAttendance, setMyAttendance] = useState<Attendance[]>([]);
+  const [scanMsg, setScanMsg] = useState("");
+  const scanHandled = useRef(false);
 
   useEffect(() => {
     try {
@@ -72,6 +79,44 @@ export default function Home() {
     const unsubResume = subscribeMyResume(user.uid, setMyResume);
     return () => { unsubApps(); unsubViews(); unsubResume(); };
   }, [user, role]);
+
+  // Events (all roles) + this account's own attendance records.
+  useEffect(() => {
+    if (!user || !db) return;
+    const unsubEvents = subscribeEvents(setEvents, () => {});
+    const unsubAtt = subscribeAttendance(setMyAttendance, user.uid);
+    return () => { unsubEvents(); unsubAtt(); };
+  }, [user]);
+
+  // Process a scanned attendance QR (?ev=&s=&c=) once the events + user are ready.
+  useEffect(() => {
+    if (scanHandled.current || !user || !events.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const ev = params.get("ev"), step = params.get("s"), code = params.get("c");
+    if (!ev || !step || !code) return;
+    scanHandled.current = true;
+    window.history.replaceState({}, "", window.location.pathname);
+    const eventId = Number(ev);
+    const event = events.find((e) => e.id === eventId);
+    setMainView("events");
+    (async () => {
+      if (!event) { setScanMsg("Event not found."); return; }
+      const name = user.displayName || user.email || "Student";
+      try {
+        if (step === "checkout") {
+          const existing = await getMyAttendance(eventId, user.uid);
+          if (!existing) { setScanMsg("Check in first, then check out."); return; }
+          await checkOutAttendance(event, user.uid, code, existing);
+          setScanMsg(`✓ Checked out of ${event.title}.`);
+        } else {
+          await checkInAttendance(event, user.uid, name, user.email ?? "", code);
+          setScanMsg(`✓ Checked in to ${event.title}. Remember to check out at the end.`);
+        }
+      } catch {
+        setScanMsg("That QR code is invalid or expired — scan the live code on the hall screen.");
+      }
+    })();
+  }, [user, events]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -176,7 +221,6 @@ export default function Home() {
     <main id="top">
       <header className="topbar">
         {brand}
-        <nav aria-label="Main navigation"><a className="active" href="#jobs" aria-current="page">Vacancies</a></nav>
         <div className="header-actions">
           <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
           {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>{role === "employer" ? "Employer dashboard" : "Admin dashboard"}</button>}
@@ -184,6 +228,16 @@ export default function Home() {
         </div>
       </header>
 
+      {scanMsg && (
+        <div className="scan-banner" role="status" aria-live="polite"><span>{scanMsg}</span><button type="button" onClick={() => setScanMsg("")} aria-label="Dismiss">×</button></div>
+      )}
+
+      <nav className="utility-bar" aria-label="Main sections" style={{ minHeight: "auto", gap: ".5rem" }}>
+        <button type="button" className={`px-3.5 py-2 text-sm font-bold rounded-lg ${mainView === "vacancies" ? "tone-accent" : "text-accent"}`} onClick={() => setMainView("vacancies")}>Vacancies</button>
+        <button type="button" className={`px-3.5 py-2 text-sm font-bold rounded-lg ${mainView === "events" ? "tone-accent" : "text-accent"}`} onClick={() => setMainView("events")}>Events</button>
+      </nav>
+
+      {mainView === "vacancies" && <>
       {isStudent && (
         <nav className="utility-bar" aria-label="Student sections" style={{ minHeight: "auto", gap: ".5rem" }}>
           {([["vacancies", "Vacancies"], ["history", "History"], ["resume", "My Resume"]] as const).map(([key, label]) => (
@@ -255,6 +309,11 @@ export default function Home() {
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
           <StudentResume user={user} course={course} myResume={myResume} />
         </section>
+      )}
+      </>}
+
+      {mainView === "events" && (
+        <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} />
       )}
 
       <footer>{brand}<p>QIU Industry Day 2026. Verify vacancy details directly with the employer.</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>

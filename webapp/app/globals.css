@@ -149,6 +149,26 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .job-assistant-toggle>span:first-child { color:var(--blue); }
 .job-assistant-messages { margin-top:.75rem; max-height:15rem; overflow-y:auto; display:flex; flex-direction:column; gap:.55rem; padding-right:.25rem; }
 
+/* Events module. */
+.event-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1.1rem; margin-top:1.25rem; }
+.event-card { background:var(--surface); border:1px solid var(--line); border-radius:.9rem; padding:1.1rem; box-shadow:var(--shadow); display:flex; flex-direction:column; }
+.event-card .card-top { display:flex; gap:.4rem; flex-wrap:wrap; }
+.event-card h2 { margin:.5rem 0 .1rem; font-size:1.05rem; letter-spacing:-.02em; }
+.event-speaker { margin-top:.8rem; padding-top:.7rem; border-top:1px solid var(--line); }
+.event-speaker a { color:var(--blue); }
+.event-actions { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.9rem; }
+.event-actions button { min-height:2.25rem; border-radius:.5rem; padding:.4rem .65rem; font-size:.68rem; font-weight:750; }
+
+.scan-banner { max-width:1500px; margin:0 auto; display:flex; align-items:center; gap:.75rem; padding:.75rem clamp(1rem,4vw,3rem); background:var(--blue-soft); color:var(--ink); border-bottom:1px solid var(--line); font-size:.82rem; font-weight:700; }
+.scan-banner button { margin-left:auto; border:0; background:none; font-size:1.15rem; color:var(--muted); }
+
+.event-presenter { text-align:center; }
+.presenter-steps { display:flex; gap:.5rem; justify-content:center; margin:.9rem 0; }
+.presenter-steps button { border:1px solid var(--line); border-radius:.6rem; padding:.5rem 1rem; font-weight:800; font-size:.82rem; }
+.presenter-qr { display:grid; place-items:center; min-height:20rem; }
+.presenter-qr img { width:min(72vw,26rem); height:auto; padding:.75rem; border-radius:.6rem; background:#fff; }
+.presenter-hint { font-weight:800; margin-top:.9rem; font-size:1.05rem; }
+
 /* Mobile header: keep just the logo (drop the wordmark text) so items never clip. */
 @media (max-width:600px) {
   .brand>span,.brand>small { display:none; }

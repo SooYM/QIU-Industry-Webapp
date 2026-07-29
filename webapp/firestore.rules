@@ -137,6 +137,29 @@ service cloud.firestore {
         && (data.company == null || (data.company is string && data.company.size() <= 160));
     }
 
+    function validEvent(data) {
+      return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id > 0
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.description is string && data.description.size() <= 5000
+        && data.location is string && data.location.size() <= 200
+        && data.speakerName is string && data.speakerName.size() <= 200
+        && data.speakerEmail is string && data.speakerEmail.size() <= 254
+        && data.startAt is string && data.startAt.size() <= 40
+        && data.endAt is string && data.endAt.size() <= 40
+        && data.sessionMinutes is int && data.sessionMinutes >= 0 && data.sessionMinutes <= 1440
+        && data.createdBy is string
+        && data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
+    // Live rotating code for an event (in event_codes/{eventId}). get() bypasses
+    // read rules, so the attendance rules can validate the scanned code even though
+    // students cannot read this collection.
+    function eventCode(eventIdStr) {
+      return get(/databases/$(database)/documents/event_codes/$(eventIdStr)).data;
+    }
+
     match /users/{uid} {
       allow read: if isAllowedUser() && (request.auth.uid == uid || isSuperAdmin());
       allow create: if isAuthenticated() && validUser(request.resource.data, uid);
@@ -238,6 +261,45 @@ service cloud.firestore {
         && request.resource.data.studentUid == request.auth.uid
         && validChatLog(request.resource.data);
       allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // Events: everyone allowed can read; only admins/superadmin manage.
+    match /events/{eventId} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAdmin() && validEvent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Live rotating attendance code — managers write it; NO ONE reads it via the
+    // client (get() in attendance rules still works). This is what defeats a
+    // shared/screenshotted QR: the code rotates every ~25s.
+    match /event_codes/{eventId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Attendance: a student checks in / out only with the currently-valid code for
+    // the active step; validated server-side against event_codes.
+    match /attendance/{attendanceId} {
+      allow read: if isAllowedUser() && (resource.data.studentUid == request.auth.uid || isAdmin());
+      allow create: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.step == 'checkin'
+        && request.resource.data.eventId is int
+        && request.resource.data.code is string
+        && attendanceId == string(request.resource.data.eventId) + '_' + request.auth.uid
+        && eventCode(string(request.resource.data.eventId)).activeStep == 'checkin'
+        && eventCode(string(request.resource.data.eventId)).activeCode == request.resource.data.code
+        && request.time.toMillis() < eventCode(string(request.resource.data.eventId)).codeExpiry;
+      allow update: if isAllowedUser()
+        && resource.data.studentUid == request.auth.uid
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.step == 'checkout'
+        && request.resource.data.code is string
+        && eventCode(string(resource.data.eventId)).activeStep == 'checkout'
+        && eventCode(string(resource.data.eventId)).activeCode == request.resource.data.code
+        && request.time.toMillis() < eventCode(string(resource.data.eventId)).codeExpiry;
       allow delete: if isAdmin();
     }
 

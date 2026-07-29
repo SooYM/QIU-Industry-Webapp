@@ -91,6 +91,50 @@ export interface ChatLog {
   createdAt?: unknown;
 }
 
+/** A live/upcoming Industry Day event. Only admins/superadmin manage these. */
+export interface EventItem {
+  id: number;
+  title: string;
+  description: string;
+  location: string;
+  speakerName: string;
+  speakerEmail: string;
+  startAt: string;        // datetime-local value, e.g. "2026-08-01T14:00"
+  endAt: string;
+  sessionMinutes: number; // scheduled length, drives the CCA eligibility threshold
+  createdBy?: string;
+}
+
+/**
+ * The live rotating attendance code for an event, written by the presenter every
+ * ~25s. Stored in a separate collection students CANNOT read — the attendance
+ * write is validated against it in security rules, so a shared screenshot is
+ * useless once the code rotates.
+ */
+export interface EventCode {
+  activeStep: "checkin" | "checkout" | "none";
+  activeCode: string;
+  codeExpiry: number;     // epoch ms
+}
+
+/** A student's attendance record for one event (doc id `${eventId}_${uid}`). */
+export interface Attendance {
+  id: string;
+  eventId: number;
+  eventTitle: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  code: string;           // last validated rotating code (rules check it)
+  step: "checkin" | "checkout";
+  checkInMs?: number;     // client epoch, for duration math
+  checkOutMs?: number;
+  durationMinutes?: number;
+  caEligible?: boolean;
+  checkInAt?: unknown;
+  checkOutAt?: unknown;
+}
+
 export interface UserRecord {
   uid: string;
   email: string;
