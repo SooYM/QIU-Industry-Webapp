@@ -122,7 +122,7 @@ service cloud.firestore {
       return data.studentUid is string && data.studentUid == uid
         && data.studentEmail is string && data.studentEmail.size() <= 254
         && data.studentName is string && data.studentName.size() <= 160
-        && data.source in ['upload', 'generated']
+        && data.source in ['upload', 'generated', 'link']
         && (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() <= 2048))
         && (!('fileName' in data) || (data.fileName is string && data.fileName.size() <= 256))
         && (!('course' in data) || (data.course is string && data.course.size() <= 120));

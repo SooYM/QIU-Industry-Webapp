@@ -19,7 +19,7 @@ export function ResumeViewer() {
             <div className="local-job" key={resume.id}>
               <span>
                 <b>{resume.studentName || resume.studentEmail}</b>
-                <small>{resume.studentEmail}{resume.course ? ` · ${resume.course}` : ""} · {resume.source === "generated" ? "Generated CV" : "Uploaded PDF"}</small>
+                <small>{resume.studentEmail}{resume.course ? ` · ${resume.course}` : ""} · {resume.source === "link" ? "Shared link" : resume.source === "generated" ? "Generated CV" : "Uploaded PDF"}</small>
               </span>
               <div className="local-job-actions">
                 {resume.fileUrl

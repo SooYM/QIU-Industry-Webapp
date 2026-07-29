@@ -69,9 +69,9 @@ export interface Resume {
   studentEmail: string;
   studentName: string;
   course?: string;
-  fileUrl?: string;        // Firebase Storage download URL (uploaded PDF)
+  fileUrl?: string;        // Storage download URL (upload) or an external link
   fileName?: string;
-  source: "upload" | "generated";
+  source: "upload" | "generated" | "link";
   updatedAt?: unknown;
 }
 
