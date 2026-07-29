@@ -14,7 +14,6 @@ import { VacancyFilters } from "../features/vacancies/VacancyFilters";
 import { VacancyList } from "../features/vacancies/VacancyList";
 import { VacancyModal } from "../features/vacancies/VacancyModal";
 import { AdminPanel } from "../features/admin/AdminPanel";
-import { ChatAssistant } from "../features/chat/ChatAssistant";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
@@ -40,7 +39,6 @@ export default function Home() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
 
   useEffect(() => {
@@ -84,7 +82,7 @@ export default function Home() {
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setSelectedJob(null); setAdminOpen(false); setChatOpen(false); }
+      if (event.key === "Escape") { setSelectedJob(null); setAdminOpen(false); }
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
@@ -181,8 +179,7 @@ export default function Home() {
         <nav aria-label="Main navigation"><a className="active" href="#jobs" aria-current="page">Vacancies</a></nav>
         <div className="header-actions">
           <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
-          {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>Admin dashboard</button>}
-          <button className="assistant-button" onClick={() => setChatOpen(true)}><span>✦</span> Ask assistant</button>
+          {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>{role === "employer" ? "Employer dashboard" : "Admin dashboard"}</button>}
           <AuthAccount />
         </div>
       </header>
@@ -285,12 +282,6 @@ export default function Home() {
         />
       )}
 
-      <ChatAssistant
-        open={chatOpen}
-        jobs={jobs}
-        onClose={() => setChatOpen(false)}
-        onSelectSource={(job) => { setSelectedJob(job); setChatOpen(false); }}
-      />
     </main>
   );
 }

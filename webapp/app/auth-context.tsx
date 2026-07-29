@@ -4,6 +4,7 @@ import { createContext, ReactNode, useContext, useEffect, useMemo, useState } fr
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithPopup,
   signInWithPopup,
   signOut as firebaseSignOut,
   type User,
@@ -24,6 +25,7 @@ type AuthContextValue = {
   user: User | null;
   role: UserRole | null;
   course: string | null;
+  company: string | null;
   loading: boolean;
   error: string;
   signIn: () => Promise<void>;
@@ -42,13 +44,16 @@ type WhitelistedEmailRecord = {
   id: string;
   email: string;
   role: UserRole;
+  company?: string;
   addedBy?: string;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+// Base provider carries NO sensitive scopes, so non-QIU sign-in never triggers the
+// "unverified app" consent. The People API directory scope is requested
+// incrementally in signIn(), only for @qiu.edu.my accounts.
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: "select_account" });
-provider.addScope(PEOPLE_SCOPE);
 
 function readableAuthError(error: unknown) {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -62,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [course, setCourse] = useState<string | null>(null);
+  const [company, setCompany] = useState<string | null>(null);
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState(isFirebaseConfigured ? "" : "Firebase has not been configured for this deployment.");
 
@@ -102,35 +108,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userRef = doc(activeDb, "users", nextUser.uid);
         const snapshot = await getDoc(userRef);
         
-        // Check if there is a whitelisted role override
+        // Whitelisted external accounts can carry a role + company override.
         let defaultRole: UserRole = "user";
+        let whitelistCompany: string | undefined;
         try {
           const whitelistDoc = await getDoc(doc(activeDb, "whitelisted_emails", normalizeEmail(nextUser.email)));
-          if (whitelistDoc.exists() && whitelistDoc.data()?.role) {
-            defaultRole = whitelistDoc.data()?.role as UserRole;
+          if (whitelistDoc.exists()) {
+            if (whitelistDoc.data()?.role) defaultRole = whitelistDoc.data()?.role as UserRole;
+            if (whitelistDoc.data()?.company) whitelistCompany = whitelistDoc.data()?.company as string;
           }
         } catch {
           // Keep default
         }
 
         const nextRole = roleForEmail(nextUser.email, snapshot.data()?.role || defaultRole);
+        const storedCompany = snapshot.data()?.company as string | undefined;
+        const resolvedCompany = storedCompany ?? whitelistCompany;
         const profile = {
           displayName: nextUser.displayName ?? "",
           photoURL: nextUser.photoURL ?? "",
           updatedAt: serverTimestamp(),
         };
         if (snapshot.exists()) {
-          await setDoc(userRef, profile, { merge: true });
+          await setDoc(userRef, { ...profile, ...(whitelistCompany && !storedCompany ? { company: whitelistCompany } : {}) }, { merge: true });
         } else {
           await setDoc(userRef, {
             ...profile,
             email: normalizeEmail(nextUser.email),
             role: nextRole,
+            ...(resolvedCompany ? { company: resolvedCompany } : {}),
             createdAt: serverTimestamp(),
           });
         }
         setUser(nextUser);
         setRole(nextRole);
+        setCompany(resolvedCompany ?? null);
         // onAuthStateChanged carries no OAuth token (e.g. page reload), so read the
         // course resolved during the last interactive sign-in from the stored doc.
         setCourse((snapshot.data()?.course as string) ?? null);
@@ -140,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setRole(null);
         setCourse(null);
+        setCompany(null);
       } finally {
         setLoading(false);
       }
@@ -150,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     role,
     course,
+    company,
     loading,
     error,
     signIn: async () => {
@@ -160,21 +174,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError("");
       try {
         const result = await signInWithPopup(auth, provider);
-        // The OAuth access token is only available on the interactive sign-in
-        // result. Resolve the student's course from the Workspace directory and
-        // persist it so later reloads (which have no token) can read it back.
-        // Best-effort: a blocked/failed People API call must never block sign-in.
-        const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
-        if (token && db) {
+        // Course auto-detection is for @qiu.edu.my students only. Request the
+        // People API directory scope INCREMENTALLY here, so non-QIU accounts never
+        // see the sensitive-scope "unverified app" consent. Best-effort — a failed
+        // or dismissed lookup never blocks sign-in.
+        if (isAllowedQiuEmail(result.user.email) && db) {
           try {
-            const resolved = await fetchDirectoryCourse(token);
-            if (resolved) {
-              await setDoc(
-                doc(db, "users", result.user.uid),
-                { course: resolved.name, courseCode: resolved.code },
-                { merge: true },
-              );
-              setCourse(resolved.name);
+            const scoped = new GoogleAuthProvider();
+            scoped.addScope(PEOPLE_SCOPE);
+            const scopedResult = await reauthenticateWithPopup(result.user, scoped);
+            const token = GoogleAuthProvider.credentialFromResult(scopedResult)?.accessToken;
+            if (token) {
+              const resolved = await fetchDirectoryCourse(token);
+              if (resolved) {
+                await setDoc(doc(db, "users", result.user.uid), { course: resolved.name, courseCode: resolved.code }, { merge: true });
+                setCourse(resolved.name);
+              }
             }
           } catch { /* Directory lookup is best-effort; keep the stored course. */ }
         }
@@ -185,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       if (auth) await firebaseSignOut(auth);
     },
-  }), [course, error, loading, role, user]);
+  }), [company, course, error, loading, role, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -243,6 +258,7 @@ export function RoleManager() {
   const [message, setMessage] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<UserRole>("employer");
+  const [newCompany, setNewCompany] = useState("");
 
   const canManageRoles = role === "superadmin" || role === "admin";
   useEffect(() => {
@@ -264,6 +280,7 @@ export function RoleManager() {
         id: entry.id,
         email: entry.data().email ?? entry.id,
         role: (entry.data().role as UserRole) || "employer",
+        company: entry.data().company ?? "",
         addedBy: entry.data().addedBy ?? "",
       })))
     );
@@ -293,15 +310,18 @@ export function RoleManager() {
     const emailToSave = normalizeEmail(newEmail);
     setMessage("");
     try {
+      const company = newRole === "employer" ? newCompany.trim() : "";
       await setDoc(doc(db, "whitelisted_emails", emailToSave), {
         email: emailToSave,
         role: newRole,
+        ...(company ? { company } : {}),
         addedBy: normalizeEmail(user?.email),
         createdAt: serverTimestamp(),
       });
-      setWhitelistedEmails((prev) => [...prev.filter((item) => item.id !== emailToSave), { id: emailToSave, email: emailToSave, role: newRole }]);
+      setWhitelistedEmails((prev) => [...prev.filter((item) => item.id !== emailToSave), { id: emailToSave, email: emailToSave, role: newRole, company }]);
       setNewEmail("");
-      setMessage(`Whitelisted non-QIU account ${emailToSave} with role ${newRole}.`);
+      setNewCompany("");
+      setMessage(`Whitelisted non-QIU account ${emailToSave} with role ${newRole}${company ? ` (${company})` : ""}.`);
     } catch {
       setMessage(`Could not whitelist ${emailToSave}.`);
     }
@@ -330,10 +350,10 @@ export function RoleManager() {
         <small>{users.length} registered accounts</small>
       </div>
 
-      {/* Non-QIU whitelist stays superadmin-only; admins can still assign roles below. */}
-      {role === "superadmin" && <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
+      {/* Admins & superadmin can approve external (non-QIU) accounts and set the employer's company. */}
+      {canManageRoles && <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
         <h4 className="font-bold text-sm text-indigo-900 dark:text-indigo-200">➕ Approve Non-@qiu.edu.my Account</h4>
-        <p className="text-xs text-slate-600 dark:text-slate-400">By default, non-QIU emails cannot log in. Superadmin can approve external emails (e.g. Employers or External Admins) here.</p>
+        <p className="text-xs text-slate-600 dark:text-slate-400">By default, non-QIU emails cannot log in. Approve external emails (e.g. Employers or External Admins) here. For an employer, set which company they represent.</p>
         <form onSubmit={addWhitelistedEmail} className="flex flex-wrap gap-2 items-center">
           <input
             type="email"
@@ -352,6 +372,16 @@ export function RoleManager() {
             <option value="admin">Admin (All Jobs)</option>
             <option value="user">User / Student (Browse Only)</option>
           </select>
+          {newRole === "employer" && (
+            <input
+              type="text"
+              required
+              value={newCompany}
+              onChange={(e) => setNewCompany(e.target.value)}
+              placeholder="Company name"
+              className="flex-1 min-w-[160px] px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            />
+          )}
           <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors shadow-sm">
             Approve External Email
           </button>
@@ -363,7 +393,7 @@ export function RoleManager() {
             <div className="space-y-1">
               {whitelistedEmails.map((item) => (
                 <div key={item.id} className="flex items-center justify-between px-3 py-1.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
-                  <span className="font-medium text-slate-800 dark:text-slate-200">{item.email} <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">{item.role}</span></span>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">{item.email} <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">{item.role}</span>{item.company ? <span className="ml-1 text-[10px] text-slate-500 dark:text-slate-400">· {item.company}</span> : null}</span>
                   <button type="button" onClick={() => removeWhitelistedEmail(item.id)} className="text-[11px] text-rose-600 hover:text-rose-700 dark:text-rose-400 font-semibold">Revoke</button>
                 </div>
               ))}

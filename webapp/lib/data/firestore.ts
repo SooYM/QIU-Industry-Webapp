@@ -56,10 +56,12 @@ export async function stageJobEdit(id: number, edit: Partial<Job>) {
 }
 
 export async function approveJob(job: Job) {
-  const merged = job.pendingEdit ? { ...job, ...job.pendingEdit } : job;
-  await updateDoc(doc(requireDb(), COLLECTIONS.vacancies, String(job.id)), {
-    ...clean(merged), status: "approved", pendingEdit: null, updatedAt: serverTimestamp(),
-  });
+  // Patch only — never re-send createdAt/updatedAt. Round-tripping the whole doc
+  // through JSON would turn the Firestore Timestamp into a plain object and the
+  // immutable-createdAt rule would reject the write (this is why approve failed).
+  const patch: Record<string, unknown> = { status: "approved", pendingEdit: null, updatedAt: serverTimestamp() };
+  if (job.pendingEdit) Object.assign(patch, clean(job.pendingEdit)); // apply the staged edit
+  await updateDoc(doc(requireDb(), COLLECTIONS.vacancies, String(job.id)), patch);
 }
 
 export async function rejectJob(id: number) {

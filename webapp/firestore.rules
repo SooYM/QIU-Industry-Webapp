@@ -47,12 +47,13 @@ service cloud.firestore {
 
     function validUser(data, uid) {
       return data.keys().hasAll(['email', 'role', 'updatedAt'])
-        && data.keys().hasOnly(['email', 'displayName', 'photoURL', 'role', 'course', 'courseCode', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'displayName', 'photoURL', 'role', 'course', 'courseCode', 'company', 'createdAt', 'updatedAt'])
         && data.email is string
         && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 2048))
         && (!('course' in data) || (data.course is string && data.course.size() <= 120))
         && (!('courseCode' in data) || (data.courseCode is string && data.courseCode.size() <= 120))
+        && (!('company' in data) || (data.company is string && data.company.size() <= 160))
         && (!('createdAt' in data) || data.createdAt is timestamp)
         && data.updatedAt is timestamp
         && ((data.email == 'ai@qiu.edu.my' && data.role == 'superadmin' && isSuperAdmin() && uid == request.auth.uid)
@@ -71,7 +72,7 @@ service cloud.firestore {
           'salaryLabel', 'salary', 'payFrequency', 'minimumRequirement',
           'detailsLink', 'email', 'companySummary', 'companySources', 'isCustom',
           'locationMode', 'state', 'country', 'mapX', 'mapY', 'youtubeUrl', 'status',
-          'pendingEdit', 'createdBy', 'createdAt', 'updatedAt'
+          'pendingEdit', 'jobScope', 'requirement', 'createdBy', 'createdAt', 'updatedAt'
         ])
         && data.id is int && data.id > 0
         && data.title is string && data.title.size() > 0 && data.title.size() <= 160
@@ -98,6 +99,8 @@ service cloud.firestore {
         && (!('mapX' in data) || (data.mapX is number && data.mapX >= 0 && data.mapX <= 1000))
         && (!('mapY' in data) || (data.mapY is number && data.mapY >= 0 && data.mapY <= 500))
         && (!('youtubeUrl' in data) || (data.youtubeUrl is string && data.youtubeUrl.size() <= 2048))
+        && (!('jobScope' in data) || (data.jobScope is string && data.jobScope.size() <= 5000))
+        && (!('requirement' in data) || (data.requirement is string && data.requirement.size() <= 5000))
         && (!('status' in data) || data.status in ['approved', 'pending', 'pending_edit', 'rejected'])
         && (!('pendingEdit' in data) || data.pendingEdit is map || data.pendingEdit == null)
         && data.createdBy is string && data.createdBy.size() > 0
@@ -149,7 +152,8 @@ service cloud.firestore {
 
     match /whitelisted_emails/{emailId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      // Admins & superadmin can approve external accounts (and set the employer's company).
+      allow write: if isAdmin();
     }
 
     match /vacancies/{vacancyId} {

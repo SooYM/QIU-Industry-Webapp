@@ -28,6 +28,8 @@ export interface Job {
   email: string;
   companySummary: string;
   companySources: string[];
+  jobScope?: string;      // employer-entered responsibilities/scope
+  requirement?: string;   // employer-entered requirements
   youtubeUrl?: string;
   isCustom?: boolean;
   /** Approval workflow. Absent = legacy record, treated as approved. */
@@ -97,4 +99,5 @@ export interface UserRecord {
   role: UserRole;
   course?: string;         // resolved course name (e.g. "Computer Science")
   courseCode?: string;     // raw directory code (e.g. "BCS")
+  company?: string;        // employer's company, assigned by an admin
 }

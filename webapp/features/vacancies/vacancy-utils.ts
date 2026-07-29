@@ -14,6 +14,8 @@ export type AdminDraft = Pick<Job, "title" | "company" | "type" | "specializatio
   country: string;
   youtubeUrl?: string;
   hasVideo?: boolean;
+  jobScope?: string;
+  requirement?: string;
   customSpecialization?: string;
   mapX?: number;
   mapY?: number;
@@ -31,7 +33,7 @@ export function jobStatusMeta(job: Job): { label: string; tone: string } {
 
 export const DOSM_SOURCE = "https://www.dosm.gov.my/portal-main/release-content/salaries-and-wages-survey-report-2024";
 export const PREFS_KEY = "vacancyportal-view-prefs";
-export const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", customSpecialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "", youtubeUrl: "", hasVideo: false };
+export const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", customSpecialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "", youtubeUrl: "", hasVideo: false, jobScope: "", requirement: "" };
 export const malaysiaStates = ["Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang", "Pulau Pinang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu", "W.P. Kuala Lumpur", "W.P. Labuan", "W.P. Putrajaya"];
 export const malaysiaStateAliases: Record<string, string> = { "Kuala Lumpur": "W.P. Kuala Lumpur" };
 
