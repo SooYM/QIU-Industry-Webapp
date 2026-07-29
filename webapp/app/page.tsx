@@ -89,7 +89,15 @@ function formatSalary(job: Job) {
 
 function benchmarkFor(job: Job) {
   const haystack = `${job.title} ${job.specialization}`;
-  return salaryBenchmarks.find((item) => item.match.test(haystack)) ?? { amount: 3652, label: "Malaysia employee mean" };
+  const benchmark = salaryBenchmarks.find((item) => item.match.test(haystack)) ?? { amount: 3652, label: "Malaysia employee mean" };
+  const minSalary = Math.round((benchmark.amount * 0.8) / 50) * 50;
+  const maxSalary = Math.round((benchmark.amount * 1.25) / 50) * 50;
+  return {
+    ...benchmark,
+    minSalary,
+    maxSalary,
+    rangeLabel: `RM ${minSalary.toLocaleString()} – RM ${maxSalary.toLocaleString()}`,
+  };
 }
 
 function roleDescription(job: Job) {
@@ -321,6 +329,7 @@ export default function Home() {
   const selectedMapCountry = countryShapes.find((country) => country.name.toLocaleLowerCase() === draft.country.trim().toLocaleLowerCase())?.name;
   const adminMessageIsError = adminMessage.startsWith("Complete") || adminMessage.includes("could not");
   const draftBenchmark = useMemo(() => {
+    if (!draft.title.trim()) return null;
     const effectiveSpec = draft.specialization === "Other" ? (draft.customSpecialization || "") : draft.specialization;
     return benchmarkFor({ title: draft.title, specialization: effectiveSpec } as Job);
   }, [draft.title, draft.specialization, draft.customSpecialization]);
@@ -648,22 +657,26 @@ export default function Home() {
           {draft.specialization === "Other" && <label className="full"><span className="field-label">Custom Specialization Title <small>Required for 'Other'</small></span><input required value={draft.customSpecialization ?? ""} placeholder="e.g. Culinary Art & Hospitality" onChange={e => setDraft({ ...draft, customSpecialization: e.target.value })}/></label>}
           <fieldset className="location-choice full"><legend>Location type</legend><label><input type="radio" name="location-mode" checked={draft.locationMode === "malaysia"} onChange={() => setDraft({ ...draft, locationMode: "malaysia", country: "", mapX: undefined, mapY: undefined })}/> Malaysia</label><label><input type="radio" name="location-mode" checked={draft.locationMode === "international"} onChange={() => setDraft({ ...draft, locationMode: "international", state: "" })}/> International</label></fieldset>
           {draft.locationMode === "malaysia" ? <label className="full">Malaysian state<select required value={draft.state} onChange={e => setDraft({ ...draft, state: e.target.value })}><option value="" disabled>Select state or federal territory</option>{malaysiaStates.map(state => <option key={state} value={state}>{state}</option>)}</select></label> : <div className="international-location full"><label>Exact country<input required list="world-country-list" value={draft.country} placeholder="e.g. Singapore" onChange={e => setDraft({ ...draft, country: e.target.value })}/><datalist id="world-country-list">{countryShapes.map(country => <option key={country.name} value={country.name}/>)}</datalist></label><span className="map-instruction">Hover to identify a country. Click it to select and highlight the country.</span><button ref={worldMapRef} type="button" className="world-map" onClick={pinpointCountry} onPointerMove={moveCountryLabel} onPointerLeave={() => setHoveredCountry(null)} aria-label={`World map country location picker${hoveredCountry ? `: ${hoveredCountry.name}` : ""}`}><svg viewBox="0 0 1000 500" role="img" aria-label="Interactive world countries">{countryShapes.map(country => <path key={country.name} d={country.path} data-country={country.name} className={selectedMapCountry === country.name ? "selected-country" : undefined}/>)}</svg>{!countryShapes.length && <span className="map-loading">Loading countries…</span>}{hoveredCountry && <span ref={countryTooltipRef} className="country-tooltip" style={{ left: tooltipPosition.left, top: tooltipPosition.top }}>{hoveredCountry.name}</span>}</button><small>{selectedMapCountry ? `${selectedMapCountry} selected and highlighted.` : "No country selected yet."}</small><a href="https://www.naturalearthdata.com/" target="_blank" rel="noreferrer">Public-domain boundaries: Natural Earth ↗</a></div>}
-          <div className="full rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/80 dark:bg-indigo-950/40 p-3.5 my-1 text-xs">
-            <div className="flex items-center gap-1.5 font-bold text-indigo-900 dark:text-indigo-200">
-              <span>📊</span>
-              <span>Malaysia Workforce Salary Benchmark Helper (DOSM 2024 Survey)</span>
+          {draftBenchmark && (
+            <div className="full rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/80 dark:bg-indigo-950/40 p-3.5 my-1 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-indigo-900 dark:text-indigo-200">
+                <span>📊</span>
+                <span>DOSM Salary Range Benchmark Helper (2024 Survey)</span>
+              </div>
+              <p className="mt-1 text-indigo-800 dark:text-indigo-300">
+                Estimated Benchmark Salary Range for <b>{draft.title.trim()}</b>:{" "}
+                <span className="font-extrabold text-indigo-950 dark:text-indigo-100 text-sm">
+                  {draftBenchmark.rangeLabel} / month
+                </span>{" "}
+                <small className="text-slate-600 dark:text-slate-400 font-normal">
+                  (Mean: RM {draftBenchmark.amount.toLocaleString()} / mo · {draftBenchmark.label})
+                </small>
+              </p>
+              <small className="text-[10px] text-indigo-600 dark:text-indigo-400 block mt-0.5">
+                Calculated live based on the job title typed above.
+              </small>
             </div>
-            <p className="mt-1 text-indigo-800 dark:text-indigo-300">
-              Suggested benchmark for <b>{draft.title.trim() || "this role"}</b>:{" "}
-              <span className="font-extrabold text-indigo-950 dark:text-indigo-100 text-sm">
-                RM {draftBenchmark.amount.toLocaleString()} / month
-              </span>{" "}
-              <i>({draftBenchmark.label})</i>
-            </p>
-            <small className="text-[10px] text-indigo-600 dark:text-indigo-400 block mt-0.5">
-              Use this benchmark to guide realistic compensation offers when creating vacancies.
-            </small>
-          </div>
+          )}
           <label>Monthly salary (RM)<input type="number" min="0" step="1" placeholder="e.g. 1800" value={draft.salary} onChange={e => setDraft({ ...draft, salary: e.target.value })}/></label><label>Vacancies<input type="number" min="1" value={draft.vacancies} onChange={e => setDraft({ ...draft, vacancies: Number(e.target.value) })}/></label><label>Minimum requirement<select value={draft.minimumRequirement} onChange={e => setDraft({ ...draft, minimumRequirement: e.target.value })}><option>SPM</option><option>Certificate</option><option>Diploma</option><option>Degree</option><option>Post-graduate</option></select></label><label><span className="field-label">Enquiry email <small>Optional</small></span><input type="email" value={draft.email} onChange={e => setDraft({ ...draft, email: e.target.value })}/></label><label className="full"><span className="field-label">Corporate YouTube Video URL <small>Optional placeholder</small></span><input type="url" value={draft.youtubeUrl ?? ""} placeholder="e.g. https://www.youtube.com/watch?v=5qap5aO4i9A" onChange={e => setDraft({ ...draft, youtubeUrl: e.target.value })}/></label><div className="admin-form-footer full">{adminMessage && <p className={`admin-message ${adminMessageIsError ? "error" : ""}`} role="status" aria-live="polite">{adminMessage}</p>}<div className="admin-submit">{editingId && <button type="button" className="cancel-edit" onClick={() => { setEditingId(null); setDraft(emptyDraft); setAdminMessage(""); }}>Cancel edit</button>}<button className="save-job" type="submit">{editingId ? "Save changes" : "Add vacancy"}</button></div></div></form>
         {customJobs.length > 0 && <section className="local-jobs" aria-labelledby="admin-vacancies-title"><div className="local-jobs-head"><div><span className="detail-label">VACANCIES</span><h3 id="admin-vacancies-title">Manage vacancies</h3></div><strong aria-live="polite">{adminFilteredJobs.length} of {customJobs.length}</strong></div><div className="admin-job-filters"><label className="admin-job-search"><span>Search vacancies</span><input type="search" value={adminQuery} onChange={e => setAdminQuery(e.target.value)} placeholder="Title, company or location"/></label><label><span>Company</span><select value={adminCompany} onChange={e => setAdminCompany(e.target.value)}>{companies.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Specialization</span><select value={adminSpecialization} onChange={e => setAdminSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Opportunity type</span><select value={adminType} onChange={e => setAdminType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label><button type="button" className="reset-admin-filters" onClick={resetAdminFilters}>Reset filters</button></div>{adminFilteredJobs.length > 0 ? <div className="local-job-list">{adminFilteredJobs.map(job => { const editable = canEditOrDeleteJob(job, user?.email, role); return <div className="local-job" key={job.id}><span><b>{job.title}</b><small>{job.company} · {job.location} {job.createdBy && `(by ${job.createdBy})`}</small></span><div className="local-job-actions">{editable ? <><button className="edit-local" onClick={() => editCustomJob(job)}>Edit</button><button className="delete-local" onClick={() => removeCustomJob(job.id)}>Delete</button></> : <span className="text-xs text-slate-400 italic">Created by another account</span>}</div></div>; })}</div> : <div className="admin-jobs-empty"><strong>No vacancies match these filters.</strong><p>Try another search or clear the filters.</p><button type="button" onClick={resetAdminFilters}>Reset filters</button></div>}</section>}
       </section></div>}
