@@ -102,6 +102,7 @@ export interface EventItem {
   startAt: string;        // datetime-local value, e.g. "2026-08-01T14:00"
   endAt: string;
   sessionMinutes: number; // scheduled length, drives the CCA eligibility threshold
+  presenters: string[];   // extra emails allowed to present this event's QR only
   createdBy?: string;
 }
 

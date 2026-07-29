@@ -18,12 +18,13 @@ import { AdminPanel } from "../features/admin/AdminPanel";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
 import { EventsView } from "../features/events/EventsView";
+import { EventDetail } from "../features/events/EventDetail";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
 
 export default function Home() {
   const { user, role, course } = useAuth();
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
-  const [studentTab, setStudentTab] = useState<"vacancies" | "history" | "resume">("vacancies");
+  const [tab, setTab] = useState<"vacancies" | "history" | "resume" | "events">("vacancies");
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [myViews, setMyViews] = useState<ViewEvent[]>([]);
   const [myResume, setMyResume] = useState<Resume | null>(null);
@@ -42,7 +43,7 @@ export default function Home() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
-  const [mainView, setMainView] = useState<"vacancies" | "events">("vacancies");
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [myAttendance, setMyAttendance] = useState<Attendance[]>([]);
   const [scanMsg, setScanMsg] = useState("");
@@ -98,7 +99,7 @@ export default function Home() {
     window.history.replaceState({}, "", window.location.pathname);
     const eventId = Number(ev);
     const event = events.find((e) => e.id === eventId);
-    setMainView("events");
+    setTab("events");
     (async () => {
       if (!event) { setScanMsg("Event not found."); return; }
       const name = user.displayName || user.email || "Student";
@@ -127,7 +128,7 @@ export default function Home() {
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setSelectedJob(null); setAdminOpen(false); }
+      if (event.key === "Escape") { setSelectedJob(null); setAdminOpen(false); setSelectedEvent(null); }
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
@@ -142,7 +143,7 @@ export default function Home() {
     }).catch(() => { /* View logging is best-effort. */ });
   }, [selectedJob, user, role]);
 
-  const isAnyModalOpen = Boolean(selectedJob || adminOpen);
+  const isAnyModalOpen = Boolean(selectedJob || adminOpen || selectedEvent);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -232,23 +233,18 @@ export default function Home() {
         <div className="scan-banner" role="status" aria-live="polite"><span>{scanMsg}</span><button type="button" onClick={() => setScanMsg("")} aria-label="Dismiss">×</button></div>
       )}
 
-      <nav className="utility-bar" aria-label="Main sections" style={{ minHeight: "auto", gap: ".5rem" }}>
-        <button type="button" className={`px-3.5 py-2 text-sm font-bold rounded-lg ${mainView === "vacancies" ? "tone-accent" : "text-accent"}`} onClick={() => setMainView("vacancies")}>Vacancies</button>
-        <button type="button" className={`px-3.5 py-2 text-sm font-bold rounded-lg ${mainView === "events" ? "tone-accent" : "text-accent"}`} onClick={() => setMainView("events")}>Events</button>
+      <nav className="utility-bar main-tabs" aria-label="Sections" style={{ minHeight: "auto", gap: ".4rem", flexWrap: "wrap" }}>
+        {(isStudent
+          ? [["vacancies", "Vacancies"], ["history", "History"], ["resume", "My Resume"], ["events", "Events"]]
+          : [["vacancies", "Vacancies"], ["events", "Events"]]
+        ).map(([key, label]) => (
+          <button key={key} type="button" aria-current={tab === key ? "page" : undefined}
+            className={`px-3.5 py-2 text-sm font-bold rounded-lg ${tab === key ? "tone-accent" : "text-accent"}`}
+            onClick={() => setTab(key as typeof tab)}>{label}</button>
+        ))}
       </nav>
 
-      {mainView === "vacancies" && <>
-      {isStudent && (
-        <nav className="utility-bar" aria-label="Student sections" style={{ minHeight: "auto", gap: ".5rem" }}>
-          {([["vacancies", "Vacancies"], ["history", "History"], ["resume", "My Resume"]] as const).map(([key, label]) => (
-            <button key={key} type="button" aria-current={studentTab === key ? "page" : undefined}
-              className={`px-3.5 py-2 text-sm font-bold rounded-lg ${studentTab === key ? "tone-accent" : "text-accent"}`}
-              onClick={() => setStudentTab(key)}>{label}</button>
-          ))}
-        </nav>
-      )}
-
-      {(!isStudent || studentTab === "vacancies") && <>
+      {tab === "vacancies" && <>
       <section className="utility-bar" aria-label="Vacancy display settings">
         <div><strong>Browse vacancies</strong><span>{jobsLoading ? "Loading records…" : `${jobs.length} records available`}</span></div>
         <button className="mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls="vacancy-filters" onClick={() => setMobileFiltersOpen((open) => !open)}>{mobileFiltersOpen ? "Hide filters" : "Filter results"}</button>
@@ -299,21 +295,22 @@ export default function Home() {
       </section>
       </>}
 
-      {isStudent && studentTab === "history" && (
+      {tab === "history" && isStudent && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
           <StudentHistory jobs={jobs} applications={myApplications} views={myViews} onOpen={setSelectedJob} />
         </section>
       )}
 
-      {isStudent && studentTab === "resume" && user && (
+      {tab === "resume" && isStudent && user && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
           <StudentResume user={user} course={course} myResume={myResume} />
         </section>
       )}
-      </>}
 
-      {mainView === "events" && (
-        <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} />
+      {tab === "events" && (
+        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
+          <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} onOpenEvent={setSelectedEvent} />
+        </section>
       )}
 
       <footer>{brand}<p>QIU Industry Day 2026. Verify vacancy details directly with the employer.</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
@@ -326,7 +323,7 @@ export default function Home() {
           applied={appliedJobIds.has(selectedJob.id)}
           hasResume={Boolean(myResume)}
           onApply={() => applyToJob(selectedJob)}
-          onGoToResume={() => { setSelectedJob(null); setStudentTab("resume"); }}
+          onGoToResume={() => { setSelectedJob(null); setTab("resume"); }}
           onClose={() => setSelectedJob(null)}
         />
       )}
@@ -343,6 +340,15 @@ export default function Home() {
         />
       )}
 
+      {selectedEvent && (
+        <EventDetail
+          event={selectedEvent}
+          canManageEvents={role === "admin" || role === "superadmin"}
+          userEmail={user?.email ?? ""}
+          attendance={myAttendance.find((a) => a.eventId === selectedEvent.id) ?? null}
+          onClose={() => setSelectedEvent(null)}
+        />
+      )}
     </main>
   );
 }

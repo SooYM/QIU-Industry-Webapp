@@ -30,24 +30,26 @@ export function EventsView({
   canManageEvents,
   userEmail,
   myAttendance,
+  onOpenEvent,
 }: {
   events: EventItem[];
   canManageEvents: boolean;
   userEmail: string;
   myAttendance: Attendance[];
+  onOpenEvent: (event: EventItem) => void;
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<EventItem | null>(null);
   const [presenting, setPresenting] = useState<EventItem | null>(null);
   const [viewing, setViewing] = useState<EventItem | null>(null);
 
+  const myLower = userEmail.trim().toLowerCase();
   const attendanceByEvent = new Map(myAttendance.map((a) => [a.eventId, a]));
-  // Live + upcoming first, ended last.
   const order = { live: 0, upcoming: 1, ended: 2 } as const;
   const sorted = [...events].sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || a.startAt.localeCompare(b.startAt));
 
   return (
-    <section className="results" aria-labelledby="events-title" style={{ maxWidth: 1100, margin: "0 auto", width: "100%", padding: "2rem clamp(1rem,4vw,3rem)" }}>
+    <section className="results" aria-labelledby="events-title">
       <div className="results-head">
         <div><span>EVENTS</span><h1 id="events-title">Live &amp; upcoming events</h1></div>
         {canManageEvents && <button className="admin-button" onClick={() => { setEditing(null); setFormOpen(true); }}>＋ Add event</button>}
@@ -56,11 +58,15 @@ export function EventsView({
       {sorted.length ? (
         <div className="event-grid">
           {sorted.map((ev) => {
-            const status = eventStatus(ev);
-            const meta = statusMeta[status];
+            const st = eventStatus(ev);
+            const meta = statusMeta[st];
             const att = attendanceByEvent.get(ev.id);
+            const canPresent = canManageEvents || (ev.presenters ?? []).includes(myLower);
             return (
-              <article className="event-card" key={ev.id}>
+              <article className="event-card" key={ev.id} role="button" tabIndex={0}
+                aria-label={`View ${ev.title}`}
+                onClick={() => onOpenEvent(ev)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenEvent(ev); } }}>
                 <div className="card-top">
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}>{meta.label}</span>
                   {att && <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${att.caEligible ? "tone-success" : att.checkOutMs ? "tone-danger" : "tone-neutral"}`}>
@@ -69,24 +75,19 @@ export function EventsView({
                 </div>
                 <h2>{ev.title}</h2>
                 <p className="text-accent text-xs">{when(ev.startAt)} → {when(ev.endAt)}{ev.location ? ` · ${ev.location}` : ""}</p>
-                {ev.description && <p className="text-sm mt-1" style={{ whiteSpace: "pre-wrap" }}>{ev.description}</p>}
                 <div className="event-speaker">
                   <span className="detail-label">SPEAKER</span>
                   {ev.speakerName || ev.speakerEmail
-                    ? <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{ev.speakerEmail ? <> · <a href={`mailto:${ev.speakerEmail}`}>{ev.speakerEmail}</a></> : null}</p>
-                    : <p className="text-accent text-sm">Speaker to be announced.</p>}
+                    ? <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{ev.speakerEmail ? ` · ${ev.speakerEmail}` : ""}</p>
+                    : <p className="text-accent text-sm">To be announced.</p>}
                 </div>
-                {!canManageEvents && (
-                  <p className="text-accent text-xs mt-2">
-                    {status === "live" ? "Scan the QR on the hall screen to check in / out." : status === "upcoming" ? "Attendance opens when the session starts." : "This session has ended."}
-                  </p>
-                )}
-                {canManageEvents && (
-                  <div className="event-actions">
-                    <button className="edit-local" onClick={() => setPresenting(ev)}>▶ Present QR</button>
-                    <button className="edit-local" onClick={() => setViewing(ev)}>Attendance</button>
-                    <button className="edit-local" onClick={() => { setEditing(ev); setFormOpen(true); }}>Edit</button>
-                    <button className="delete-local" onClick={() => { if (confirm(`Delete "${ev.title}"?`)) deleteEvent(ev.id); }}>Delete</button>
+                <p className="view-job mt-2">View details <span>→</span></p>
+                {(canPresent || canManageEvents) && (
+                  <div className="event-actions" onClick={(e) => e.stopPropagation()}>
+                    {canPresent && <button className="edit-local" onClick={() => setPresenting(ev)}>▶ Present QR</button>}
+                    {canManageEvents && <button className="edit-local" onClick={() => setViewing(ev)}>Attendance</button>}
+                    {canManageEvents && <button className="edit-local" onClick={() => { setEditing(ev); setFormOpen(true); }}>Edit</button>}
+                    {canManageEvents && <button className="delete-local" onClick={() => { if (confirm(`Delete "${ev.title}"?`)) deleteEvent(ev.id); }}>Delete</button>}
                   </div>
                 )}
               </article>
@@ -94,7 +95,7 @@ export function EventsView({
           })}
         </div>
       ) : (
-        <div className="admin-jobs-empty"><strong>No events yet</strong><p>{canManageEvents ? "Add the first event to get started." : "Events will appear here soon."}</p></div>
+        <div className="empty"><strong>No events yet</strong><p>{canManageEvents ? "Add the first event to get started." : "Events will appear here soon."}</p></div>
       )}
 
       {!canManageEvents && myAttendance.length > 0 && (

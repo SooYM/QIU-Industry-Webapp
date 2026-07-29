@@ -138,8 +138,8 @@ service cloud.firestore {
     }
 
     function validEvent(data) {
-      return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'createdBy', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.description is string && data.description.size() <= 5000
@@ -149,6 +149,7 @@ service cloud.firestore {
         && data.startAt is string && data.startAt.size() <= 40
         && data.endAt is string && data.endAt.size() <= 40
         && data.sessionMinutes is int && data.sessionMinutes >= 0 && data.sessionMinutes <= 1440
+        && data.presenters is list && data.presenters.size() <= 50
         && data.createdBy is string
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }
@@ -276,7 +277,11 @@ service cloud.firestore {
     // shared/screenshotted QR: the code rotates every ~25s.
     match /event_codes/{eventId} {
       allow read: if isAdmin();
-      allow write: if isAdmin();
+      // Admins/superadmin, OR a person the admin assigned to present THIS event only.
+      allow write: if isAdmin()
+        || (isAllowedUser()
+          && exists(/databases/$(database)/documents/events/$(eventId))
+          && (request.auth.token.email.lower() in get(/databases/$(database)/documents/events/$(eventId)).data.presenters));
     }
 
     // Attendance: a student checks in / out only with the currently-valid code for

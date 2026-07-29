@@ -168,6 +168,23 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .presenter-qr { display:grid; place-items:center; min-height:20rem; }
 .presenter-qr img { width:min(72vw,26rem); height:auto; padding:.75rem; border-radius:.6rem; background:#fff; }
 .presenter-hint { font-weight:800; margin-top:.9rem; font-size:1.05rem; }
+.event-card { cursor:pointer; transition:border-color .15s,transform .15s; }
+.event-card:hover { border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); }
+.event-card:active { transform:scale(.99); }
+.event-card .view-job { margin-top:.6rem; }
+
+/* datetime-local: keep the calendar/clock picker icon visible in dark mode. */
+.admin-form input[type="datetime-local"] { width:100%; }
+:root[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+:root[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator { filter:invert(1); }
+
+@media (max-width:600px) {
+  .event-grid { grid-template-columns:1fr; }
+  .main-tabs { overflow-x:auto; flex-wrap:nowrap!important; }
+  .presenter-qr img { width:min(86vw,22rem); }
+  .presenter-hint { font-size:.95rem; }
+}
 
 /* Mobile header: keep just the logo (drop the wordmark text) so items never clip. */
 @media (max-width:600px) {
