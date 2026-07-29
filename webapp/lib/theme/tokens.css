@@ -1,0 +1,93 @@
+/* ============================================================================
+   QIU Industry Day 2026 — Design Tokens (THE re-theme seam)
+   ----------------------------------------------------------------------------
+   This is the ONLY file you edit to change the portal's colour scheme.
+   Components and legacy component CSS reference these variables exclusively.
+
+   Layers:
+     1. Semantic tokens          --color-*, --radius-*, --space-*, --shadow-*
+     2. Legacy compatibility map  --bg / --surface / --ink / --blue ...
+        (kept so the existing component stylesheet keeps working unchanged)
+
+   To rebrand for a future colour scheme: change the values in :root and
+   :root[data-theme="dark"] below. Nothing else needs to move.
+   ============================================================================ */
+
+:root {
+  /* --- Brand: QIU Industry Day monochrome (charcoal / white / graphite) --- */
+  --color-page:        #1b1b1e; /* charcoal app background (side gutters, auth) */
+  --color-surface:     #ffffff; /* white content cards / panels */
+  --color-surface-2:   #f4f4f5; /* muted section, filter rail, inputs backdrop */
+  --color-surface-3:   #ececee; /* input fill (Industry Day light-grey field)  */
+
+  --color-text:        #17171a; /* near-black primary text */
+  --color-text-muted:  #6b6b72; /* secondary / helper text */
+  --color-text-inverse:#ffffff; /* text on dark/primary surfaces */
+
+  --color-primary:     #17171a; /* primary action = black (monochrome) */
+  --color-primary-hover:#000000;
+  --color-primary-soft:#f1f1f2; /* tinted primary background */
+  --color-on-primary:  #ffffff;
+  --color-accent:      #52525b; /* graphite secondary accent */
+
+  --color-border:      #e4e4e7;
+  --color-border-strong:#d4d4d8;
+
+  /* Functional state colours (kept chromatic for usability, not brand) */
+  --color-success:#137b64; --color-success-soft:#e7f6f1;
+  --color-warning:#8a5a12; --color-warning-soft:#fbf1de;
+  --color-danger:#b3352f;  --color-danger-soft:#fdecec;
+  --color-info:#0d6f83;    --color-info-soft:#e4f6f9;
+
+  /* Radius / shadow / spacing scale */
+  --radius-sm:.5rem; --radius-md:.75rem; --radius-lg:1rem; --radius-card:1.5rem; --radius-pill:999px;
+  --shadow-card:0 16px 42px rgba(20,20,25,.10);
+  --shadow-pop:0 24px 60px rgba(10,10,15,.28);
+  --font-scale:1;
+
+  /* ---- Legacy compatibility (maps old component CSS onto new tokens) ---- */
+  --bg:var(--color-page); --surface:var(--color-surface); --surface-2:var(--color-surface-2);
+  --ink:var(--color-text); --muted:var(--color-text-muted); --line:var(--color-border);
+  --blue:var(--color-primary); --blue-hover:var(--color-primary-hover); --blue-soft:var(--color-primary-soft);
+  --cyan:#d4d4d8; --navy:#17171a; --success:var(--color-success);
+  --warning:var(--color-warning); --warning-soft:var(--color-warning-soft);
+  --danger:var(--color-danger); --danger-soft:var(--color-danger-soft);
+  --info:var(--color-info); --info-soft:var(--color-info-soft);
+  --map-water:#e6e6e8; --map-land:#c2c2c7; --map-border:#f7f7f8;
+  --shadow:var(--shadow-card);
+}
+
+:root[data-theme="dark"] {
+  --color-page:        #08080a;
+  --color-surface:     #18181b;
+  --color-surface-2:   #111114;
+  --color-surface-3:   #232327;
+
+  --color-text:        #f4f4f5;
+  --color-text-muted:  #a1a1aa;
+  --color-text-inverse:#17171a;
+
+  --color-primary:     #fafafa; /* primary = white on dark */
+  --color-primary-hover:#ffffff;
+  --color-primary-soft:#232327;
+  --color-on-primary:  #17171a;
+  --color-accent:      #a1a1aa;
+
+  --color-border:      #2a2a30;
+  --color-border-strong:#3a3a42;
+
+  --color-success:#5fd0af; --color-success-soft:#12352c;
+  --color-warning:#e6b968; --color-warning-soft:#332715;
+  --color-danger:#f28b86;  --color-danger-soft:#3a1d1c;
+  --color-info:#6fd0e0;    --color-info-soft:#123138;
+
+  --shadow-card:0 18px 50px rgba(0,0,0,.45);
+  --shadow-pop:0 24px 64px rgba(0,0,0,.55);
+
+  /* legacy dark accents */
+  --cyan:#d4d4d8; --navy:#fafafa;
+  --map-water:#1a1a1f; --map-land:#3a3a42; --map-border:#111114;
+}
+
+:root[data-text-scale="large"]  { --font-scale:1.1; }
+:root[data-text-scale="xlarge"] { --font-scale:1.2; }

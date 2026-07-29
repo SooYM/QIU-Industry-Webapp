@@ -10,6 +10,7 @@ import {
 } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
+import { fetchDirectoryCourse, PEOPLE_SCOPE } from "../lib/auth/course-directory";
 import {
   isAllowedAccessEmail,
   isAllowedQiuEmail,
@@ -22,6 +23,7 @@ import {
 type AuthContextValue = {
   user: User | null;
   role: UserRole | null;
+  course: string | null;
   loading: boolean;
   error: string;
   signIn: () => Promise<void>;
@@ -46,6 +48,7 @@ type WhitelistedEmailRecord = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: "select_account" });
+provider.addScope(PEOPLE_SCOPE);
 
 function readableAuthError(error: unknown) {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -58,6 +61,7 @@ function readableAuthError(error: unknown) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
+  const [course, setCourse] = useState<string | null>(null);
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState(isFirebaseConfigured ? "" : "Firebase has not been configured for this deployment.");
 
@@ -72,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!nextUser) {
         setUser(null);
         setRole(null);
+        setCourse(null);
         setLoading(false);
         return;
       }
@@ -126,11 +131,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setUser(nextUser);
         setRole(nextRole);
+        // onAuthStateChanged carries no OAuth token (e.g. page reload), so read the
+        // course resolved during the last interactive sign-in from the stored doc.
+        setCourse((snapshot.data()?.course as string) ?? null);
       } catch {
         await firebaseSignOut(activeAuth);
-        setError("Your account could not be checked. Contact the VacancyPortal administrator.");
+        setError("Your account could not be checked. Contact the QIU Industry Day portal administrator.");
         setUser(null);
         setRole(null);
+        setCourse(null);
       } finally {
         setLoading(false);
       }
@@ -140,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(() => ({
     user,
     role,
+    course,
     loading,
     error,
     signIn: async () => {
@@ -149,7 +159,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setError("");
       try {
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        // The OAuth access token is only available on the interactive sign-in
+        // result. Resolve the student's course from the Workspace directory and
+        // persist it so later reloads (which have no token) can read it back.
+        // Best-effort: a blocked/failed People API call must never block sign-in.
+        const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
+        if (token && db) {
+          try {
+            const resolved = await fetchDirectoryCourse(token);
+            if (resolved) {
+              await setDoc(
+                doc(db, "users", result.user.uid),
+                { course: resolved.name, courseCode: resolved.code },
+                { merge: true },
+              );
+              setCourse(resolved.name);
+            }
+          } catch { /* Directory lookup is best-effort; keep the stored course. */ }
+        }
       } catch (nextError) {
         setError(readableAuthError(nextError));
       }
@@ -157,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       if (auth) await firebaseSignOut(auth);
     },
-  }), [error, loading, role, user]);
+  }), [course, error, loading, role, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -175,8 +203,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!user) {
     return <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
-        <a className="brand auth-brand" href="#" aria-label="VacancyPortal"><span className="brand-mark">VP</span><span>Vacancy<span>Portal</span></span><small>POC</small></a>
-        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to browse vacancies</h1><p>Use your @qiu.edu.my Google account or a Superadmin approved external account.</p></div>
+        <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><span className="brand-mark">QIU</span><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
+        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Use your @qiu.edu.my Google account or a Superadmin approved external account.</p></div>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with Google account</button>
         <small className="auth-boundary">Allowed: @qiu.edu.my or Superadmin Whitelisted Accounts</small>
@@ -188,7 +216,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 function AuthStatus({ title, detail, loading = false }: { title: string; detail: string; loading?: boolean }) {
   return <main className="auth-screen"><section className="auth-card auth-status" role="status" aria-live="polite">
-    <span className="brand-mark">VP</span>{loading && <span className="auth-progress" aria-hidden="true" />}
+    <span className="brand-mark">QIU</span>{loading && <span className="auth-progress" aria-hidden="true" />}
     <h1>{title}</h1><p>{detail}</p>
   </section></main>;
 }

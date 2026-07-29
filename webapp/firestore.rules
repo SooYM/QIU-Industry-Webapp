@@ -46,10 +46,12 @@ service cloud.firestore {
 
     function validUser(data, uid) {
       return data.keys().hasAll(['email', 'role', 'updatedAt'])
-        && data.keys().hasOnly(['email', 'displayName', 'photoURL', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'displayName', 'photoURL', 'role', 'course', 'courseCode', 'createdAt', 'updatedAt'])
         && data.email is string
         && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 120))
         && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 2048))
+        && (!('course' in data) || (data.course is string && data.course.size() <= 120))
+        && (!('courseCode' in data) || (data.courseCode is string && data.courseCode.size() <= 120))
         && (!('createdAt' in data) || data.createdAt is timestamp)
         && data.updatedAt is timestamp
         && ((data.email == 'ai@qiu.edu.my' && data.role == 'superadmin' && isSuperAdmin() && uid == request.auth.uid)
@@ -67,8 +69,8 @@ service cloud.firestore {
           'id', 'title', 'company', 'type', 'specialization', 'vacancies', 'location',
           'salaryLabel', 'salary', 'payFrequency', 'minimumRequirement',
           'detailsLink', 'email', 'companySummary', 'companySources', 'isCustom',
-          'locationMode', 'state', 'country', 'mapX', 'mapY', 'youtubeUrl', 'createdBy',
-          'createdAt', 'updatedAt'
+          'locationMode', 'state', 'country', 'mapX', 'mapY', 'youtubeUrl', 'status',
+          'pendingEdit', 'createdBy', 'createdAt', 'updatedAt'
         ])
         && data.id is int && data.id > 0
         && data.title is string && data.title.size() > 0 && data.title.size() <= 160
@@ -95,9 +97,40 @@ service cloud.firestore {
         && (!('mapX' in data) || (data.mapX is number && data.mapX >= 0 && data.mapX <= 1000))
         && (!('mapY' in data) || (data.mapY is number && data.mapY >= 0 && data.mapY <= 500))
         && (!('youtubeUrl' in data) || (data.youtubeUrl is string && data.youtubeUrl.size() <= 2048))
+        && (!('status' in data) || data.status in ['approved', 'pending', 'pending_edit', 'rejected'])
+        && (!('pendingEdit' in data) || data.pendingEdit is map || data.pendingEdit == null)
         && data.createdBy is string && data.createdBy.size() > 0
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
+    }
+
+    function validApplication(data) {
+      return data.studentUid is string && data.studentUid.size() > 0
+        && data.studentEmail is string && data.studentEmail.size() <= 254
+        && data.studentName is string && data.studentName.size() <= 160
+        && data.jobId is int && data.jobId > 0
+        && data.jobTitle is string && data.jobTitle.size() <= 160
+        && data.company is string && data.company.size() <= 160
+        && (!('resumeId' in data) || (data.resumeId is string && data.resumeId.size() <= 256));
+    }
+
+    function validResume(data, uid) {
+      return data.studentUid is string && data.studentUid == uid
+        && data.studentEmail is string && data.studentEmail.size() <= 254
+        && data.studentName is string && data.studentName.size() <= 160
+        && data.source in ['upload', 'generated']
+        && (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() <= 2048))
+        && (!('fileName' in data) || (data.fileName is string && data.fileName.size() <= 256))
+        && (!('course' in data) || (data.course is string && data.course.size() <= 120));
+    }
+
+    function validChatLog(data) {
+      return data.studentUid is string && data.studentUid.size() > 0
+        && data.studentEmail is string && data.studentEmail.size() <= 254
+        && data.studentName is string && data.studentName.size() <= 160
+        && data.question is string && data.question.size() <= 5000
+        && data.answer is string && data.answer.size() <= 20000
+        && (data.company == null || (data.company is string && data.company.size() <= 160));
     }
 
     match /users/{uid} {
@@ -118,13 +151,71 @@ service cloud.firestore {
         && validVacancy(request.resource.data)
         && (request.resource.data.createdBy == request.auth.uid || request.resource.data.createdBy == request.auth.token.email.lower())
         && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        // Employer listings are gated: they may only self-submit as 'pending'.
+        // Admins/superadmin publish immediately ('approved') or queue ('pending').
+        && (isAdmin()
+          || (request.resource.data.status is string && request.resource.data.status == 'pending'));
       allow update: if canManageJobs()
         && validVacancy(request.resource.data)
         && (isAdmin() || resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower())
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        // Only admins may approve. An employer editing their own approved job can
+        // stage a 'pending_edit' but can never set 'approved' themselves.
+        && (isAdmin()
+          || !('status' in request.resource.data)
+          || request.resource.data.status != 'approved');
       allow delete: if isAdmin() || (isEmployer() && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower()));
+    }
+
+    // A student's application history. Owner writes their own; employers/admins
+    // read for candidate context.
+    match /applications/{appId} {
+      allow read: if isAllowedUser()
+        && (resource.data.studentUid == request.auth.uid || isAdmin() || isEmployer());
+      allow create, update: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && validApplication(request.resource.data);
+      allow delete: if isAllowedUser()
+        && (resource.data.studentUid == request.auth.uid || isAdmin());
+    }
+
+    // "Viewed job" events powering the student history tab. Private to the owner
+    // (and admins for analytics).
+    match /view_events/{id} {
+      allow read: if isAllowedUser()
+        && (resource.data.studentUid == request.auth.uid || isAdmin());
+      allow create, update: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid;
+      allow delete: if isAllowedUser()
+        && (resource.data.studentUid == request.auth.uid || isAdmin());
+    }
+
+    // One resume per student (doc id == student uid). Owner writes; employers and
+    // admins read for hiring.
+    match /resumes/{uid} {
+      allow read: if isAllowedUser()
+        && (request.auth.uid == uid || isAdmin() || isEmployer());
+      allow create, update: if isAllowedUser()
+        && request.auth.uid == uid
+        && validResume(request.resource.data, uid);
+      allow delete: if isAllowedUser()
+        && (request.auth.uid == uid || isAdmin());
+    }
+
+    // Persisted assistant chat turns. Students append their own; admins read all.
+    // POC boundary: employer per-company scoping and identity anonymization are
+    // enforced CLIENT-SIDE via a where('company','==',...) query (see
+    // subscribeCompanyChats). Rules do NOT map an employer -> company, so any
+    // employer read is allowed here; do not treat this as a hard tenant boundary.
+    match /chat_logs/{id} {
+      allow read: if isAdmin() || isEmployer();
+      allow create: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && validChatLog(request.resource.data);
+      allow update: if false;
+      allow delete: if isAdmin();
     }
 
     match /{document=**} {
