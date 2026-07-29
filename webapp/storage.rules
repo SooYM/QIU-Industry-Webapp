@@ -1,0 +1,25 @@
+rules_version = '2';
+
+// Firebase Storage rules for student resume uploads.
+// NOTE: Storage rules cannot read Firestore, so role-based (employer/admin)
+// read access cannot be enforced here. Reads are allowed to any signed-in user;
+// the app only surfaces resume download URLs to managers. This is the POC
+// boundary, mirroring the chat_logs client-side scoping in firestore.rules.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // resumes/<studentUid>/<fileName>
+    match /resumes/{uid}/{fileName} {
+      allow read: if request.auth != null;
+      // Only the student may write/replace their own resume; PDF only, <= 5 MB.
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
