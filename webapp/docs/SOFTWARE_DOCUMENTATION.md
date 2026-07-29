@@ -2,183 +2,220 @@
 
 **Status:** Active Internal Testing Phase<br>
 **Audience:** Developers, reviewers, administrators, and deployment owners<br>
-**Deployment model:** Static Next.js export on Firebase Hosting with Firebase Authentication and Cloud Firestore
+**Deployment Model:** Static Next.js export on Firebase Hosting with Firebase Authentication and Cloud Firestore
 
-## 1. Purpose and scope
+---
 
-QIU Industry Webapp is a full-fledged industry career & vacancy discovery web application for QIU accounts. It provides:
+## 1. Purpose and Scope
 
-- vacancy search and composable company, specialization, opportunity-type, and salary filters;
-- authenticated vacancy and company-profile access;
-- candidate application submission with resume support (Shareable URL or PDF upload);
-- role-based access control with 4 distinct roles (`user`, `employer`, `admin`, `superadmin`);
-- employer & administrator Activity Dashboards for candidate application tracking;
-- per-job grounded deterministic assistant for applicant queries;
-- course-driven recommendations based on student academic profiles;
-- private JSON import into Firestore for administrative initialization;
-- static deployment using Firebase services.
+QIU Industry Webapp is a full-fledged industry career, event management, and anti-cheat attendance discovery web application built for **QIU (Quest International University)** students, academic staff, and participating industry partner employers.
 
-## 2. Design decisions
+The system delivers:
+- **Vacancy Search & Multi-Criteria Filtering**: Composable filtering across company, specialization, employment type (`Permanent`, `Internship`, `Contract`, `Part-time`), location, and salary ranges.
+- **Events & Anti-Cheat QR Attendance Verification (NEW)**:
+  - **Industry Day Event Management**: Admins schedule and manage event details (speaker, location, schedule, session duration `sessionMinutes`, and assigned presenter emails `presenters`).
+  - **Live Dynamic Presenter View (`EventPresenter.tsx`)**: Displays a dynamic **25-second rotating QR code** and 6-character dynamic secret code on projector screens, writing current active step (`checkin` or `checkout`), active code, and expiry timestamp (`codeExpiry`) to `event_codes/{eventId}`.
+  - **WhatsApp / Proxy Anti-Cheat Protection**: The `event_codes` collection is **strictly unreadable by client queries**. Server-side Firestore Security Rules evaluate `eventCode(eventId)` to verify step match, code match, and timestamp validity (`request.time.toMillis() < codeExpiry`). Photos or screenshots shared over messaging apps expire within 25 seconds and fail verification.
+  - **Two-Step CCA Points Eligibility Verification**: Students perform both a Check-In at session start and a Check-Out at session conclusion. Elapsed time is calculated against scheduled session length (`sessionMinutes`), awarding Co-Curricular Activity (CCA) points eligibility (`caEligible`) when threshold conditions are satisfied (≥ 80% of `sessionMinutes`, or 45-minute floor).
+  - **Presenter Delegation**: Admins assign specific presenter emails (`presenters` array) to individual events, granting guest speakers display privileges for live QR screens without granting webapp-wide administrative roles.
+- **Gated Candidate Applications**: Requires students to maintain a valid resume on file (shareable URL or PDF upload via Firebase Storage) prior to applying.
+- **Role-Based Access Control (RBAC)**: Enforces 4 distinct roles (`user`, `employer`, `admin`, `superadmin`) alongside delegated presenter permissions via server-side Firestore Security Rules.
+- **Employer & Admin Activity Dashboards**: Dedicated views for employers to manage candidates for their assigned company, and for admins to review application pipelines and export event attendance records.
+- **Per-Job Grounded Lexical Assistant**: Fast, deterministic in-memory keyword assistant grounded exclusively to the selected vacancy's scope and requirements, eliminating API token costs and hallucination risks.
+- **Course-Driven Recommendations**: Recommends relevant vacancies by matching student directory course profiles with vacancy titles and specializations.
+- **Administrative Data Import**: Superadmin batch import mechanism for initializing or updating vacancy collections from processed local JSON files (`data/jobs.json`).
+
+---
+
+## 2. Design Decisions
 
 | Decision | Reason | Consequence |
 | --- | --- | --- |
-| Static Next.js export | Works with Firebase Hosting without a server runtime | All application logic runs in the browser |
-| Firestore instead of bundled JSON | Keeps private vacancy records out of public Hosting assets | Authorized clients read records from Firebase |
-| Google-only QIU authentication | Matches the institutional access requirement | Other providers, domains, and unverified accounts are rejected |
-| Firestore rules as authority | Client checks can be bypassed | Every protected read and write is reauthorized server-side |
-| Fixed email superadmin | Initial administrative bootstrap | `ai@qiu.edu.my` must remain an active institutional Google identity |
-| Deterministic local assistant | Avoids paid inference and external record processing | Retrieval is lexical, not a true language model |
-| Superadmin browser import | Avoids shipping private seed data or adding backend ingestion | Initial import is manual and capped at 500 records |
+| **Static Next.js Export** | Operates on standard Firebase Hosting without requiring Node.js server runtimes or Blaze serverless functions | All rendering and state management execute client-side in the browser |
+| **Unreadable `event_codes` Collection** | Prevents students from inspecting Firestore subscriptions to extract active attendance codes or sharing QR codes via WhatsApp/social proxy | Security rules evaluate `eventCode(eventId)` via internal `get()` assertions server-side; client reads are blocked |
+| **Two-Step Attendance Verification** | Enforces actual physical attendance for the entire session to prevent quick check-in-and-leave proxy fraud | Students must perform both Check-In and Check-Out; `caEligible` calculation enforces minimum elapsed duration |
+| **Presenter Delegation Model** | Allows guest presenters/speakers to launch live QR screens without giving them full webapp `admin` rights | Presenters listed in `events/{eventId}.presenters` pass targeted authorization checks for `event_codes/{eventId}` writes |
+| **Firestore Rules as Security Authority** | Client-side checks can be bypassed by browser console manipulation | Every protected read and write is validated server-side in `firestore.rules` |
+| **Google-Only QIU Authentication** | Mandates verified institutional identity for standard users | Provider token checks verify `email_verified == true`, provider `google.com`, and `@qiu.edu.my` domain |
+| **Fixed Identity Superadmin** | Guarantees immutable system bootstrap administrator | `ai@qiu.edu.my` is hardcoded in security rules and cannot be demoted, updated by others, or deleted |
+| **Deterministic Local Assistant** | Eliminates paid LLM API token costs, rate limits, and model hallucinations during high-traffic events | Retrieval relies on structured keyword matching against active authorized in-memory vacancy records |
 
-The active application no longer uses the former Cloudflare/vinext Worker or Groq runtime. There is no `/api/chat` request, model API key, or server-side generation. Legacy starter files under `worker/`, `db/`, `examples/`, and `vite.config.ts` are excluded from the active TypeScript build and current npm scripts.
+---
 
-## 3. System context
+## 3. System Context & Architecture
 
 ```mermaid
-flowchart TB
-    Person["QIU user"] --> Browser["Static VacancyPortal client"]
-    Browser --> Auth["Firebase Authentication"]
-    Browser <--> Firestore["Cloud Firestore"]
-    Rules["Firestore Security Rules"] --> Firestore
-    Browser --> Chat["Deterministic grounded retrieval"]
-    Hosting["Firebase Hosting"] --> Browser
+flowchart TD
+    Auth["Google Auth (@qiu.edu.my Gate & Whitelist)"] --> Client["Next.js 16 Static Export Client"]
+    Client --> Rules["Firestore Security Rules (firestore.rules)"]
+    Rules --> Firestore[("Cloud Firestore Database")]
+    
+    subgraph FirestoreCollections ["Firestore Protected Collections"]
+        Vacancies[("vacancies")]
+        Applications[("applications")]
+        Resumes[("resumes")]
+        ChatLogs[("chat_logs")]
+        Events[("events")]
+        EventCodes[("event_codes (Hidden from Client Reads)")]
+        Attendance[("attendance")]
+        Whitelist[("whitelisted_emails")]
+    end
+    
+    Rules --> Vacancies
+    Rules --> Applications
+    Rules --> Resumes
+    Rules --> ChatLogs
+    Rules --> Events
+    Rules --> EventCodes
+    Rules --> Attendance
+    Rules --> Whitelist
 
-    Sources["Private CSV + XLSX"] --> Generator["scripts/generate_data.py"]
-    Generator --> JSON["data/jobs.json, Git-ignored"]
-    JSON -->|"selected locally by superadmin"| Browser
-    Browser -->|"validated batch import"| Firestore
+    subgraph LiveAttendanceModule ["Anti-Cheat QR Attendance Verification"]
+        Presenter["Presenter View (EventPresenter.tsx)"] -->|"Write 25s Rotating Code"| EventCodes
+        Student["Student Scan / Submit Code"] -->|"Server-Side Security Rules Check"| Attendance
+        EventCodes -.->|"get() Rule Check (Timestamp & Code Expiry)"| Attendance
+        Attendance -->|"Check-in + Checkout Duration"| CCA["CCA Eligibility (caEligible)"]
+    end
+
+    subgraph ClientFeatures ["Client Features & Features Scope"]
+        Assistant["Per-Job Grounded Assistant"]
+        Dashboard["Employer & Admin Activity Dashboard"]
+        Recs["Course-Driven Recommendations"]
+        EventsView["Industry Day Events View"]
+    end
+
+    Client --> Assistant
+    Client --> Dashboard
+    Client --> Recs
+    Client --> EventsView
+    Client --> Presenter
+    Client --> Student
+    Dashboard <--> Storage[("Firebase Storage (PDF Resumes)")]
 ```
 
-### Trust boundaries
+### Trust Boundaries
 
-1. **Public Hosting boundary:** `out/` contains the static application, fonts, icons, social image, and country map. It must not contain vacancy JSON.
-2. **Authentication boundary:** Firebase establishes a verified identity. Google provider selection in the UI is helpful but not sufficient by itself.
-3. **Authorization boundary:** `firestore.rules` checks provider, verified email, exact domain, role, document schema, and audit fields.
-4. **Institutional-user boundary:** authorized QIU users receive vacancy data in their browser and can inspect or copy it.
-5. **Admin boundary:** admin and superadmin writes are shared; they are not local-only changes.
-6. **Import boundary:** the private file remains local until its records are deliberately written to Firestore.
+1. **Public Static Asset Boundary**: `out/` contains compiled static bundles, fonts, icons, branding assets, and map graphics. It strictly excludes private raw source files (`*.csv`, `*.xlsx`) and intermediate datasets (`data/jobs.json`).
+2. **Authentication Boundary**: Firebase Authentication establishes identity tokens. Google provider checks ensure that non-Google tokens or unverified email accounts are rejected.
+3. **Authorization Boundary (`firestore.rules`)**: Server-enforced rules validate user authentication, verified status, institutional domain matching (`@qiu.edu.my` or whitelisted employer email), role privileges, document schema validation, and audit field immutability.
+4. **Anti-Cheat Attendance Boundary (`event_codes`)**: Dynamic rotating attendance codes stored in `event_codes/{eventId}` cannot be queried or read by client applications. Verification occurs entirely inside server-side Firestore Security Rules via the `eventCode(eventId)` helper during attendance creation or update.
+5. **Admin & Presenter Boundary**: Administrative features (event management, user promotion, attendance CSV export) are restricted to `admin` and `superadmin` roles. Presenter access to write dynamic QR codes is scoped strictly to the specific event where the user's email is registered in `presenters`.
 
-## 4. Technology stack
+---
 
-| Concern | Technology | Active responsibility |
+## 4. Complete Technology Stack
+
+| Layer | Technology | Active Responsibility & Version |
 | --- | --- | --- |
-| UI | React 19, TypeScript, CSS | Portal, dialogs, filters, map, chat, admin tools |
-| Framework | Next.js App Router | Static page generation and metadata |
-| Build | `next build`, `output: "export"` | Produces `out/` |
-| Authentication | Firebase Authentication | Google sign-in and ID tokens |
-| Database | Cloud Firestore | Shared users and vacancies |
-| Authorization | Firestore Security Rules v2 | Domain, provider, RBAC, and schema checks |
-| Hosting | Firebase Hosting | Static asset delivery and security headers |
-| Assistant | TypeScript lexical retrieval | Deterministic grounded responses |
-| Data preparation | Python | CSV/XLSX to private JSON |
-| Tests | Node + Firebase Rules Unit Testing | App regressions and emulator authorization checks |
+| **UI Framework** | React 19, TypeScript 5.9 | Component hierarchy, modal dialogs, dark mode theme system, state management |
+| **Styling** | Tailwind CSS 4.2, PostCSS | Responsive design tokens, high-contrast dark mode classes (`on-primary`) |
+| **Application Framework** | Next.js 16 (App Router) | Static export builder (`output: "export"`) producing pre-rendered HTML/JS in `out/` |
+| **Authentication** | Firebase Authentication | Google OAuth 2.0 provider integration with institutional domain hints |
+| **Database** | Cloud Firestore | Realtime NoSQL database holding users, vacancies, applications, events, attendance, and logs |
+| **Database Security** | Firestore Security Rules v2 | Server-side role enforcement, schema validation, rate limits, and unreadable secret assertion |
+| **File Storage** | Firebase Storage | Storage bucket for candidate PDF resume uploads with ownership security rules |
+| **Static Hosting** | Firebase Hosting | Production CDN hosting delivering static assets with security header policies |
+| **Realtime Sync** | Firestore `onSnapshot` Subscriptions | Live reactive updates for job vacancies, candidate applications, events, and dynamic presenter codes |
+| **Assistant Engine** | Grounded Lexical Retrieval | In-memory keyword matching engine executing deterministically inside the browser client |
+| **Data Processing** | Python 3 | Off-line data normalization script (`scripts/generate_data.py`) transforming raw CSV/XLSX into JSON |
+| **Test & Emulator Suite** | Node Test Runner & `@firebase/rules-unit-testing` | Unit test suite (`npm test`) and emulator-backed security rules assertion suite (`npm run test:rules`) |
 
-## 5. Component design
+---
+
+## 5. Component Design
 
 ```mermaid
 flowchart LR
     Layout["app/layout.tsx"] --> Provider["AuthProvider"]
     Provider --> Gate["AuthGate"]
-    Gate --> Page["app/page.tsx"]
-    FirebaseClient["app/firebase-client.ts"] --> Provider
-    FirebaseClient --> Page
-    Policy["app/auth-policy.ts"] --> Provider
-    Page --> Chat["app/chat.ts"]
-    Page --> Tooltip["app/map-tooltip.ts"]
-    Page <--> Firestore["users + vacancies"]
+    Gate --> Shell["Main Page Shell (app/page.tsx)"]
+    
+    Shell --> VacanciesModule["features/vacancies/*"]
+    Shell --> EventsModule["features/events/*"]
+    Shell --> StudentModule["features/student/*"]
+    Shell --> AdminModule["features/admin/*"]
+    Shell --> ChatModule["features/chat/*"]
+
+    EventsModule --> EventPresenter["EventPresenter.tsx"]
+    EventsModule --> EventAttendance["EventAttendance.tsx"]
+    EventsModule --> EventsView["EventsView.tsx"]
+    EventsModule --> EventDetail["EventDetail.tsx"]
+
+    FirestoreAccess["lib/data/firestore.ts"] <--> Firestore[("Cloud Firestore")]
+    Shell <--> FirestoreAccess
 ```
 
-### 5.1 Authentication components
+### 5.1 Authentication Components (`app/auth-context.tsx`, `app/auth-policy.ts`)
+- `firebase-client.ts`: Initializes Firebase Auth, Firestore, and Storage SDKs.
+- `auth-context.tsx`: Manages active user authentication state, handles Google OAuth sign-in flow, auto-provisions missing user profiles in `users/{uid}`, and provides role management state.
+- `auth-policy.ts`: Contains domain helper functions for QIU email validation, email normalization, fixed superadmin identity check (`ai@qiu.edu.my`), and role evaluation helpers.
 
-`app/firebase-client.ts` initializes the Firebase Web SDK from `NEXT_PUBLIC_FIREBASE_*` build variables. These values identify a Firebase Web App; they are not service-account secrets.
+### 5.2 Vacancy & Application Components (`features/vacancies/*`, `features/student/*`)
+- `VacancyList.tsx` / `VacancyCard.tsx`: Displays authorized vacancies with real-time search, category filtering, and location mapping.
+- `VacancyModal.tsx`: Displays vacancy details, requirements, scope, salary metadata, and candidate application submission forms.
+- `StudentResume.tsx`: Manages candidate resume submissions (shareable external link or PDF file upload to Firebase Storage).
 
-`app/auth-context.tsx`:
+### 5.3 Events & Anti-Cheat Attendance Module (`features/events/*`)
+- `EventsView.tsx`: Displays upcoming Industry Day talks and sessions, speaker metadata, session length (`sessionMinutes`), and student attendance status.
+- `EventDetail.tsx`: Modal view providing session descriptions, speaker profiles, check-in status, and quick scan buttons.
+- `EventForm.tsx`: Administrative modal for creating and updating event entries, setting scheduled duration, and configuring the `presenters` email whitelist array.
+- `EventPresenter.tsx`: Dedicated live projector display screen. Generates a dynamic dynamic QR code and 6-character code every 25 seconds, publishing active step, code, and expiry timestamp to `event_codes/{eventId}`.
+- `EventAttendance.tsx`: Administrative attendance log viewer. Displays real-time attendee list, check-in/checkout timestamps, calculated duration, CCA points eligibility (`caEligible`), and exports formatted UTF-8 CSV reports for Excel.
 
-- opens Google sign-in with a QIU hosted-domain hint;
-- rejects unverified and non-QIU emails client-side;
-- creates a missing user profile with the default role;
-- refreshes display name and photo URL without allowing self-role changes;
-- exposes the current role to the UI;
-- provides the superadmin role manager.
+---
 
-`app/auth-policy.ts` normalizes emails, checks the QIU domain, derives the fixed superadmin, and exposes UI authorization helpers.
+## 6. Identity and Role Model
 
-`AuthGate` prevents the portal from rendering before client authentication completes. It is a presentation boundary only; Firestore rules are the security boundary.
+### 6.1 Authentication Requirements
+`firestore.rules` enforces the following claims on every protected database request:
+1. Valid authenticated Firebase token (`request.auth != null`).
+2. Verified email address (`request.auth.token.email_verified == true`).
+3. Google sign-in provider (`request.auth.token.firebase.sign_in_provider == 'google.com'`).
+4. Institutional email domain matching `@qiu.edu.my` OR explicit entry in `whitelisted_emails/{email}`.
 
-### 5.2 Portal component
+### 6.2 Roles & Capabilities Matrix
 
-`app/page.tsx` owns:
+| Role | Vacancy Access | Event Management | Live Presenter Screen | Attendance Logs & CSV Export | Role Management | Data Import |
+| --- | --- | --- | --- | --- | --- | --- |
+| `user` | Browse, Filter, Apply | View Events, Check-in/out | No | View Own History Only | No | No |
+| `employer` | Post & Stage Edits (Own Company) | No | No | No | No | No |
+| `admin` | Full CRUD (All Companies) | Create, Edit, Delete | Yes | Full View & Export | Promote Users | No |
+| `superadmin` | Full CRUD (All Companies) | Create, Edit, Delete | Yes | Full View & Export | Full RBAC Control | Batch Import |
+| *(Delegated Presenter)* | Standard User Access | View Assigned Event | Yes (Assigned Event Only) | View Assigned Event | No | No |
 
-- the live Firestore vacancy subscription;
-- search, filters, pagination, columns, text scale, and theme;
-- vacancy details and salary context;
-- admin create, edit, delete, and superadmin import operations;
-- Malaysian and international location entry;
-- deterministic chat state and source links.
+---
 
-Only display preferences are stored in `localStorage` under `vacancyportal-view-prefs`. Vacancies are no longer stored in browser-local persistence.
-
-### 5.3 Deterministic assistant
-
-`app/chat.ts` is included in the static client. It searches only the vacancy array already authorized and loaded from Firestore. It performs no network request beyond the existing Firestore subscription and sends no prompt or record to an external model provider.
-
-## 6. Identity and role model
-
-### 6.1 Required identity claims
-
-`firestore.rules` requires all of the following:
-
-- an authenticated Firebase user;
-- `email_verified == true`;
-- `firebase.sign_in_provider == "google.com"`;
-- an email matching the exact `@qiu.edu.my` suffix.
-
-The Google `hd=qiu.edu.my` parameter is only a sign-in hint. Provider and domain enforcement remains in rules.
-
-### 6.2 Roles
-
-| Role | Vacancy reads | Vacancy writes | Role management | JSON import |
-| --- | ---: | ---: | ---: | ---: |
-| `user` | Yes | No | No | No |
-| `admin` | Yes | Create, update, delete | No | No |
-| `superadmin` | Yes | Create, update, delete | Assign `user`/`admin` | Yes |
-
-The superadmin is determined from the authenticated email `ai@qiu.edu.my`, not from an editable client value. Rules prevent its profile from being assigned to another UID, demoted, or deleted.
-
-### 6.3 Profile lifecycle
-
-1. A verified QIU Google identity signs in.
-2. The client reads `users/{uid}`.
-3. If absent, that identity may create only its own document with:
-   - its exact authenticated email;
-   - role `user`, except `ai@qiu.edu.my`, which receives `superadmin`;
-   - server timestamps and optional display profile fields.
-4. A user may update only its own `displayName`, `photoURL`, and `updatedAt`.
-5. The superadmin may assign another profile `user` or `admin`.
-
-Firestore rules apply a changed role immediately. The affected browser may need sign-out/sign-in before its cached UI role changes.
-
-## 7. Firestore data model
+## 7. Firestore Data Model & Schemas
 
 ### 7.1 `users/{uid}`
-
 ```ts
-type UserProfile = {
+export interface UserRecord {
+  uid: string;
   email: string;
-  role: "user" | "admin" | "superadmin";
-  displayName?: string;
-  photoURL?: string;
+  displayName: string;
+  photoURL: string;
+  role: "user" | "admin" | "superadmin" | "employer";
+  course?: string;         // e.g. "Computer Science"
+  courseCode?: string;     // e.g. "BCS"
+  company?: string;        // Assigned employer company binding
   createdAt?: Timestamp;
   updatedAt: Timestamp;
-};
+}
 ```
 
-Only the superadmin may list all profiles. Normal users may read their own profile.
-
-### 7.2 `vacancies/{id}`
-
+### 7.2 `whitelisted_emails/{email}`
 ```ts
-type Vacancy = {
+export interface WhitelistedEmail {
+  email: string;           // Normalized lowercase email
+  company?: string;        // Bound company name for employer accounts
+  addedBy: string;
+  createdAt: Timestamp;
+}
+```
+
+### 7.3 `vacancies/{id}`
+```ts
+export interface Job {
   id: number;
   title: string;
   company: string;
@@ -186,6 +223,11 @@ type Vacancy = {
   specialization: string;
   vacancies: number;
   location: string;
+  locationMode?: "malaysia" | "international";
+  state?: string;
+  country?: string;
+  mapX?: number;
+  mapY?: number;
   salaryLabel: string;
   salary: number;
   payFrequency: "Monthly" | "Annually" | "Weekly" | "Daily";
@@ -194,313 +236,303 @@ type Vacancy = {
   email: string;
   companySummary: string;
   companySources: string[];
-  isCustom: true;
-  locationMode: "malaysia" | "international";
-  state: string;
-  country: string;
-  mapX?: number;
-  mapY?: number;
-  createdBy: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-};
+  jobScope?: string;
+  requirement?: string;
+  youtubeUrl?: string;
+  isCustom?: boolean;
+  status?: "approved" | "pending" | "pending_edit" | "rejected";
+  pendingEdit?: Partial<Job> | null;
+  createdBy?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
 ```
 
-Rules reject unknown fields and enforce string lengths, numeric bounds, enum values, email shape, location consistency, server timestamps, and immutable `createdBy`/`createdAt` on update. Creation requires `createdBy` to equal the authenticated admin UID.
+### 7.4 `applications/{appId}` (Doc ID: `${studentUid}_${jobId}`)
+```ts
+export interface Application {
+  id: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  jobId: number;
+  jobTitle: string;
+  company: string;
+  resumeId?: string;
+  appliedAt?: Timestamp;
+}
+```
 
-`companySummary` and `companySources` are supplied discussion material, not verified employer claims.
+### 7.5 `resumes/{uid}` (Doc ID: `${studentUid}`)
+```ts
+export interface Resume {
+  id: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  course?: string;
+  fileUrl?: string;        // Storage download URL or external share link
+  fileName?: string;
+  source: "upload" | "generated" | "link";
+  updatedAt?: Timestamp;
+}
+```
 
-### 7.3 Indexes
+### 7.6 `chat_logs/{id}`
+```ts
+export interface ChatLog {
+  id: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  company: string | null;  // Detected target company, if any
+  question: string;
+  answer: string;
+  createdAt?: Timestamp;
+}
+```
 
-The current client subscribes to the full authorized vacancy collection and filters in memory, so `firestore.indexes.json` declares no composite indexes. Add indexes only when server-side queries require them.
+### 7.7 `events/{eventId}`
+```ts
+export interface EventItem {
+  id: number;
+  title: string;
+  description: string;
+  location: string;
+  speakerName: string;
+  speakerEmail: string;
+  startAt: string;        // ISO format "YYYY-MM-DDTHH:mm"
+  endAt: string;
+  sessionMinutes: number; // Scheduled length driving CCA eligibility threshold
+  presenters: string[];   // Whitelisted emails granted live QR presentation rights
+  createdBy?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+```
 
-## 8. Primary flows
+### 7.8 `event_codes/{eventId}` (Secret Server-Only Collection)
+```ts
+export interface EventCode {
+  activeStep: "checkin" | "checkout" | "none";
+  activeCode: string;     // Dynamic 25s dynamic code
+  codeExpiry: number;     // Epoch timestamp in milliseconds
+}
+```
 
-### 8.1 Sign-in and protected read
+> [!IMPORTANT]
+> **Client Read Protection:** Security rules block all direct client `read` requests (`allow read: if isAdmin()`). When a student submits a check-in or checkout, Firestore Security Rules evaluate `eventCode(eventId)` internally via server-side `get()` assertions.
+
+### 7.9 `attendance/{attendanceId}` (Doc ID: `${eventId}_${studentUid}`)
+```ts
+export interface Attendance {
+  id: string;
+  eventId: number;
+  eventTitle: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  code: string;           // Submitted dynamic code validated by security rules
+  step: "checkin" | "checkout";
+  checkInMs?: number;     // Client epoch timestamp at Check-In
+  checkOutMs?: number;    // Client epoch timestamp at Check-Out
+  durationMinutes?: number; // Calculated elapsed duration in minutes
+  caEligible?: boolean;   // Co-Curricular Activity (CCA) points eligibility flag
+  checkInAt?: Timestamp;
+  checkOutAt?: Timestamp;
+}
+```
+
+---
+
+## 8. Primary Flows
+
+### 8.1 Presenter Dynamic QR Code Rotation Flow
 
 ```mermaid
 sequenceDiagram
-    actor User
-    participant UI as Static client
-    participant Auth as Firebase Auth
-    participant DB as Firestore
+    actor Presenter as Presenter / Admin
+    participant View as EventPresenter.tsx
+    participant DB as Cloud Firestore
     participant Rules as Security Rules
 
-    User->>UI: Continue with QIU Google account
-    UI->>Auth: Google popup
-    Auth-->>UI: Verified identity token
-    UI->>DB: Read/create own user profile
-    DB->>Rules: Evaluate provider, email, domain, schema
-    Rules-->>DB: Allow or deny
-    UI->>DB: Subscribe to vacancies
-    DB->>Rules: Evaluate QIU read access
-    DB-->>UI: Authorized vacancy snapshot
-```
-
-Non-QIU, unverified, signed-out, and non-Google identities cannot read vacancy records even if they bypass the visual gate.
-
-### 8.2 Admin vacancy write
-
-```mermaid
-sequenceDiagram
-    actor Admin
-    participant Form as Admin form
-    participant DB as Firestore
-    participant Rules as Security Rules
-    participant List as Live vacancy list
-
-    Admin->>Form: Submit vacancy
-    Form->>DB: setDoc or updateDoc with server timestamp
-    DB->>Rules: Verify QIU identity, admin role, schema, audit fields
-    alt Allowed
-        Rules-->>DB: Accept
-        DB-->>List: Snapshot update
-    else Denied or invalid
-        Rules-->>Form: Permission error
+    Presenter->>View: Select Event & Start Live View (Step: Check-in)
+    loop Every 25 Seconds
+        View->>View: Generate random code & compute codeExpiry (+31s)
+        View->>DB: setDoc event_codes/{eventId}
+        DB->>Rules: Check if user is Admin OR email in events/{eventId}.presenters
+        Rules-->>DB: Allow write
+        View->>View: Render updated QR image on projector screen
     end
 ```
 
-Editing preserves supplied pay frequency, details reference, company summary, and company sources. Those fields default only for a newly created vacancy.
-
-### 8.3 Superadmin import
-
-1. The superadmin generates or receives an approved `jobs.json` locally.
-2. The browser parses the selected file and requires an array of no more than 500 basic records.
-3. Malaysian location aliases such as `Kuala Lumpur` are normalized to the configured state label.
-4. The client adds location fields, audit fields, and server timestamps.
-5. A Firestore batch writes the records.
-6. Security rules validate every document; one invalid record rejects the whole batch.
-
-Import is intentionally unavailable to ordinary admins. Re-importing an existing numeric document ID replaces that document.
-
-### 8.4 Grounded chat
+### 8.2 Student Anti-Cheat Attendance Verification Flow
 
 ```mermaid
 sequenceDiagram
-    actor User
-    participant Chat as Assistant panel
-    participant Jobs as Authorized in-memory vacancies
-    participant R as Deterministic retriever
+    actor Student as QIU Student
+    participant Scanner as Webapp Scanner / Input
+    participant DB as Cloud Firestore
+    participant Rules as Security Rules
 
-    User->>Chat: Ask a question
-    Chat->>R: Question + Jobs
-    R->>Jobs: Score title, company, type, specialization, location, requirement
-    alt Matches
-        R-->>Chat: Up to five formatted records + sources
-    else No match
-        R-->>Chat: Supplied-record refusal
+    Student->>Scanner: Scan QR Code or Enter Dynamic Code
+    Scanner->>DB: setDoc / updateDoc attendance/{eventId}_{uid}
+    DB->>Rules: Evaluate attendance document write rules
+    Rules->>DB: Server assertion: get(event_codes/{eventId})
+    alt Code & Step Match AND request.time.toMillis() < codeExpiry
+        Rules-->>DB: Allow Document Write
+        DB-->>Scanner: Attendance Verified Successfully
+        Scanner->>Scanner: Update Check-In / Check-Out UI & Calculate CCA Status
+    else Invalid Code OR Expired (> 25s photo) OR Step Mismatch
+        Rules-->>DB: Reject Write (Permission Denied)
+        DB-->>Scanner: Display Verification Error
     end
 ```
 
-Supported boosts cover internship intent, salary comparisons, and a small computing-study vocabulary including the observed `computer scienc` typo. No embeddings, vector database, prompt generation, or external inference service is used.
+### 8.3 Two-Step CCA Points Calculation Flow
+1. **Check-In**: Student submits active `checkin` code while presenter runs Step 1. Firestore creates `attendance/{eventId}_{studentUid}` with `checkInMs` timestamp.
+2. **Session Attendance**: Student attends event session.
+3. **Check-Out**: Student submits active `checkout` code while presenter runs Step 2. Firestore updates attendance document with `checkOutMs`.
+4. **Eligibility Computation**: `durationMinutes` is calculated as `Math.round((checkOutMs - checkInMs) / 60000)`. `caEligible` is set to `true` if `durationMinutes >= ccaThresholdMinutes(sessionMinutes)` (where threshold is ≥ 80% of `sessionMinutes` or 45 min floor).
 
-## 9. Private data lifecycle
+---
 
-### 9.1 Source preparation
+## 9. Anti-Cheat Security & Data Protection Model
 
-`scripts/generate_data.py` reads the private vacancy CSV and company-discussion workbook, normalizes salary data, joins company information, and writes `data/jobs.json`.
+### Dynamic QR Expiration vs Screenshot Fraud
+Standard static QR codes posted at venues are vulnerable to proxy attendance, where students take photos and broadcast them via WhatsApp or Telegram groups.
 
-These files remain ignored:
+QIU Industry Webapp resolves proxy attendance through a multi-tiered defense:
+1. **Short Expiry Window**: Dynamic codes expire within 25 seconds (`REFRESH_MS = 25000`). A shared photo becomes invalid almost instantly.
+2. **Unreadable Secret Collection**: `event_codes` cannot be queried by students (`allow read: if isAdmin()`), blocking automated screen-scraping bots.
+3. **Atomic Server-Side Rule Evaluation**: When an attendance document write request arrives, Firestore Security Rules retrieve the secret `event_codes/{eventId}` document server-side and assert:
+   - `eventCode(eventId).activeStep == request.resource.data.step`
+   - `eventCode(eventId).activeCode == request.resource.data.code`
+   - `request.time.toMillis() < eventCode(eventId).codeExpiry`
 
-- `data/jobs.json`;
-- `*.csv`;
-- `*.xls`, `*.xlsx`, and `*.tsv`;
-- `.env*`, except `.env.example`;
-- `out/` and Firebase debug state.
+If any assertion fails, Firestore instantly rejects the transaction.
 
-### 9.2 Deployment boundary
+---
 
-The static build does not import `data/jobs.json`. Therefore approved vacancy values and company summaries do not appear in `out/`. The generated file is supplied manually after deployment through authenticated superadmin import.
-
-Git and bundle exclusion do not prevent an authorized QIU user from reading records delivered by Firestore. This design controls access; it does not provide digital-rights enforcement after delivery.
-
-### 9.3 External processors
-
-Firebase processes authentication profile data, Hosting requests, and Firestore records. The application does not send vacancy records or chat questions to Groq, OpenAI, or another model API. Deployment owners must still apply institutional classification, retention, consent, and account-lifecycle policies to Firebase.
-
-## 10. Local development
+## 10. Local Development & Setup Commands
 
 ### Prerequisites
+- Node.js `22.13.0` or newer
+- npm package manager
+- Java Runtime Environment (JRE) for local Firestore security rules emulator testing
 
-- Node.js 22.13 or newer
-- npm
-- Java for Firestore emulator tests
-- Firebase project with Google Authentication and Firestore
-- Firebase Web App configuration
-
-### Environment
+### Setup & Execution Commands
 
 ```bash
+# 1. Install dependencies
+cd webapp
 npm ci
+
+# 2. Configure environment
 cp .env.example .env.local
-```
 
-Fill `.env.local` with values from Firebase Console:
-
-```dotenv
-NEXT_PUBLIC_FIREBASE_API_KEY=...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=<your-project-id>.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=<your-project-id>
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=<your-project-id>.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
-NEXT_PUBLIC_FIREBASE_APP_ID=...
-```
-
-Never use a project ID merely because it matches the product name; Firebase project IDs are globally unique. Confirm the project belongs to the intended QIU Firebase account.
-
-### Run
-
-```bash
+# 3. Start development server
 npm run dev
-```
 
-Open `http://localhost:3000`. Add `localhost` to Firebase Authentication authorized domains when required.
-
-## 11. Test and quality gates
-
-```bash
+# 4. Execute linting & static build
 npm run lint
-npm test
-npm run test:rules
-```
-
-| Test | Coverage |
-| --- | --- |
-| `admin-form-regression.test.mjs` | Salary entry, Firestore save wiring, refresh behavior, imported-field preservation |
-| `chat-retrieval.test.mjs` | Computing-study matching, typo handling, deterministic refusal |
-| `map-tooltip-regression.test.mjs` | Country label containment at map edges |
-| `firestore-rules.test.mjs` | QIU/Google reads, outsider denial, self-escalation denial, immutable superadmin, admin-only CRUD, audit-field protection |
-
-`npm run test:rules` starts a local Firestore emulator against the demo project ID `demo-vacancyportal`; it does not access production Firebase data.
-
-Recommended manual checks:
-
-1. Verify Google QIU sign-in and non-QIU rejection.
-2. Confirm a new user can browse but cannot see admin controls.
-3. Promote a test user and confirm Firestore permits vacancy CRUD.
-4. Demote the account and confirm rules deny further writes.
-5. Confirm `ai@qiu.edu.my` cannot be changed or deleted.
-6. Import approved JSON and confirm all records appear through the live subscription.
-7. Edit an imported record and confirm company context and pay frequency remain intact.
-8. Search a multi-role company and combine all filters.
-9. Ask supported and unsupported chat questions and confirm source-only behavior.
-10. Inspect `out/` and confirm private vacancy strings are absent.
-
-## 12. Firebase Spark deployment
-
-### Firebase project setup
-
-1. Create or select a Firebase project with a globally unique project ID.
-2. Register a Web App.
-3. Enable Authentication → Google.
-4. Create Cloud Firestore.
-5. Configure Authentication authorized domains.
-6. Populate `.env.local` with that same project’s Web App values.
-
-CLI example:
-
-```bash
-npx firebase-tools login
-npx firebase-tools projects:list
-npx firebase-tools projects:create <your-project-id> --display-name VacancyPortal
-```
-
-Project creation is needed only when an owned project does not already exist. The display name may be `VacancyPortal`; the project ID must be unique.
-
-### Validate and deploy
-
-```bash
-npm run lint
-npm test
-npm run test:rules
 npm run build
-npx firebase-tools deploy --only firestore:rules,firestore:indexes,hosting --project <your-project-id>
+
+# 5. Execute application tests
+npm test
+
+# 6. Execute emulator-backed Firestore Security Rules tests
+npm run test:rules
 ```
 
-`firebase.json` deploys:
+---
 
-- `firestore.rules`;
-- `firestore.indexes.json`;
-- static `out/` Hosting content;
-- long-lived cache headers for static assets;
-- `X-Content-Type-Options`, `Referrer-Policy`, and `X-Frame-Options` headers.
+## 11. Testing & Quality Gates
 
-This architecture requires no Cloud Functions, Cloud Run, App Hosting, or Blaze-only server runtime. It is designed for Spark usage, but quotas and Firebase product terms can change. Deployment owners must monitor current Authentication, Firestore, and Hosting limits.
+The repository includes comprehensive automated tests covering application logic, UI components, and Firestore security rules:
 
-### First deployment order
+```bash
+# Run unit & regression test suite
+npm test
 
-1. Deploy rules and Hosting.
-2. Open the Hosting URL and sign in as `ai@qiu.edu.my` to create the fixed superadmin profile.
-3. Import the approved private JSON.
-4. Assign test users as needed.
-5. Re-run manual privacy and role checks.
+# Run Firestore security rules emulator suite
+npm run test:rules
+```
 
-## 13. Operations
+### Test Suites Overview
 
-### Role changes
+| Test File | Target Scope |
+| --- | --- |
+| `tests/admin-form-regression.test.mjs` | Vacancy editing, salary input normalization, field preservation |
+| `tests/chat-retrieval.test.mjs` | Deterministic assistant lexical matching, typo handling, refusal state |
+| `tests/map-tooltip-regression.test.mjs` | Interactive location map boundary checks |
+| `tests/firestore-rules.test.mjs` | Complete Firestore security rules suite verifying domain restrictions, RBAC enforcement, `event_codes` privacy, presenter delegation, and anti-cheat attendance assertions |
 
-- Promote only known QIU accounts.
-- Use separate test accounts when validating admin behavior.
-- Firestore authorization changes immediately; ask affected users to sign out and back in if the UI still shows an old role.
-- The fixed superadmin account must be protected by QIU Google account controls.
+---
 
-### Vacancy updates
+## 12. Firebase Deployment Procedure
 
-- Admin changes propagate through the live Firestore snapshot.
-- Use the superadmin importer only for approved batch initialization or replacement.
-- There is no built-in rollback or audit-history collection; export/backup Firestore before substantial replacement.
+Deploy security rules, indexes, and static hosting to Firebase:
 
-### Incident response
+```bash
+# Build static bundle
+npm run build
 
-If unauthorized access is suspected:
+# Deploy rules, indexes, and hosting
+npx firebase-tools deploy --only firestore:rules,firestore:indexes,hosting
+```
 
-1. disable the affected Firebase Authentication account or Google identity;
-2. remove its admin role in Firestore;
-3. inspect Firebase and Google account logs available to the project owner;
-4. rotate any exposed service credentials—none should exist in this client repository;
-5. correct and deploy rules before restoring access.
+---
 
-## 14. Known limitations
+## 13. Operations & Maintenance
 
-- Active internal testing phase; currently undergoing internal validation prior to public release.
-- Deterministic lexical retrieval is not an LLM and has limited semantic recall.
-- Every authorized user receives the matching Firestore vacancy documents in the browser.
-- Client filtering reads the full vacancy collection and may become expensive at larger scale.
-- No vacancy approval, expiry, history, moderation, backup automation, or recovery UI.
-- No Firebase App Check, centralized telemetry, or alerting.
-- Profile roles are read at sign-in; UI role refresh is not realtime.
-- Import is capped at one Firestore batch of 500 records.
-- Company discussions are unverified.
-- Salary normalization does not fully model ranges or comparable pay periods.
-- Spark quotas may be insufficient for wider institutional adoption.
+### 13.1 Creating Events & Delegating Presenters
+1. Sign in as an `admin` or `superadmin`.
+2. Open **Events Management** -> **Create Event**.
+3. Fill in Title, Description, Location, Speaker Name, Speaker Email, Start/End Times, and `sessionMinutes`.
+4. To grant guest presenters live QR display rights, enter their emails into the **Presenters** list.
 
-## 15. Production recommendations
+### 13.2 Running Live Event QR Screens
+1. Open the Event item and click **Launch Live Presenter Screen**.
+2. Toggle between **Step 1: Check-in** (at start of session) and **Step 2: Check-out** (at end of session).
+3. Keep the browser window active on the projector screen. Dynamic codes will automatically update every 25 seconds.
 
-Before production use:
+### 13.3 Exporting Attendance Records
+1. Open the Event item and click **View Attendance Log**.
+2. Click **Export to Excel (CSV)** to download a UTF-8 BOM-encoded CSV file containing student names, emails, check-in/checkout times, total duration, and `caEligible` status.
 
-1. complete institutional data-classification, consent, retention, and Firebase tenancy reviews;
-2. add account deprovisioning and periodic role review;
-3. add App Check where appropriate, monitoring, alerts, and an incident runbook;
-4. implement audit-history, approval, expiry, backup, and restore workflows;
-5. move filtering to indexed Firestore queries when record volume warrants it;
-6. add end-to-end browser tests for sign-in, roles, CRUD, import, and accessibility;
-7. create a measured retrieval evaluation set before expanding assistant behavior;
-8. add a license before external redistribution or contribution.
+---
 
-## 16. Repository references
+## 14. Known Limitations
 
-- `app/auth-context.tsx` — authentication state, profile bootstrap, and role manager
-- `app/auth-policy.ts` — QIU domain and role helpers
-- `app/firebase-client.ts` — Firebase Web SDK initialization
-- `app/page.tsx` — Firestore subscription, portal UI, CRUD, and import
-- `app/chat.ts` — deterministic grounded retrieval and response formatting
-- `app/map-tooltip.ts` — country-tooltip geometry
-- `firestore.rules` — authoritative access and validation policy
-- `firestore.indexes.json` — Firestore index configuration
-- `firebase.json` — Hosting and Firestore deployment configuration
-- `next.config.ts` — static export configuration
-- `scripts/generate_data.py` — private source normalization
-- `tests/firestore-rules.test.mjs` — emulator-backed authorization tests
+- **Active Internal Testing Phase**: Currently undergoing internal validation prior to public release.
+- **Presenter Screen Active Window Requirement**: The live QR view (`EventPresenter.tsx`) must remain open in an active browser tab during presentation to continuously write 25s rotating codes to Firestore.
+- **Deterministic Assistant Bounds**: Grounded assistant operates on lexical pattern matching and does not perform broad natural language reasoning.
+
+---
+
+## 15. Production Recommendations
+
+1. Maintain periodic reviews of `whitelisted_emails` to revoke access for departed external employers.
+2. Ensure guest presenter emails listed in event `presenters` arrays match their authenticated QIU Google email addresses.
+3. Monitor Firestore read/write quota metrics during high-capacity campus recruitment fairs and Industry Day events.
+
+---
+
+## 16. Repository References
+
+- `webapp/app/auth-context.tsx` — Authentication state, profile bootstrap, role manager
+- `webapp/app/auth-policy.ts` — Domain validation and superadmin policies
+- `webapp/app/firebase-client.ts` — Firebase Web SDK initialization
+- `webapp/features/events/EventsView.tsx` — Industry Day event dashboard
+- `webapp/features/events/EventPresenter.tsx` — Dynamic 25s rotating QR presenter view
+- `webapp/features/events/EventAttendance.tsx` — Real-time attendance log & CSV exporter
+- `webapp/lib/data/types.ts` — Canonical domain interfaces (`Job`, `EventItem`, `EventCode`, `Attendance`, etc.)
+- `webapp/lib/data/firestore.ts` — Database access layer & CCA eligibility logic
+- `webapp/firestore.rules` — Authoritative security rules and server-side assertion functions
+- `webapp/tests/firestore-rules.test.mjs` — Emulator-backed security rules test suite
+
+---
 
 ## 17. License
 
