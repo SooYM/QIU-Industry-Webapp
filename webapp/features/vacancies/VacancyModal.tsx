@@ -59,14 +59,18 @@ export function VacancyModal({
   isStudent,
   recommended = false,
   applied = false,
+  hasResume = false,
   onApply,
+  onGoToResume,
   onClose,
 }: {
   job: Job;
   isStudent: boolean;
   recommended?: boolean;
   applied?: boolean;
+  hasResume?: boolean;
   onApply?: () => void;
+  onGoToResume?: () => void;
   onClose: () => void;
 }) {
   const benchmark = benchmarkFor(job);
@@ -122,10 +126,17 @@ export function VacancyModal({
             <span className="detail-label">APPLICATION</span>
             {applied ? (
               <p className="rounded-lg px-3 py-2 text-xs font-bold tone-success" role="status">✓ Applied — saved to your History.</p>
+            ) : hasResume ? (
+              <>
+                <button type="button" className="enquire-main" onClick={onApply}>Apply to this vacancy →</button>
+                <small className="text-accent">Applying records your interest and attaches your submitted resume.</small>
+              </>
             ) : (
-              <button type="button" className="enquire-main" onClick={onApply}>Apply to this vacancy →</button>
+              <>
+                <p className="rounded-lg px-3 py-2 text-xs font-bold tone-neutral" role="status">Submit your resume before you can apply.</p>
+                <button type="button" className="enquire-main" onClick={onGoToResume}>Submit your resume →</button>
+              </>
             )}
-            <small className="text-accent">Applying records your interest and attaches your submitted resume if available.</small>
           </>
         )}</aside>
       </div>

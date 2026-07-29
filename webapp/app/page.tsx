@@ -150,7 +150,7 @@ export default function Home() {
   const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setPage(1); };
 
   function applyToJob(job: Job) {
-    if (!user) return;
+    if (!user || !myResume) return; // must submit a resume before applying
     recordApplication({
       id: `${user.uid}_${job.id}`, studentUid: user.uid,
       studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Student",
@@ -265,7 +265,9 @@ export default function Home() {
           isStudent={isStudent}
           recommended={isStudent && jobMatchesCourse(selectedJob, course)}
           applied={appliedJobIds.has(selectedJob.id)}
+          hasResume={Boolean(myResume)}
           onApply={() => applyToJob(selectedJob)}
+          onGoToResume={() => { setSelectedJob(null); setStudentTab("resume"); }}
           onClose={() => setSelectedJob(null)}
         />
       )}
