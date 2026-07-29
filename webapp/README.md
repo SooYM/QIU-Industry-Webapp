@@ -1,18 +1,21 @@
-# VacancyPortal
+# QIU Industry Webapp
 
-VacancyPortal is a **proof-of-concept (POC)** vacancy discovery portal built for **QIU (Quest International University)** students, staff, and authorized partner employers. Built with Next.js 16 (App Router static export), React 19, Tailwind CSS v4, Cloud Firestore, and Firebase Authentication.
+> [!NOTE]
+> **Status:** Active Internal Testing Phase — Currently undergoing internal validation. Live deployment links and public hosting URLs are strictly withheld during testing.
+
+**QIU Industry Webapp** is a full-fledged industry career & vacancy discovery web application built for **QIU (Quest International University)** students, academic staff, and participating industry partner employers. Built with Next.js 16 (App Router static export), React 19, Tailwind CSS v4, Cloud Firestore, and Firebase Authentication.
 
 > [!IMPORTANT]
 > **Privacy & Security Boundary:** Private source files (CSV, XLSX, XLS, TSV) and generated vacancy files (`data/jobs.json`) are strictly excluded from version control and static website export bundles. Shared vacancy and application records are securely managed in Cloud Firestore and protected by server-enforced Firestore Security Rules (`firestore.rules`).
 
-![VacancyPortal social preview](public/og.png)
+![QIU Industry Webapp social preview](public/og.png)
 
 ## Core Features
 
 - **Gated Job Applications**: Applying to a vacancy requires a submitted resume on file. Candidates can provide a shareable resume URL (Google Drive, OneDrive, Dropbox) for zero-cost Firebase Spark plan hosting, or opt for direct PDF upload via Firebase Storage.
 - **Per-Job Grounded Assistant**: Embedded directly within each job details popup, the assistant is strictly grounded to that single vacancy's data (title, company, salary, location, job scope, requirements) to answer applicant queries without external LLM costs or model hallucinations.
 - **Course-Driven Recommendations**: Automatically delivers personalized vacancy recommendations tailored to the student's program by matching vacancy specializations and titles against their directory course profile.
-- **Employer Activity Dashboard**: A centralized activity dashboard. Employers view applications submitted specifically to their pre-bound company, while Admins and Superadmins maintain portal-wide visibility across all candidate submissions.
+- **Employer Activity Dashboard**: A centralized activity dashboard. Employers view applications submitted specifically to their pre-bound company, while Admins and Superadmins maintain webapp-wide visibility across all candidate submissions.
 - **Strict Required Fields**: Enforces strict data quality when posting or editing vacancies by requiring numeric salary values (with pay frequency) alongside structured Job Scope & Minimum Requirements.
 - **Branded & Dark-Mode Optimized UI**: Features responsive navigation, QIU logo branding, adjustable font scaling, and high-contrast `on-primary` dark mode styling for enhanced visual clarity and accessibility.
 - **Interactive Location Filtering**: Supports state selection across Malaysia as well as international country mapping.
@@ -28,7 +31,7 @@ Authentication requires a verified Google account. Access rights and capabilitie
 | --- | --- | --- |
 | `user` | Standard QIU student or staff (`@qiu.edu.my`) | Default role upon first Google sign-in. Can browse and filter vacancies, view course-driven recommendations, interact with per-job assistants, upload resume (URL or PDF), and apply to open positions. |
 | `employer` | External partner email whitelisted in `whitelisted_emails` | Granted access via pre-whitelisted email entry bound to a specific `company` name. Can post and edit vacancies under their assigned company, and monitor candidate applications in their company-specific Activity Dashboard. |
-| `admin` | Internal user promoted by Superadmin | Inherits all `user` capabilities plus full vacancy management (create, edit, delete any vacancy portal-wide), viewing all applications in the Activity Dashboard, and promoting `user` accounts to `admin`. |
+| `admin` | Internal user promoted by Superadmin | Inherits all `user` capabilities plus full vacancy management (create, edit, delete any vacancy webapp-wide), viewing all applications in the Activity Dashboard, and promoting `user` accounts to `admin`. |
 | `superadmin` | Fixed identity (`ai@qiu.edu.my`) | Master administrator. Inherits all `admin` capabilities plus initial bulk JSON data import, system maintenance, and user role management. Immutable role that cannot be demoted or deleted. |
 
 > [!NOTE]
@@ -141,7 +144,7 @@ Private source files (CSV/XLSX) are never compiled into the client bundle. To se
    ```bash
    python3 scripts/generate_data.py
    ```
-2. Sign in to VacancyPortal as Superadmin (`ai@qiu.edu.my`).
+2. Sign in to QIU Industry Webapp as Superadmin (`ai@qiu.edu.my`).
 3. Open **Admin Tools** -> **Initial Data Import**.
 4. Upload `data/jobs.json` to perform bulk batch writes into the Firestore `vacancies` collection.
 
@@ -179,7 +182,7 @@ git ls-files -- data/jobs.json '*.csv' '*.xlsx' '*.xls' '*.tsv' '.env' '.env.loc
 ## Project Structure
 
 ```text
-VacancyPortal/
+webapp/
 ├── app/
 │   ├── auth-context.tsx         # Auth state, Google sign-in gate, role manager
 │   ├── auth-policy.ts           # Email whitelist & role verification helpers
@@ -187,7 +190,7 @@ VacancyPortal/
 │   ├── firebase-client.ts       # Firebase SDK setup (Auth, Firestore, Storage)
 │   ├── globals.css              # Tailwind v4 styling & dark mode system
 │   ├── layout.tsx               # Root layout & providers
-│   └── page.tsx                 # Portal dashboard, vacancy listing & modals
+│   └── page.tsx                 # Webapp dashboard, vacancy listing & modals
 ├── components/                  # UI components (Modals, Dashboards, Assistant)
 ├── docs/                        # Project & software documentation
 ├── public/                      # Static assets & QIU branding logos
@@ -203,8 +206,8 @@ VacancyPortal/
 
 ---
 
-## POC Limitations
+## System Notes
 
-- **POC Scope**: Designed as a proof-of-concept portal for QIU; not a full enterprise applicant tracking system (ATS).
-- **Deterministic Lexical Assistant**: Per-job assistant operates on fast deterministic lexical matching rather than LLM generation or vector embeddings, eliminating API token costs and hallucination risks.
-- **Firebase Quotas**: Operations are calibrated for the Firebase Spark (free) plan; review storage and read/write limits for large-scale deployments.
+- **Scope**: Built as a full-fledged industry career & vacancy discovery web application for QIU students, staff, and industry partner employers.
+- **Deterministic Lexical Assistant**: Per-job assistant operates on fast deterministic lexical matching rather than LLM generation or vector embeddings, eliminating API token costs and hallucination risks during high-traffic usage.
+- **Firebase Quotas & Scalability**: Operations are calibrated for production-ready performance; monitor storage and Firestore read/write limits during peak recruitment activity.

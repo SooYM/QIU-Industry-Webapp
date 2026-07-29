@@ -1,22 +1,22 @@
-# VacancyPortal Software Documentation
+# QIU Industry Webapp Software Documentation
 
-**Status:** Proof of concept<br>
+**Status:** Active Internal Testing Phase<br>
 **Audience:** Developers, reviewers, administrators, and deployment owners<br>
 **Deployment model:** Static Next.js export on Firebase Hosting with Firebase Authentication and Cloud Firestore
 
 ## 1. Purpose and scope
 
-VacancyPortal is a private vacancy discovery POC for QIU accounts. It demonstrates:
+QIU Industry Webapp is a full-fledged industry career & vacancy discovery web application for QIU accounts. It provides:
 
 - vacancy search and composable company, specialization, opportunity-type, and salary filters;
 - authenticated vacancy and company-profile access;
-- shared admin vacancy creation, editing, and deletion;
-- a fixed superadmin who assigns `user` and `admin` roles;
-- private JSON import into Firestore;
-- deterministic grounded chat using the authorized vacancy collection;
-- static deployment using Firebase services available on the Spark plan.
-
-It is not a production recruitment service. It has no applications, approval workflow, vacancy expiry, audit-history collection, backup workflow, monitoring, or service-level objective.
+- candidate application submission with resume support (Shareable URL or PDF upload);
+- role-based access control with 4 distinct roles (`user`, `employer`, `admin`, `superadmin`);
+- employer & administrator Activity Dashboards for candidate application tracking;
+- per-job grounded deterministic assistant for applicant queries;
+- course-driven recommendations based on student academic profiles;
+- private JSON import into Firestore for administrative initialization;
+- static deployment using Firebase services.
 
 ## 2. Design decisions
 
@@ -26,7 +26,7 @@ It is not a production recruitment service. It has no applications, approval wor
 | Firestore instead of bundled JSON | Keeps private vacancy records out of public Hosting assets | Authorized clients read records from Firebase |
 | Google-only QIU authentication | Matches the institutional access requirement | Other providers, domains, and unverified accounts are rejected |
 | Firestore rules as authority | Client checks can be bypassed | Every protected read and write is reauthorized server-side |
-| Fixed email superadmin | Simple POC bootstrap | `ai@qiu.edu.my` must remain an active institutional Google identity |
+| Fixed email superadmin | Initial administrative bootstrap | `ai@qiu.edu.my` must remain an active institutional Google identity |
 | Deterministic local assistant | Avoids paid inference and external record processing | Retrieval is lexical, not a true language model |
 | Superadmin browser import | Avoids shipping private seed data or adding backend ingestion | Initial import is manual and capped at 500 records |
 
@@ -462,7 +462,7 @@ If unauthorized access is suspected:
 
 ## 14. Known limitations
 
-- POC only; no applicant or recruitment workflow.
+- Active internal testing phase; currently undergoing internal validation prior to public release.
 - Deterministic lexical retrieval is not an LLM and has limited semantic recall.
 - Every authorized user receives the matching Firestore vacancy documents in the browser.
 - Client filtering reads the full vacancy collection and may become expensive at larger scale.
