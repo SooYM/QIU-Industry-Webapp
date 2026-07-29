@@ -132,3 +132,14 @@ export function courseToSpecializationPattern(course: string): RegExp | null {
   // Medicine & Pharmacy have no matching Industry Day specialization yet → show all.
   return null;
 }
+
+/** True when a vacancy fits the student's course (by specialization or title). */
+export function jobMatchesCourse(
+  job: { title: string; specialization: string },
+  course: string | null | undefined,
+): boolean {
+  if (!course) return false;
+  const pattern = courseToSpecializationPattern(course);
+  if (!pattern) return false;
+  return pattern.test(job.specialization) || pattern.test(job.title);
+}

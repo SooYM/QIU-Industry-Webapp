@@ -203,7 +203,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!user) {
     return <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
-        <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><span className="brand-mark">QIU</span><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
+        <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><img className="brand-logo" src="/qiu-logo.png" alt="QIU" /><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
         <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Use your @qiu.edu.my Google account or a Superadmin approved external account.</p></div>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with Google account</button>
@@ -216,17 +216,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 function AuthStatus({ title, detail, loading = false }: { title: string; detail: string; loading?: boolean }) {
   return <main className="auth-screen"><section className="auth-card auth-status" role="status" aria-live="polite">
-    <span className="brand-mark">QIU</span>{loading && <span className="auth-progress" aria-hidden="true" />}
+    <img className="brand-logo auth-status-logo" src="/qiu-logo.png" alt="QIU" />{loading && <span className="auth-progress" aria-hidden="true" />}
     <h1>{title}</h1><p>{detail}</p>
   </section></main>;
 }
 
 export function AuthAccount() {
-  const { user, role, signOut } = useAuth();
+  const { user, role, course, signOut } = useAuth();
   if (!user || !role) return null;
+  const subtitle = role === "superadmin" ? "Super admin"
+    : role === "admin" ? "Admin"
+    : role === "employer" ? "Employer"
+    : (course || "Student"); // students see their course under their name
   return <div className="auth-account">
     <span className="auth-avatar" aria-hidden="true">{(user.displayName || user.email || "Q").charAt(0).toUpperCase()}</span>
-    <span><strong>{user.displayName || user.email}</strong><small>{role === "superadmin" ? "Super admin" : role === "employer" ? "Employer" : role}</small></span>
+    <span><strong>{user.displayName || user.email}</strong><small>{subtitle}</small></span>
     <button type="button" onClick={signOut}>Sign out</button>
   </div>;
 }
@@ -240,8 +244,9 @@ export function RoleManager() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<UserRole>("employer");
 
+  const canManageRoles = role === "superadmin" || role === "admin";
   useEffect(() => {
-    if (role !== "superadmin" || !db) return;
+    if (!canManageRoles || !db) return;
     const activeDb = db;
 
     const loadUsers = getDocs(collection(activeDb, "users")).then((snapshot) =>
@@ -266,9 +271,9 @@ export function RoleManager() {
     Promise.all([loadUsers, loadWhitelist])
       .catch(() => setMessage("Could not load account management data."))
       .finally(() => setLoading(false));
-  }, [role]);
+  }, [canManageRoles]);
 
-  if (role !== "superadmin") return null;
+  if (!canManageRoles) return null;
 
   async function assignRole(record: UserRecord, nextRole: UserRole) {
     if (!db || normalizeEmail(record.email) === SUPERADMIN_EMAIL) return;
@@ -319,14 +324,14 @@ export function RoleManager() {
     <section className="role-manager space-y-6" aria-labelledby="role-manager-title">
       <div className="role-manager-head">
         <div>
-          <span className="detail-label">SUPERADMIN ACCESS CONTROL</span>
+          <span className="detail-label">ACCESS CONTROL</span>
           <h3 id="role-manager-title">Portal User Roles & Whitelisted Accounts</h3>
         </div>
         <small>{users.length} registered accounts</small>
       </div>
 
-      {/* Whitelist non-QIU Email Manager */}
-      <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
+      {/* Non-QIU whitelist stays superadmin-only; admins can still assign roles below. */}
+      {role === "superadmin" && <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
         <h4 className="font-bold text-sm text-indigo-900 dark:text-indigo-200">➕ Approve Non-@qiu.edu.my Account</h4>
         <p className="text-xs text-slate-600 dark:text-slate-400">By default, non-QIU emails cannot log in. Superadmin can approve external emails (e.g. Employers or External Admins) here.</p>
         <form onSubmit={addWhitelistedEmail} className="flex flex-wrap gap-2 items-center">
@@ -365,7 +370,7 @@ export function RoleManager() {
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed.</p>
       {loading ? (

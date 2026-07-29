@@ -1,13 +1,12 @@
 import type { CSSProperties, PointerEvent } from "react";
 import type { Job } from "../../lib/data/types";
-import type { StudentProfile } from "../../app/student-data";
-import { evaluateJobForStudent } from "../../app/recommendation";
+import { jobMatchesCourse } from "../../lib/data/course-map";
 import { VacancyCard } from "./VacancyCard";
 
 export function VacancyList({
   jobs,
   isStudent,
-  currentStudent,
+  course,
   columns,
   currentPage,
   pageCount,
@@ -19,7 +18,7 @@ export function VacancyList({
 }: {
   jobs: Job[];
   isStudent: boolean;
-  currentStudent: StudentProfile;
+  course: string | null;
   columns: number;
   currentPage: number;
   pageCount: number;
@@ -37,7 +36,7 @@ export function VacancyList({
             <VacancyCard
               key={job.id}
               job={job}
-              rec={isStudent ? evaluateJobForStudent(job, currentStudent) : null}
+              recommended={isStudent && jobMatchesCourse(job, course)}
               showStatus={!isStudent}
               onGlow={onGlow}
               onOpen={onSelect}

@@ -9,11 +9,7 @@ import {
   subscribeApplications, subscribeMyResume, subscribeVacancies, subscribeViews,
 } from "../lib/data/firestore";
 import type { Application, Job, Resume, ViewEvent } from "../lib/data/types";
-import { courseToSpecializationPattern, resolveCourse } from "../lib/data/course-map";
-import { StudentProfile, sampleStudentProfiles } from "./student-data";
-import { evaluateJobForStudent } from "./recommendation";
-import { CvGeneratorModal } from "./cv-generator";
-import { StudentModal } from "./student-modal";
+import { jobMatchesCourse, resolveCourse } from "../lib/data/course-map";
 import { VacancyFilters } from "../features/vacancies/VacancyFilters";
 import { VacancyList } from "../features/vacancies/VacancyList";
 import { VacancyModal } from "../features/vacancies/VacancyModal";
@@ -45,10 +41,7 @@ export default function Home() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [currentStudent, setCurrentStudent] = useState<StudentProfile>(sampleStudentProfiles[0]);
-  const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended" | "excluded">("all");
-  const [studentModalOpen, setStudentModalOpen] = useState(false);
-  const [cvModalOpen, setCvModalOpen] = useState(false);
+  const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
 
   useEffect(() => {
     try {
@@ -106,7 +99,7 @@ export default function Home() {
     }).catch(() => { /* View logging is best-effort. */ });
   }, [selectedJob, user, role]);
 
-  const isAnyModalOpen = Boolean(selectedJob || adminOpen || studentModalOpen || cvModalOpen);
+  const isAnyModalOpen = Boolean(selectedJob || adminOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -137,38 +130,6 @@ export default function Home() {
   const specializations = useMemo(() => ["All specializations", ...Array.from(new Set(jobs.map((job) => job.specialization))).filter(Boolean).sort()], [jobs]);
   const types = useMemo(() => ["All opportunities", ...Array.from(new Set(jobs.map((job) => job.type))).filter(Boolean).sort()], [jobs]);
 
-  useEffect(() => {
-    if (!isStudent || specializations.length <= 1) return;
-
-    // Prefer the student's real Workspace programme; fall back to the sample
-    // profile's faculty/major when the directory course is unavailable.
-    let targetPattern: RegExp | null = null;
-    if (course) {
-      targetPattern = courseToSpecializationPattern(course);
-    } else if (currentStudent) {
-      const haystack = `${currentStudent.major} ${currentStudent.faculty}`.toLowerCase();
-      if (/computer science|information technology|artificial intelligence|cybersecurity|software|computing/i.test(haystack)) targetPattern = /^IT\b|IT\s*-|Software/i;
-      else if (/accountancy|accounting|finance|acca/i.test(haystack)) targetPattern = /accounting|finance/i;
-      else if (/business|administration/i.test(haystack)) targetPattern = /marketing\/business|business/i;
-      else if (/hospitality|hotel|culinary/i.test(haystack)) targetPattern = /hotel|tourism|food/i;
-      else if (/communication|advertising|journalism|media/i.test(haystack)) targetPattern = /digital marketing|advertising|creative|journalist/i;
-      else if (/mechatronics|engineering|electronics/i.test(haystack)) targetPattern = /manufacturing|engineering/i;
-      else if (/food science|biotechnology|environmental|life sciences|pharmacy|biomedical/i.test(haystack)) targetPattern = /food tech|nutritionist|manufacturing/i;
-      else if (/education|tesl|special needs|early childhood/i.test(haystack)) targetPattern = /education/i;
-      else if (/psychology/i.test(haystack)) targetPattern = /human resources|education/i;
-    }
-
-    if (targetPattern) {
-      const matchedSpec = specializations.find((s) => targetPattern!.test(s));
-      if (matchedSpec) {
-        // Derive the default specialization from the resolved programme once loaded.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSpecialization(matchedSpec);
-        setPage(1);
-      }
-    }
-  }, [isStudent, course, currentStudent, specializations]);
-
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase();
     const baseMatches = jobs.filter((job) =>
@@ -179,21 +140,11 @@ export default function Home() {
       (job.salary === 0 || maxSalary === 10000 || job.salary <= maxSalary)
     );
     if (!isStudent) return baseMatches;
-    return baseMatches
-      .filter((job) => {
-        const rec = evaluateJobForStudent(job, currentStudent);
-        if (recommendationMode === "recommended") return rec.status === "recommended";
-        if (recommendationMode === "excluded") return rec.status === "excluded";
-        return true;
-      })
-      .sort((a, b) => {
-        const recA = evaluateJobForStudent(a, currentStudent);
-        const recB = evaluateJobForStudent(b, currentStudent);
-        if (recA.status === "excluded" && recB.status !== "excluded") return 1;
-        if (recA.status !== "excluded" && recB.status === "excluded") return -1;
-        return recB.matchScore - recA.matchScore;
-      });
-  }, [jobs, query, company, specialization, type, maxSalary, recommendationMode, currentStudent, isStudent]);
+    // Recommend by the student's real course: matching jobs first (and optionally only).
+    const scored = baseMatches.map((job) => ({ job, match: jobMatchesCourse(job, course) }));
+    const kept = recommendationMode === "recommended" ? scored.filter((s) => s.match) : scored;
+    return kept.sort((a, b) => Number(b.match) - Number(a.match)).map((s) => s.job);
+  }, [jobs, query, company, specialization, type, maxSalary, recommendationMode, course, isStudent]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const currentPage = Math.min(page, pageCount);
@@ -216,20 +167,21 @@ export default function Home() {
     event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
   }
 
+  const brand = (
+    <a className="brand" href="#top" aria-label="QIU Industry Day 2026 home">
+      <img className="brand-logo" src="/qiu-logo.png" alt="QIU" />
+      <span>Industry <span>Day 2026</span></span>
+    </a>
+  );
+
   return (
     <main id="top">
       <header className="topbar">
-        <a className="brand" href="#top" aria-label="QIU Industry Day 2026 home"><span className="brand-mark">QIU</span><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
-        <nav aria-label="Main navigation"><a className="active" href="#jobs" aria-current="page">Vacancies</a><button onClick={() => setChatOpen(true)}>Assistant</button></nav>
+        {brand}
+        <nav aria-label="Main navigation"><a className="active" href="#jobs" aria-current="page">Vacancies</a></nav>
         <div className="header-actions">
-          {isStudent && (
-            <>
-              <button className="icon-button" onClick={() => setStudentModalOpen(true)} title="View Student Academic Results & Transcript">🎓</button>
-              <button className="admin-button tone-accent font-bold transition-all shadow-sm" onClick={() => setCvModalOpen(true)}>📄 1-Click CV Generator</button>
-            </>
-          )}
           <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
-          {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>＋ Add vacancy</button>}
+          {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>Admin dashboard</button>}
           <button className="assistant-button" onClick={() => setChatOpen(true)}><span>✦</span> Ask assistant</button>
           <AuthAccount />
         </div>
@@ -257,7 +209,6 @@ export default function Home() {
       <section className="workspace" id="jobs">
         <VacancyFilters
           isStudent={isStudent}
-          currentStudent={currentStudent}
           programmeLabel={programme ? `${programme.name}${programme.level ? ` · ${programme.level}` : ""}` : undefined}
           recommendationMode={recommendationMode}
           onRecommendationMode={(mode) => { setRecommendationMode(mode); setPage(1); }}
@@ -276,8 +227,6 @@ export default function Home() {
           onMaxSalary={(value) => { setMaxSalary(value); setPage(1); }}
           mobileFiltersOpen={mobileFiltersOpen}
           onReset={resetFilters}
-          onSwitchProfile={() => setStudentModalOpen(true)}
-          onInternShortcut={() => { setType("Internship"); setPage(1); }}
         />
 
         <section className="results">
@@ -285,7 +234,7 @@ export default function Home() {
           <VacancyList
             jobs={visibleJobs}
             isStudent={isStudent}
-            currentStudent={currentStudent}
+            course={course}
             columns={columns}
             currentPage={currentPage}
             pageCount={pageCount}
@@ -307,17 +256,17 @@ export default function Home() {
 
       {isStudent && studentTab === "resume" && user && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <StudentResume user={user} course={course} myResume={myResume} onOpenCvGenerator={() => setCvModalOpen(true)} />
+          <StudentResume user={user} course={course} myResume={myResume} />
         </section>
       )}
 
-      <footer><a className="brand" href="#top"><span className="brand-mark">QIU</span><span>Industry <span>Day 2026</span></span></a><p>QIU Industry Day 2026. Verify vacancy details directly with the employer.</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
+      <footer>{brand}<p>QIU Industry Day 2026. Verify vacancy details directly with the employer.</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
 
       {selectedJob && (
         <VacancyModal
           job={selectedJob}
           isStudent={isStudent}
-          currentStudent={currentStudent}
+          recommended={isStudent && jobMatchesCourse(selectedJob, course)}
           applied={appliedJobIds.has(selectedJob.id)}
           onApply={() => applyToJob(selectedJob)}
           onClose={() => setSelectedJob(null)}
@@ -342,25 +291,6 @@ export default function Home() {
         onClose={() => setChatOpen(false)}
         onSelectSource={(job) => { setSelectedJob(job); setChatOpen(false); }}
       />
-
-      {isStudent && (
-        <>
-          <StudentModal
-            currentStudent={currentStudent}
-            isOpen={studentModalOpen}
-            onClose={() => setStudentModalOpen(false)}
-            onSelectStudent={(student) => setCurrentStudent(student)}
-            onOpenCvGenerator={() => setCvModalOpen(true)}
-          />
-
-          <CvGeneratorModal
-            student={currentStudent}
-            isOpen={cvModalOpen}
-            onClose={() => setCvModalOpen(false)}
-            onUpdateStudent={(updated) => setCurrentStudent(updated)}
-          />
-        </>
-      )}
     </main>
   );
 }

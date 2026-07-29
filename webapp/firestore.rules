@@ -137,12 +137,13 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isAllowedUser() && (request.auth.uid == uid || isSuperAdmin());
       allow create: if isAuthenticated() && validUser(request.resource.data, uid);
-      // A non-superadmin may edit their own profile (displayName/photoURL/course/
-      // updatedAt via merge) but may NOT change their own role. Only the superadmin
-      // (and the RoleManager, which runs as superadmin) can reassign roles.
+      // A regular user may edit their own profile (displayName/photoURL/course/
+      // updatedAt via merge) but may NOT change their own role. Admins & superadmin
+      // may reassign roles; validUser still blocks minting a superadmin (only the
+      // fixed ai@qiu.edu.my identity may hold that role).
       allow update: if isAllowedUser()
         && validUser(request.resource.data, uid)
-        && (isSuperAdmin() || request.resource.data.role == resource.data.role);
+        && (isAdmin() || request.resource.data.role == resource.data.role);
       allow delete: if isSuperAdmin() && resource.data.email != 'ai@qiu.edu.my';
     }
 

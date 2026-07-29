@@ -11,12 +11,10 @@ export function StudentResume({
   user,
   course,
   myResume,
-  onOpenCvGenerator,
 }: {
   user: User;
   course: string | null;
   myResume: Resume | null;
-  onOpenCvGenerator: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -54,37 +52,26 @@ export function StudentResume({
     }
   }
 
-  async function markGenerated() {
-    onOpenCvGenerator();
-    if (!user) return;
-    try {
-      await saveResume({
-        id: user.uid, studentUid: user.uid, studentEmail, studentName,
-        course: course ?? undefined, source: "generated",
-      });
-    } catch { /* Best-effort: opening the generator still succeeds. */ }
-  }
-
   return (
     <section className="results" aria-labelledby="resume-title">
-      <div className="results-head"><div><span>MY RESUME</span><h1 id="resume-title">Submit your resume</h1></div><p>Upload a PDF or generate one with the built-in CV Generator. Your latest submission is shared with employers and admins.</p></div>
+      <div className="results-head"><div><span>MY RESUME</span><h1 id="resume-title">Submit your resume</h1></div><p>Upload a PDF resume. Your latest submission is shared with employers and admins.</p></div>
 
       <section className="local-jobs" aria-labelledby="resume-current-title">
         <div className="local-jobs-head"><div><span className="detail-label">CURRENT SUBMISSION</span><h3 id="resume-current-title">Your resume on file</h3></div></div>
         {myResume ? (
           <div className="local-job">
             <span>
-              <b>{myResume.fileName ?? (myResume.source === "generated" ? "Generated CV" : "Submitted resume")}</b>
-              <small>{myResume.source === "generated" ? "Created with the CV Generator" : "Uploaded PDF"}</small>
+              <b>{myResume.fileName ?? "Submitted resume"}</b>
+              <small>Uploaded PDF</small>
             </span>
             <div className="local-job-actions">
               {myResume.fileUrl
                 ? <a className="edit-local" href={myResume.fileUrl} target="_blank" rel="noreferrer">Open PDF</a>
-                : <span className="text-xs text-accent italic">No file — generated only</span>}
+                : <span className="text-xs text-accent italic">No file on record</span>}
             </div>
           </div>
         ) : (
-          <div className="admin-jobs-empty"><strong>No resume submitted yet</strong><p>Upload a PDF or generate one below to appear in the employer resume viewer.</p></div>
+          <div className="admin-jobs-empty"><strong>No resume submitted yet</strong><p>Upload a PDF below to appear in the employer resume viewer.</p></div>
         )}
       </section>
 
@@ -95,7 +82,6 @@ export function StudentResume({
             {busy ? "Uploading…" : myResume?.fileUrl ? "Replace PDF" : "Upload PDF"}
             <input type="file" accept="application/pdf" className="sr-only" disabled={busy} onChange={uploadPdf} />
           </label>
-          <button type="button" className="admin-button" onClick={markGenerated}>📄 Generate with CV Generator</button>
         </div>
         <small className="text-accent mt-2 block">PDF only, up to 5 MB.</small>
         {message && <p className={`admin-message ${isError ? "error" : ""} mt-2`} role="status" aria-live="polite">{message}</p>}

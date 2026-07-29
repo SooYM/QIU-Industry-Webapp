@@ -1,7 +1,6 @@
 // Pure helpers, constants, and view-only types for the vacancy feature.
 // Extracted verbatim from the former app/page.tsx monolith — no behaviour change.
 import type { Job } from "../../lib/data/types";
-import { DEFAULT_YOUTUBE_PLACEHOLDER } from "../../app/auth-policy";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string; sources?: Job[] };
 export type Theme = "light" | "dark";
@@ -14,6 +13,7 @@ export type AdminDraft = Pick<Job, "title" | "company" | "type" | "specializatio
   state: string;
   country: string;
   youtubeUrl?: string;
+  hasVideo?: boolean;
   customSpecialization?: string;
   mapX?: number;
   mapY?: number;
@@ -31,7 +31,7 @@ export function jobStatusMeta(job: Job): { label: string; tone: string } {
 
 export const DOSM_SOURCE = "https://www.dosm.gov.my/portal-main/release-content/salaries-and-wages-survey-report-2024";
 export const PREFS_KEY = "vacancyportal-view-prefs";
-export const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", customSpecialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "", youtubeUrl: DEFAULT_YOUTUBE_PLACEHOLDER };
+export const emptyDraft: AdminDraft = { title: "", company: "", type: "Permanent", specialization: "", customSpecialization: "", locationMode: "malaysia", state: "", country: "", salary: "", vacancies: 1, minimumRequirement: "Diploma", email: "", youtubeUrl: "", hasVideo: false };
 export const malaysiaStates = ["Johor", "Kedah", "Kelantan", "Melaka", "Negeri Sembilan", "Pahang", "Pulau Pinang", "Perak", "Perlis", "Sabah", "Sarawak", "Selangor", "Terengganu", "W.P. Kuala Lumpur", "W.P. Labuan", "W.P. Putrajaya"];
 export const malaysiaStateAliases: Record<string, string> = { "Kuala Lumpur": "W.P. Kuala Lumpur" };
 
