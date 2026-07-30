@@ -130,10 +130,10 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .border-token { border-color:var(--color-border); }
 
 /* QIU wordmark logo. The asset is black, so invert it on dark surfaces. */
-.brand-logo { height:1.85rem; width:auto; display:block; flex:none; object-fit:contain; }
+.brand-logo { height:2.7rem; width:auto; display:block; flex:none; object-fit:contain; }
 .main-tabs button { white-space:nowrap; flex:none; }
 :root[data-theme="dark"] .brand-logo { filter:invert(1) brightness(1.9); }
-.auth-status .brand-logo,.brand-logo.auth-status-logo { margin-inline:auto; height:2.6rem; }
+.auth-status .brand-logo,.brand-logo.auth-status-logo { margin-inline:auto; height:3.4rem; }
 
 /* Inline checkbox row inside the admin form (e.g. "has corporate video"). */
 .admin-form .checkbox-field { flex-direction:row; align-items:center; gap:.55rem; }
@@ -220,8 +220,8 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 /* Mobile header: keep just the logo (drop the wordmark text) so items never clip. */
 @media (max-width:600px) {
   .brand>span,.brand>small { display:none; }
-  .brand-logo { height:1.6rem; }
-  .auth-brand .brand-logo { height:2.2rem; }
+  .brand-logo { height:2.2rem; }
+  .auth-brand .brand-logo { height:3rem; }
   .auth-brand>span,.auth-brand>small { display:inline; }
   .auth-account small { display:none; }
   .auth-account strong { max-width:6.5rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
