@@ -6,7 +6,7 @@ import {
   setDoc, updateDoc, where, type Firestore,
 } from "firebase/firestore";
 import { db } from "../../app/firebase-client";
-import type { Application, Attendance, ChatLog, EventCode, EventItem, Job, Resume, ViewEvent } from "./types";
+import type { AppSettings, Application, Attendance, ChatLog, Company, EventCode, EventItem, Job, Resume, ViewEvent } from "./types";
 
 export const COLLECTIONS = {
   users: "users",
@@ -20,7 +20,19 @@ export const COLLECTIONS = {
   eventCodes: "event_codes",
   attendance: "attendance",
   jobStats: "job_stats",
+  companies: "companies",
+  settings: "app_settings",
 } as const;
+
+/** Fallback settings before the settings doc loads (or if an admin hasn't saved any). */
+export const DEFAULT_SETTINGS: AppSettings = {
+  portalTitle: "Industry Day 2026",
+  portalTagline: "QIU Industry Day 2026. Verify vacancy details directly with the employer.",
+  qrRotateSeconds: 30,
+  ccaPercent: 80,
+  ccaFloorMinutes: 45,
+  tabs: { home: true, events: true, vacancies: true, resume: true, history: true },
+};
 
 function requireDb(): Firestore {
   if (!db) throw new Error("Firestore is not configured.");
@@ -195,9 +207,11 @@ export async function stopEventCode(eventId: number) {
 
 // ---- Attendance ------------------------------------------------------------
 
-/** CCA threshold: 80% of the scheduled session, else a 45-minute floor. */
-export function ccaThresholdMinutes(sessionMinutes: number) {
-  return sessionMinutes > 0 ? Math.round(0.8 * sessionMinutes) : 45;
+/** CCA threshold: a % of the scheduled session (admin-tunable), else a minutes floor. */
+export function ccaThresholdMinutes(sessionMinutes: number, settings?: Pick<AppSettings, "ccaPercent" | "ccaFloorMinutes">) {
+  const percent = settings?.ccaPercent ?? DEFAULT_SETTINGS.ccaPercent;
+  const floor = settings?.ccaFloorMinutes ?? DEFAULT_SETTINGS.ccaFloorMinutes;
+  return sessionMinutes > 0 ? Math.round((percent / 100) * sessionMinutes) : floor;
 }
 
 export async function checkInAttendance(event: EventItem, uid: string, name: string, email: string, code: string) {
@@ -208,10 +222,10 @@ export async function checkInAttendance(event: EventItem, uid: string, name: str
   });
 }
 
-export async function checkOutAttendance(event: EventItem, uid: string, code: string, existing: Attendance) {
+export async function checkOutAttendance(event: EventItem, uid: string, code: string, existing: Attendance, settings?: Pick<AppSettings, "ccaPercent" | "ccaFloorMinutes">) {
   const checkOutMs = Date.now();
   const durationMinutes = existing.checkInMs ? Math.round((checkOutMs - existing.checkInMs) / 60000) : 0;
-  const caEligible = durationMinutes >= ccaThresholdMinutes(event.sessionMinutes);
+  const caEligible = durationMinutes >= ccaThresholdMinutes(event.sessionMinutes, settings);
   await updateDoc(doc(requireDb(), COLLECTIONS.attendance, `${event.id}_${uid}`), {
     code, step: "checkout", checkOutMs, durationMinutes, caEligible, checkOutAt: serverTimestamp(),
   });
@@ -226,4 +240,46 @@ export function subscribeAttendance(onData: (rows: Attendance[]) => void, studen
   const col = collection(requireDb(), COLLECTIONS.attendance);
   const q = studentUid ? query(col, where("studentUid", "==", studentUid)) : col;
   return onSnapshot(q, (snap) => onData(snap.docs.map((d) => d.data() as Attendance)));
+}
+
+// ---- Exhibitors (Home showcase) --------------------------------------------
+
+export function subscribeCompanies(onData: (rows: Company[]) => void, onError?: () => void) {
+  return onSnapshot(collection(requireDb(), COLLECTIONS.companies), (snap) => {
+    onData(snap.docs.map((d) => d.data() as Company).sort(
+      (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name),
+    ));
+  }, onError);
+}
+
+export async function saveCompany(company: Company, isEditing: boolean, creatorEmail: string) {
+  const database = requireDb();
+  const payload = { ...clean(company), updatedAt: serverTimestamp() };
+  const ref = doc(database, COLLECTIONS.companies, String(company.id));
+  if (isEditing) await updateDoc(ref, payload);
+  else await setDoc(ref, { ...payload, createdBy: creatorEmail, createdAt: serverTimestamp() });
+}
+
+export async function deleteCompany(id: number) {
+  await deleteDoc(doc(requireDb(), COLLECTIONS.companies, String(id)));
+}
+
+// ---- App settings ----------------------------------------------------------
+
+const SETTINGS_DOC = "app";
+
+export function subscribeSettings(onData: (settings: AppSettings) => void) {
+  return onSnapshot(doc(requireDb(), COLLECTIONS.settings, SETTINGS_DOC), (snap) => {
+    const stored = snap.exists() ? (snap.data() as Partial<AppSettings>) : {};
+    onData({
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      tabs: { ...DEFAULT_SETTINGS.tabs, ...(stored.tabs ?? {}) },
+    });
+  });
+}
+
+export async function saveSettings(settings: AppSettings) {
+  await setDoc(doc(requireDb(), COLLECTIONS.settings, SETTINGS_DOC),
+    { ...clean(settings), updatedAt: serverTimestamp() }, { merge: true });
 }

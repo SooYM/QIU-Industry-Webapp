@@ -115,7 +115,8 @@ service cloud.firestore {
         && data.jobId is int && data.jobId > 0
         && data.jobTitle is string && data.jobTitle.size() <= 160
         && data.company is string && data.company.size() <= 160
-        && (!('resumeId' in data) || (data.resumeId is string && data.resumeId.size() <= 256));
+        && (!('resumeId' in data) || (data.resumeId is string && data.resumeId.size() <= 256))
+        && (!('resumeChoice' in data) || data.resumeChoice in ['generated', 'link']);
     }
 
     function validResume(data, uid) {
@@ -125,7 +126,33 @@ service cloud.firestore {
         && data.source in ['upload', 'generated', 'link']
         && (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() <= 2048))
         && (!('fileName' in data) || (data.fileName is string && data.fileName.size() <= 256))
-        && (!('course' in data) || (data.course is string && data.course.size() <= 120));
+        && (!('course' in data) || (data.course is string && data.course.size() <= 120))
+        // Structured CV fields powering the generated CV; a bounded free-form map.
+        && (!('profile' in data) || (data.profile is map && data.profile.size() <= 20));
+    }
+
+    function validCompany(data) {
+      return data.keys().hasAll(['id', 'name', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.id is int && data.id > 0
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && (!('website' in data) || (data.website is string && data.website.size() <= 2048))
+        && (!('logoUrl' in data) || (data.logoUrl is string && data.logoUrl.size() <= 2048))
+        && (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() <= 2048))
+        && (!('summary' in data) || (data.summary is string && data.summary.size() <= 5000))
+        && (!('order' in data) || (data.order is number))
+        && data.createdBy is string
+        && data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
+    function validSettings(data) {
+      return data.keys().hasOnly(['portalTitle', 'portalTagline', 'qrRotateSeconds', 'ccaPercent', 'ccaFloorMinutes', 'tabs', 'updatedAt'])
+        && (!('portalTitle' in data) || (data.portalTitle is string && data.portalTitle.size() <= 120))
+        && (!('portalTagline' in data) || (data.portalTagline is string && data.portalTagline.size() <= 200))
+        && (!('qrRotateSeconds' in data) || (data.qrRotateSeconds is number && data.qrRotateSeconds >= 5 && data.qrRotateSeconds <= 600))
+        && (!('ccaPercent' in data) || (data.ccaPercent is number && data.ccaPercent >= 0 && data.ccaPercent <= 100))
+        && (!('ccaFloorMinutes' in data) || (data.ccaFloorMinutes is number && data.ccaFloorMinutes >= 0 && data.ccaFloorMinutes <= 1440))
+        && (!('tabs' in data) || (data.tabs is map && data.tabs.size() <= 10));
     }
 
     function validChatLog(data) {
@@ -138,18 +165,19 @@ service cloud.firestore {
     }
 
     function validEvent(data) {
-      return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerEmail', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
+      return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'qrRotateSeconds', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.description is string && data.description.size() <= 5000
         && data.location is string && data.location.size() <= 200
         && data.speakerName is string && data.speakerName.size() <= 200
-        && data.speakerEmail is string && data.speakerEmail.size() <= 254
+        && data.speakerLinks is list && data.speakerLinks.size() <= 10
         && data.startAt is string && data.startAt.size() <= 40
         && data.endAt is string && data.endAt.size() <= 40
         && data.sessionMinutes is int && data.sessionMinutes >= 0 && data.sessionMinutes <= 1440
         && data.presenters is list && data.presenters.size() <= 50
+        && (!('qrRotateSeconds' in data) || (data.qrRotateSeconds is number && data.qrRotateSeconds >= 5 && data.qrRotateSeconds <= 600))
         && data.createdBy is string
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }
@@ -315,6 +343,20 @@ service cloud.firestore {
       allow write: if isAllowedUser()
         && request.resource.data.keys().hasOnly(['applicants'])
         && request.resource.data.applicants is number;
+    }
+
+    // Exhibitor showcase on the Home landing. Everyone allowed reads; admins manage.
+    match /companies/{companyId} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAdmin() && validCompany(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Portal-wide settings (single doc). Everyone allowed reads so the UI can
+    // apply title/tabs/attendance rules; only admins write.
+    match /app_settings/{docId} {
+      allow read: if isAllowedUser();
+      allow write: if isAdmin() && validSettings(request.resource.data);
     }
 
     match /{document=**} {

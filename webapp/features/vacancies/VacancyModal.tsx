@@ -109,7 +109,8 @@ export function VacancyModal({
   isStudent,
   recommended = false,
   applied = false,
-  hasResume = false,
+  hasGeneratedResume = false,
+  hasResumeLink = false,
   applicantCount = 0,
   onApply,
   onWithdraw,
@@ -120,14 +121,18 @@ export function VacancyModal({
   isStudent: boolean;
   recommended?: boolean;
   applied?: boolean;
-  hasResume?: boolean;
+  hasGeneratedResume?: boolean;
+  hasResumeLink?: boolean;
   applicantCount?: number;
-  onApply?: () => void;
+  onApply?: (choice: "generated" | "link") => void;
   onWithdraw?: () => void;
   onGoToResume?: () => void;
   onClose: () => void;
 }) {
   const hasVideo = Boolean(job.youtubeUrl && job.youtubeUrl.trim());
+  const hasResume = hasGeneratedResume || hasResumeLink;
+  // Default the choice to whichever the student has (generated preferred when both).
+  const [resumeChoice, setResumeChoice] = useState<"generated" | "link">(hasGeneratedResume ? "generated" : "link");
   return (
     <Modal className="job-detail" labelledBy="job-detail-title" closeLabel="Close job details" onClose={onClose}>
       <div className="detail-header">
@@ -183,13 +188,20 @@ export function VacancyModal({
               </>
             ) : hasResume ? (
               <>
-                <button type="button" className="enquire-main" onClick={onApply}>Apply to this vacancy →</button>
-                <small className="text-accent">Applying records your interest and attaches your submitted resume.</small>
+                {hasGeneratedResume && hasResumeLink && (
+                  <fieldset className="resume-choice">
+                    <legend>Attach which resume?</legend>
+                    <label><input type="radio" name="resume-choice" checked={resumeChoice === "generated"} onChange={() => setResumeChoice("generated")} /> My generated CV</label>
+                    <label><input type="radio" name="resume-choice" checked={resumeChoice === "link"} onChange={() => setResumeChoice("link")} /> My uploaded resume link</label>
+                  </fieldset>
+                )}
+                <button type="button" className="enquire-main" onClick={() => onApply?.(resumeChoice)}>Apply to this vacancy →</button>
+                <small className="text-accent">Applying records your interest and attaches your {hasGeneratedResume && hasResumeLink ? "chosen" : hasGeneratedResume ? "generated CV" : "resume link"}.</small>
               </>
             ) : (
               <>
-                <p className="rounded-lg px-3 py-2 text-xs font-bold tone-neutral" role="status">Submit your resume before you can apply.</p>
-                <button type="button" className="enquire-main" onClick={onGoToResume}>Submit your resume →</button>
+                <p className="rounded-lg px-3 py-2 text-xs font-bold tone-neutral" role="status">Add a resume before you can apply.</p>
+                <button type="button" className="enquire-main" onClick={onGoToResume}>Build or link your resume →</button>
               </>
             )}
           </>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Attendance, EventItem } from "../../lib/data/types";
+import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
 import { deleteEvent } from "../../lib/data/firestore";
 import { EventForm } from "./EventForm";
 import { EventPresenter } from "./EventPresenter";
@@ -30,12 +30,14 @@ export function EventsView({
   canManageEvents,
   userEmail,
   myAttendance,
+  settings,
   onOpenEvent,
 }: {
   events: EventItem[];
   canManageEvents: boolean;
   userEmail: string;
   myAttendance: Attendance[];
+  settings: AppSettings;
   onOpenEvent: (event: EventItem) => void;
 }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -77,8 +79,8 @@ export function EventsView({
                 <p className="text-accent text-xs">{when(ev.startAt)} → {when(ev.endAt)}{ev.location ? ` · ${ev.location}` : ""}</p>
                 <div className="event-speaker">
                   <span className="detail-label">SPEAKER</span>
-                  {ev.speakerName || ev.speakerEmail
-                    ? <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{ev.speakerEmail ? ` · ${ev.speakerEmail}` : ""}</p>
+                  {ev.speakerName || (ev.speakerLinks ?? []).length
+                    ? <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
                     : <p className="text-accent text-sm">To be announced.</p>}
                 </div>
                 <p className="view-job mt-2">View details <span>→</span></p>
@@ -114,8 +116,8 @@ export function EventsView({
         </section>
       )}
 
-      {formOpen && <EventForm editing={editing} userEmail={userEmail} onClose={() => { setFormOpen(false); setEditing(null); }} />}
-      {presenting && <EventPresenter event={presenting} onClose={() => setPresenting(null)} />}
+      {formOpen && <EventForm editing={editing} userEmail={userEmail} defaultRotateSeconds={settings.qrRotateSeconds} onClose={() => { setFormOpen(false); setEditing(null); }} />}
+      {presenting && <EventPresenter event={presenting} rotateSeconds={presenting.qrRotateSeconds ?? settings.qrRotateSeconds} ccaSettings={{ ccaPercent: settings.ccaPercent, ccaFloorMinutes: settings.ccaFloorMinutes }} onClose={() => setPresenting(null)} />}
       {viewing && <EventAttendance event={viewing} onClose={() => setViewing(null)} />}
     </section>
   );

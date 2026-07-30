@@ -228,3 +228,76 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
   /* Free header space for the bigger logo: avatar + Sign out are enough ID here. */
   .auth-account small,.auth-account strong { display:none; }
 }
+
+/* ---- Home / exhibitor showcase -------------------------------------------- */
+.exhibitor-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1.1rem; margin-top:1.25rem; }
+.exhibitor-card { display:flex; flex-direction:column; gap:.55rem; padding:1.2rem; background:var(--surface); border:1px solid var(--line); border-radius:.9rem; box-shadow:var(--shadow); cursor:pointer; transition:border-color .15s,transform .15s; }
+.exhibitor-card:hover { border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); transform:translateY(-2px); }
+.exhibitor-card h3 { margin:.1rem 0 0; font-size:1.02rem; letter-spacing:-.02em; color:var(--navy); }
+.exhibitor-logo-wrap { display:grid; place-items:center; height:5.5rem; border:1px solid var(--line); border-radius:.7rem; background:var(--surface-2); overflow:hidden; }
+.exhibitor-logo-wrap img { max-width:82%; max-height:78%; object-fit:contain; }
+.exhibitor-logo-fallback { font-family:var(--font-geist-mono),monospace; font-weight:800; font-size:1.6rem; color:var(--blue); }
+.exhibitor-logo-lg { width:3.4rem; height:3.4rem; object-fit:contain; border:1px solid var(--line); border-radius:.6rem; background:var(--surface-2); padding:.25rem; }
+.exhibitor-blurb { margin:0; color:var(--muted); font-size:.74rem; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.exhibitor-tags { display:flex; flex-wrap:wrap; gap:.4rem; }
+.exhibitor-tag { font-size:.62rem; font-weight:750; color:var(--blue); background:var(--blue-soft); border-radius:.35rem; padding:.28rem .48rem; }
+
+/* ---- Generated CV --------------------------------------------------------- */
+.resume-status-grid { display:grid; grid-template-columns:1fr 1fr; gap:.8rem; margin-top:.6rem; }
+.resume-status { padding:.85rem; border:1px solid var(--line); border-radius:.7rem; background:var(--surface-2); }
+.resume-status.ready { border-color:color-mix(in srgb,var(--success) 40%,var(--line)); background:color-mix(in srgb,var(--success) 8%,var(--surface)); }
+.resume-status strong { display:block; font-size:.78rem; }
+.resume-status small { display:block; color:var(--muted); font-size:.68rem; margin-top:.25rem; }
+.resume-status .local-job-actions { margin-top:.5rem; }
+.resume-builder { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.4rem; margin-top:.8rem; align-items:start; }
+.cv-form { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
+.cv-form label { display:flex; flex-direction:column; gap:.4rem; color:var(--muted); font-size:.7rem; font-weight:750; }
+.cv-form .full { grid-column:1/-1; }
+.cv-form input,.cv-form textarea { background:var(--surface); border:1px solid var(--line); border-radius:.6rem; padding:.6rem .7rem; font-size:.76rem; color:inherit; resize:vertical; }
+.cv-preview { position:sticky; top:1rem; }
+.cv-preview-head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-bottom:.6rem; }
+.cv-sheet { background:#fff; color:#14181f; border:1px solid var(--line); border-radius:.6rem; padding:1.6rem 1.7rem; font-size:.78rem; line-height:1.55; box-shadow:var(--shadow); }
+.cv-head { border-bottom:2px solid #14181f; padding-bottom:.7rem; margin-bottom:.9rem; }
+.cv-head h2 { margin:0; font-size:1.4rem; letter-spacing:-.02em; color:#14181f; }
+.cv-headline { margin:.2rem 0 0; font-weight:700; color:#3a4557; }
+.cv-contact { margin:.35rem 0 0; font-size:.7rem; color:#5a6474; }
+.cv-links { margin:.3rem 0 0; display:flex; flex-wrap:wrap; gap:.3rem .8rem; font-size:.7rem; }
+.cv-links a { color:#1a52c4; word-break:break-all; }
+.cv-block { margin-top:.95rem; }
+.cv-block h3 { margin:0 0 .3rem; font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:#1a52c4; }
+.cv-block p { margin:0; color:#2a3240; }
+.cv-fyp-title,.cv-cgpa { margin:0 0 .25rem; color:#14181f; }
+.cv-skills { display:flex; flex-wrap:wrap; gap:.35rem; }
+.cv-skill { font-size:.68rem; font-weight:700; color:#1a52c4; background:#eef3fd; border:1px solid #d6e2fb; border-radius:.35rem; padding:.24rem .5rem; }
+/* Print only the CV: hide app chrome, expand the sheet to the page. */
+@media print {
+  body * { visibility:hidden !important; }
+  .cv-print, .cv-print * { visibility:visible !important; }
+  .cv-print { position:absolute; inset:0; margin:0; }
+  .cv-print .cv-sheet { border:0; box-shadow:none; border-radius:0; }
+}
+
+/* ---- Apply resume choice + speaker links ---------------------------------- */
+.resume-choice { border:1px solid var(--line); border-radius:.6rem; padding:.7rem .8rem; margin:.6rem 0; display:flex; flex-direction:column; gap:.45rem; }
+.resume-choice legend { padding:0 .35rem; color:var(--muted); font-size:.68rem; font-weight:750; }
+.resume-choice label { display:flex; align-items:center; gap:.45rem; font-size:.74rem; font-weight:700; color:var(--ink); }
+.resume-choice input { accent-color:var(--blue); }
+.speaker-links { display:flex; flex-direction:column; gap:.25rem; margin:.4rem 0 0; }
+.speaker-links a { color:var(--blue); font-size:.76rem; font-weight:700; word-break:break-all; }
+
+/* ---- Settings panel ------------------------------------------------------- */
+.settings-panel .section-heading { margin-top:.4rem; }
+.toggle-grid { border:1px solid var(--line); border-radius:.7rem; padding:.85rem 1rem; display:flex; flex-wrap:wrap; gap:.7rem 1.4rem; }
+.toggle-grid legend { padding:0 .35rem; }
+.toggle-row { display:flex; align-items:center; gap:.45rem; color:var(--ink); font-size:.76rem; font-weight:700; }
+.toggle-row input { accent-color:var(--blue); }
+.local-job-stack { flex-direction:column; align-items:stretch; }
+.local-job-row { display:flex; align-items:center; gap:1rem; }
+.local-job-row>span { flex:1; }
+
+@media (max-width:800px) {
+  .resume-builder { grid-template-columns:1fr; }
+  .cv-form { grid-template-columns:1fr; }
+  .cv-preview { position:static; }
+  .resume-status-grid { grid-template-columns:1fr; }
+}

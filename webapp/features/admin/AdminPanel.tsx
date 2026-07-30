@@ -16,6 +16,7 @@ import { ApprovalQueue } from "./ApprovalQueue";
 import { ResumeViewer } from "./ResumeViewer";
 import { ChatHistory } from "./ChatHistory";
 import { StudentActivity } from "./StudentActivity";
+import { SettingsPanel } from "./SettingsPanel";
 
 const PREDEFINED_SPECS = [
   "IT - Software", "IT - Network/Sys/DB Admin", "IT - Hardware", "Accounting/Finance",
@@ -44,7 +45,7 @@ export function AdminPanel({
   const canManageJobs = canManageVacancies(role);
   const isApprover = role === "admin" || role === "superadmin";
   const isEmployer = role === "employer";
-  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats" | "activity" | "access">("manage");
+  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings">("manage");
   const [draft, setDraft] = useState<AdminDraft>(emptyDraft);
   const [titleCommitted, setTitleCommitted] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -309,13 +310,14 @@ export function AdminPanel({
     { key: "resumes", label: "Resumes" },
     { key: "activity", label: "Activity" },
     { key: "chats", label: "Chats" },
-    ...(isApprover ? [{ key: "access" as const, label: "Access" }] : []),
+    ...(isApprover ? [{ key: "access" as const, label: "Access" }, { key: "settings" as const, label: "Settings" }] : []),
   ];
   const viewTitle = adminView === "manage" ? (editingId ? "Edit vacancy" : "Add a vacancy")
     : adminView === "approvals" ? "Approval queue"
     : adminView === "resumes" ? "Student resumes"
     : adminView === "activity" ? "Student activity"
     : adminView === "access" ? "Access control"
+    : adminView === "settings" ? "Portal settings"
     : "Assistant chats";
 
   return (
@@ -338,6 +340,7 @@ export function AdminPanel({
         {role === "superadmin" && <label className="import-vacancies">Initial data import<input type="file" accept="application/json,.json" onChange={importVacancies}/><small>Select private vacancy JSON. File stays local and only its records are uploaded to Firestore.</small></label>}
         <RoleManager />
       </>}
+      {adminView === "settings" && isApprover && <SettingsPanel />}
 
       {adminView === "manage" && <>
       <form onSubmit={saveVacancy} className="admin-form"><label>Job title<input required value={draft.title} onChange={e => { setDraft({ ...draft, title: e.target.value }); setTitleCommitted(false); }} onBlur={() => setTitleCommitted(true)}/></label>{isApprover

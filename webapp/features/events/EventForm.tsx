@@ -4,33 +4,36 @@ import { saveEvent } from "../../lib/data/firestore";
 import { normalizeEmail } from "../../app/auth-policy";
 import { Modal } from "../../components/Modal";
 
-type Draft = Omit<EventItem, "id" | "createdBy" | "presenters">;
+type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds">;
 
-const emptyDraft: Draft = { title: "", description: "", location: "", speakerName: "", speakerEmail: "", startAt: "", endAt: "", sessionMinutes: 60 };
+const emptyDraft: Draft = { title: "", description: "", location: "", speakerName: "", startAt: "", endAt: "", sessionMinutes: 60 };
 
-export function EventForm({ editing, userEmail, onClose }: { editing: EventItem | null; userEmail: string; onClose: () => void }) {
+export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }: { editing: EventItem | null; userEmail: string; defaultRotateSeconds: number; onClose: () => void }) {
   const [draft, setDraft] = useState<Draft>(editing
-    ? { title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, speakerEmail: editing.speakerEmail, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes }
+    ? { title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes }
     : emptyDraft);
   const [presentersText, setPresentersText] = useState((editing?.presenters ?? []).join(", "));
+  const [speakerLinksText, setSpeakerLinksText] = useState((editing?.speakerLinks ?? []).join("\n"));
+  const [rotateSeconds, setRotateSeconds] = useState(editing?.qrRotateSeconds ?? defaultRotateSeconds);
   const [message, setMessage] = useState("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.title.trim() || !draft.startAt || !draft.endAt) { setMessage("Title, start and end are required."); return; }
-    // Accept multiple emails separated by comma, semicolon, space, or newline.
     const presenters = Array.from(new Set(presentersText.split(/[\s,;]+/).map((e) => normalizeEmail(e)).filter(Boolean)));
+    const speakerLinks = Array.from(new Set(speakerLinksText.split(/[\s,]+/).map((l) => l.trim()).filter(Boolean))).slice(0, 10);
     const record: EventItem = {
       id: editing?.id ?? Date.now(),
       title: draft.title.trim(),
       description: draft.description.trim(),
       location: draft.location.trim(),
       speakerName: draft.speakerName.trim(),
-      speakerEmail: draft.speakerEmail.trim(),
+      speakerLinks,
       startAt: draft.startAt,
       endAt: draft.endAt,
       sessionMinutes: Number(draft.sessionMinutes) || 0,
       presenters,
+      qrRotateSeconds: Math.min(600, Math.max(5, Number(rotateSeconds) || defaultRotateSeconds)),
     };
     try {
       await saveEvent(record, Boolean(editing), normalizeEmail(userEmail));
@@ -50,7 +53,8 @@ export function EventForm({ editing, userEmail, onClose }: { editing: EventItem 
         <label>Location / hall<input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></label>
         <label>Session length (minutes)<input type="number" min="0" value={draft.sessionMinutes} onChange={(e) => setDraft({ ...draft, sessionMinutes: Number(e.target.value) })} /></label>
         <label>Speaker name<input value={draft.speakerName} onChange={(e) => setDraft({ ...draft, speakerName: e.target.value })} /></label>
-        <label>Speaker email<input type="email" value={draft.speakerEmail} onChange={(e) => setDraft({ ...draft, speakerEmail: e.target.value })} /></label>
+        <label>QR rotate (seconds)<input type="number" min="5" max="600" value={rotateSeconds} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">How often the attendance QR changes. Default {defaultRotateSeconds}s.</small></label>
+        <label className="full"><span className="field-label">Speaker links <small>Optional — LinkedIn / portfolio URLs, one per line</small></span><textarea rows={2} value={speakerLinksText} placeholder={"https://linkedin.com/in/speaker\nhttps://speaker.dev"} onChange={(e) => setSpeakerLinksText(e.target.value)} /></label>
         <label className="full"><span className="field-label">QR presenters <small>Optional — one or more emails allowed to show this event&apos;s QR (comma or space separated)</small></span><textarea rows={2} value={presentersText} placeholder="volunteer1@qiu.edu.my, staff2@qiu.edu.my, staff3@qiu.edu.my" onChange={(e) => setPresentersText(e.target.value)} /></label>
         <div className="admin-form-footer full">
           {message && <p className="admin-message error" role="status">{message}</p>}

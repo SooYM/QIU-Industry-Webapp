@@ -1,4 +1,4 @@
-import type { Attendance, EventItem } from "../../lib/data/types";
+import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
 import { ccaThresholdMinutes } from "../../lib/data/firestore";
 import { Modal } from "../../components/Modal";
 
@@ -21,17 +21,21 @@ export function EventDetail({
   canManageEvents,
   userEmail,
   attendance,
+  settings,
   onClose,
 }: {
   event: EventItem;
   canManageEvents: boolean;
   userEmail: string;
   attendance: Attendance | null;
+  settings: Pick<AppSettings, "ccaPercent" | "ccaFloorMinutes">;
   onClose: () => void;
 }) {
   const st = status(event);
   const meta = statusMeta[st];
   const isPresenter = canManageEvents || (event.presenters ?? []).includes(userEmail.trim().toLowerCase());
+  const threshold = ccaThresholdMinutes(event.sessionMinutes, settings);
+  const speakerLinks = (event.speakerLinks ?? []).filter(Boolean);
 
   return (
     <Modal className="job-detail" labelledBy="event-detail-title" closeLabel="Close event details" onClose={onClose}>
@@ -49,9 +53,18 @@ export function EventDetail({
         {event.description && <section><span className="detail-label">ABOUT</span><p style={{ whiteSpace: "pre-wrap" }}>{event.description}</p></section>}
 
         <section><span className="detail-label">SPEAKER</span>
-          {event.speakerName || event.speakerEmail
-            ? <p><b>{event.speakerName || "TBA"}</b>{event.speakerEmail ? <> · <a href={`mailto:${event.speakerEmail}`}>{event.speakerEmail}</a></> : null}</p>
-            : <p className="text-accent">To be announced.</p>}
+          {event.speakerName || speakerLinks.length ? (
+            <>
+              <p><b>{event.speakerName || "TBA"}</b></p>
+              {speakerLinks.length > 0 && (
+                <p className="speaker-links">
+                  {speakerLinks.map((href) => (
+                    <a key={href} href={/^https?:\/\//i.test(href) ? href : `https://${href}`} target="_blank" rel="noreferrer">{href.replace(/^https?:\/\//i, "")} ↗</a>
+                  ))}
+                </p>
+              )}
+            </>
+          ) : <p className="text-accent">To be announced.</p>}
         </section>
 
         <section><span className="detail-label">DETAILS</span>
@@ -59,7 +72,7 @@ export function EventDetail({
             <div><dt>Starts</dt><dd>{when(event.startAt)}</dd></div>
             <div><dt>Ends</dt><dd>{when(event.endAt)}</dd></div>
             <div><dt>Session length</dt><dd>{event.sessionMinutes} min</dd></div>
-            <div><dt>CCA eligible at</dt><dd>≥ {ccaThresholdMinutes(event.sessionMinutes)} min attended</dd></div>
+            <div><dt>CCA eligible at</dt><dd>≥ {threshold} min attended</dd></div>
           </dl>
         </section>
 
@@ -69,7 +82,7 @@ export function EventDetail({
             {attendance ? (
               <p className={`rounded-lg px-3 py-2 text-xs font-bold ${attendance.caEligible ? "tone-success" : attendance.checkOutMs ? "tone-danger" : "tone-neutral"}`}>
                 {attendance.caEligible ? `✓ CCA eligible — ${attendance.durationMinutes} min attended`
-                  : attendance.checkOutMs ? `Checked out — ${attendance.durationMinutes} min (below ${ccaThresholdMinutes(event.sessionMinutes)} min)`
+                  : attendance.checkOutMs ? `Checked out — ${attendance.durationMinutes} min (below ${threshold} min)`
                   : "Checked in — remember to check out at the end to earn CCA."}
               </p>
             ) : (

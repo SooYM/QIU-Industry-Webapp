@@ -5,11 +5,12 @@ import { AuthAccount, useAuth } from "./auth-context";
 import { canManageVacancies } from "./auth-policy";
 import { db } from "./firebase-client";
 import {
-  checkInAttendance, checkOutAttendance, deleteApplication, getMyAttendance, isApproved,
-  recordApplication, recordView, subscribeApplications, subscribeAttendance,
-  subscribeEvents, subscribeJobStats, subscribeMyResume, subscribeVacancies, subscribeViews,
+  checkInAttendance, checkOutAttendance, deleteApplication, DEFAULT_SETTINGS, getMyAttendance, isApproved,
+  recordApplication, recordView, subscribeApplications, subscribeAttendance, subscribeCompanies,
+  subscribeEvents, subscribeJobStats, subscribeMyResume, subscribeSettings, subscribeVacancies, subscribeViews,
 } from "../lib/data/firestore";
-import type { Application, Attendance, EventItem, Job, Resume, ViewEvent } from "../lib/data/types";
+import type { AppSettings, Application, Attendance, Company, EventItem, Job, Resume, ViewEvent } from "../lib/data/types";
+import { hasGeneratedCV } from "../lib/data/types";
 import { jobMatchesCourse, resolveCourse } from "../lib/data/course-map";
 import { VacancyFilters } from "../features/vacancies/VacancyFilters";
 import { VacancyList } from "../features/vacancies/VacancyList";
@@ -17,15 +18,18 @@ import { VacancyModal } from "../features/vacancies/VacancyModal";
 import { AdminPanel } from "../features/admin/AdminPanel";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
+import { HomeView } from "../features/home/HomeView";
 import { EventsView } from "../features/events/EventsView";
 import { EventDetail } from "../features/events/EventDetail";
 import { Guide } from "../features/Guide";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
 
+type Tab = "home" | "vacancies" | "history" | "resume" | "events";
+
 export default function Home() {
   const { user, role, course } = useAuth();
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
-  const [tab, setTab] = useState<"vacancies" | "history" | "resume" | "events">("vacancies");
+  const [tab, setTab] = useState<Tab>("home");
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [myViews, setMyViews] = useState<ViewEvent[]>([]);
   const [myResume, setMyResume] = useState<Resume | null>(null);
@@ -51,6 +55,8 @@ export default function Home() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [myAttendance, setMyAttendance] = useState<Attendance[]>([]);
   const [jobStats, setJobStats] = useState<Record<number, number>>({});
+  const [exhibitors, setExhibitors] = useState<Company[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [scanMsg, setScanMsg] = useState("");
   const scanHandled = useRef(false);
 
@@ -85,13 +91,15 @@ export default function Home() {
     return () => { unsubApps(); unsubViews(); unsubResume(); };
   }, [user, role]);
 
-  // Events (all roles) + this account's own attendance records.
+  // Events, exhibitors, settings (all roles) + this account's own attendance records.
   useEffect(() => {
     if (!user || !db) return;
     const unsubEvents = subscribeEvents(setEvents, () => {});
     const unsubAtt = subscribeAttendance(setMyAttendance, user.uid);
     const unsubStats = subscribeJobStats(setJobStats);
-    return () => { unsubEvents(); unsubAtt(); unsubStats(); };
+    const unsubCompanies = subscribeCompanies(setExhibitors, () => {});
+    const unsubSettings = subscribeSettings(setSettings);
+    return () => { unsubEvents(); unsubAtt(); unsubStats(); unsubCompanies(); unsubSettings(); };
   }, [user]);
 
   // Process a scanned attendance QR (?ev=&s=&c=) once the events + user are ready.
@@ -112,7 +120,7 @@ export default function Home() {
         if (step === "checkout") {
           const existing = await getMyAttendance(eventId, user.uid);
           if (!existing) { setScanMsg("Check in first, then check out."); return; }
-          await checkOutAttendance(event, user.uid, code, existing);
+          await checkOutAttendance(event, user.uid, code, existing, settings);
           setScanMsg(`✓ Checked out of ${event.title}.`);
         } else {
           await checkInAttendance(event, user.uid, name, user.email ?? "", code);
@@ -178,6 +186,22 @@ export default function Home() {
 
   const canManageJobs = canManageVacancies(role);
   const isStudent = !canManageJobs;
+
+  // Tab order (Home · Events · My Resume · Vacancies · History for students),
+  // filtered by the admin feature toggles. Managers get a focused subset.
+  const visibleTabs = useMemo(() => {
+    const studentTabs: [Tab, string][] = [["home", "Home"], ["events", "Events"], ["resume", "My Resume"], ["vacancies", "Vacancies"], ["history", "History"]];
+    const managerTabs: [Tab, string][] = [["home", "Home"], ["vacancies", "Vacancies"], ["events", "Events"]];
+    return (isStudent ? studentTabs : managerTabs).filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
+  }, [isStudent, settings.tabs]);
+
+  // If the active tab gets toggled off (or isn't available for this role), fall back.
+  useEffect(() => {
+    if (visibleTabs.length && !visibleTabs.some(([key]) => key === tab)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab(visibleTabs[0][0]);
+    }
+  }, [visibleTabs, tab]);
   // Students browse only approved vacancies; managers see every record.
   const jobs = useMemo(() => (isStudent ? customJobs.filter(isApproved) : customJobs), [customJobs, isStudent]);
   const appliedJobIds = useMemo(() => new Set(myApplications.map((a) => a.jobId)), [myApplications]);
@@ -222,13 +246,13 @@ export default function Home() {
     deleteApplication(`${user.uid}_${job.id}`).catch(() => { /* best-effort */ });
   }
 
-  function applyToJob(job: Job) {
-    if (!user || !myResume) return; // must submit a resume before applying
+  function applyToJob(job: Job, choice: "generated" | "link") {
+    if (!user || !myResume) return; // must have a resume on file before applying
     recordApplication({
       id: `${user.uid}_${job.id}`, studentUid: user.uid,
       studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Student",
       jobId: job.id, jobTitle: job.title, company: job.company,
-      resumeId: myResume ? user.uid : undefined,
+      resumeId: user.uid, resumeChoice: choice,
     }).catch(() => { /* Application logging is best-effort. */ });
   }
 
@@ -238,10 +262,11 @@ export default function Home() {
     event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
   }
 
+  const [titleHead, ...titleRest] = settings.portalTitle.split(" ");
   const brand = (
-    <a className="brand" href="#top" aria-label="QIU Industry Day 2026 home">
+    <a className="brand" href="#top" aria-label={`${settings.portalTitle} home`}>
       <img className="brand-logo" src="/qiu-logo.png" alt="QIU" />
-      <span>Industry <span>Day 2026</span></span>
+      <span>{titleHead}{titleRest.length ? <> <span>{titleRest.join(" ")}</span></> : null}</span>
     </a>
   );
 
@@ -261,23 +286,26 @@ export default function Home() {
         <div className="scan-banner" role="status" aria-live="polite"><span>{scanMsg}</span><button type="button" onClick={() => setScanMsg("")} aria-label="Dismiss">×</button></div>
       )}
 
-      {isStudent && resumeChecked && !myResume && tab !== "resume" && (
+      {isStudent && resumeChecked && !hasGeneratedCV(myResume?.profile) && !myResume?.fileUrl && tab !== "resume" && settings.tabs.resume !== false && (
         <div className="scan-banner" role="status">
-          <span>📄 You haven&apos;t submitted a resume yet — add one so you can apply to vacancies.</span>
+          <span>📄 You haven&apos;t added a resume yet — build a CV or paste a link so you can apply to vacancies.</span>
           <button type="button" className="nudge-btn" onClick={() => setTab("resume")}>Add resume</button>
         </div>
       )}
 
       <nav className="utility-bar main-tabs" aria-label="Sections" style={{ minHeight: "auto", gap: ".4rem", flexWrap: "wrap" }}>
-        {(isStudent
-          ? [["vacancies", "Vacancies"], ["history", "History"], ["resume", "My Resume"], ["events", "Events"]]
-          : [["vacancies", "Vacancies"], ["events", "Events"]]
-        ).map(([key, label]) => (
+        {visibleTabs.map(([key, label]) => (
           <button key={key} type="button" aria-current={tab === key ? "page" : undefined}
             className={`px-3.5 py-2 text-sm font-bold rounded-lg ${tab === key ? "tone-accent" : "text-accent"}`}
-            onClick={() => setTab(key as typeof tab)}>{label}</button>
+            onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
+
+      {tab === "home" && (
+        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
+          <HomeView companies={exhibitors} settings={{ portalTitle: settings.portalTitle, portalTagline: settings.portalTagline }} />
+        </section>
+      )}
 
       {tab === "vacancies" && <>
       <section className="utility-bar" aria-label="Vacancy display settings">
@@ -346,11 +374,11 @@ export default function Home() {
 
       {tab === "events" && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} onOpenEvent={setSelectedEvent} />
+          <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} settings={settings} onOpenEvent={setSelectedEvent} />
         </section>
       )}
 
-      <footer>{brand}<p>QIU Industry Day 2026. Verify vacancy details directly with the employer.</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
+      <footer>{brand}<p>{settings.portalTagline}</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
 
       {selectedJob && (
         <VacancyModal
@@ -358,9 +386,10 @@ export default function Home() {
           isStudent={isStudent}
           recommended={isStudent && jobMatchesCourse(selectedJob, course)}
           applied={appliedJobIds.has(selectedJob.id)}
-          hasResume={Boolean(myResume)}
+          hasGeneratedResume={hasGeneratedCV(myResume?.profile)}
+          hasResumeLink={Boolean(myResume?.fileUrl)}
           applicantCount={jobStats[selectedJob.id] ?? 0}
-          onApply={() => applyToJob(selectedJob)}
+          onApply={(choice) => applyToJob(selectedJob, choice)}
           onWithdraw={() => withdrawFromJob(selectedJob)}
           onGoToResume={() => { setSelectedJob(null); setTab("resume"); }}
           onClose={() => setSelectedJob(null)}
@@ -385,6 +414,7 @@ export default function Home() {
           canManageEvents={role === "admin" || role === "superadmin"}
           userEmail={user?.email ?? ""}
           attendance={myAttendance.find((a) => a.eventId === selectedEvent.id) ?? null}
+          settings={settings}
           onClose={() => setSelectedEvent(null)}
         />
       )}

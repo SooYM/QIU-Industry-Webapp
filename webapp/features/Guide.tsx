@@ -18,16 +18,24 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
     intro: "A quick tour of everything you can do. Reopen this any time from the ? button in the top bar.",
     sections: [
       {
-        heading: "1 · Add your resume first",
+        heading: "1 · Start at Home",
         points: [
-          "Go to the My Resume tab.",
-          "Paste a shareable link (Google Drive / OneDrive / Dropbox) set to “Anyone with the link”. PDF preferred.",
-          "You'll need a resume on file before you can apply, so it's best to do this first.",
+          "The Home tab shows the companies attending Industry Day.",
+          "Tap any company to see its profile, website and video.",
         ],
-        demo: <Demo><Chip className="tone-accent" style={{ borderRadius: ".6rem", padding: ".5rem .9rem", fontWeight: 700 }}>My Resume</Chip><Chip className="save-job">Save link</Chip></Demo>,
+        demo: <Demo><Chip className="tone-accent" style={{ borderRadius: ".6rem", padding: ".5rem .9rem", fontWeight: 700 }}>Home</Chip></Demo>,
       },
       {
-        heading: "2 · Browse vacancies matched to your course",
+        heading: "2 · Build your resume",
+        points: [
+          "In My Resume you have two options: fill in your details (results, FYP title, skills…) to generate a clean CV, and/or paste a link to your own resume.",
+          "Preview your generated CV live and Print → Save as PDF any time.",
+          "You'll need at least one before you can apply, so it's best to do this early.",
+        ],
+        demo: <Demo><Chip className="tone-accent" style={{ borderRadius: ".6rem", padding: ".5rem .9rem", fontWeight: 700 }}>My Resume</Chip><Chip className="save-job">Save CV details</Chip></Demo>,
+      },
+      {
+        heading: "3 · Browse vacancies matched to your course",
         points: [
           "Roles that fit your course carry this badge and appear first.",
           "Use the filters (company, specialization, salary) to narrow the list.",
@@ -36,20 +44,20 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
         demo: <Demo><Chip className="tone-success" style={{ borderRadius: ".5rem", padding: ".35rem .6rem", fontWeight: 700, fontSize: ".75rem" }}>🌟 Recommended for your course</Chip></Demo>,
       },
       {
-        heading: "3 · Apply (and change your mind freely)",
+        heading: "4 · Apply (and change your mind freely)",
         points: [
-          "Inside a job, press Apply. Your application is saved to the History tab.",
-          "Changed your mind? Withdraw it from the job or from History — no problem.",
+          "Inside a job, press Apply. If you have both a generated CV and a link, you choose which one to attach.",
+          "Your application is saved to the History tab. Changed your mind? Withdraw it any time.",
         ],
         demo: <Demo><Chip className="enquire-main">Apply to this vacancy →</Chip><Chip className="cancel-edit">Withdraw application</Chip></Demo>,
       },
       {
-        heading: "4 · Ask about a specific job",
+        heading: "5 · Ask about a specific job",
         points: ["Each job has an assistant that answers only from that listing's details."],
         demo: <Demo><Chip className="job-assistant-toggle">✦ Ask about this job ▼</Chip></Demo>,
       },
       {
-        heading: "5 · Attend Industry Day sessions",
+        heading: "6 · Attend Industry Day sessions",
         points: [
           "The Events tab lists live and upcoming sessions.",
           "At the venue, scan the QR on the hall screen to CHECK IN, and again at the end to CHECK OUT.",
@@ -111,6 +119,14 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
           "Access tab: assign roles and approve non-QIU employers (set their company).",
           "Activity & Chats tabs list applications and questions grouped by student — click a student to expand.",
         ],
+      },
+      {
+        heading: "4 · Settings (no code needed)",
+        points: [
+          "The Settings tab is where you change the portal without a developer.",
+          "Edit the title & tagline, add the exhibitor companies for the Home page, tune the QR rotate time and CCA rules, and show/hide whole tabs.",
+        ],
+        demo: <Demo><Chip className="tone-accent" style={{ borderRadius: ".5rem", padding: ".4rem .7rem", fontWeight: 700 }}>Settings</Chip><Chip className="save-job">Add exhibitor</Chip></Demo>,
       },
     ],
   },
