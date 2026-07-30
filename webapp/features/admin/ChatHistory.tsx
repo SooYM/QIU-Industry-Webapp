@@ -17,10 +17,13 @@ function whenValue(ts: unknown): number {
 function AllChats() {
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
   useEffect(() => subscribeAllChats((rows) => { setLogs(rows); setLoading(false); }), []);
 
+  const q = query.trim().toLowerCase();
+  const shown = q ? logs.filter((l) => [l.studentName, l.studentEmail, l.company, l.question, l.answer].some((f) => (f ?? "").toLowerCase().includes(q))) : logs;
   const groups = new Map<string, { name: string; email: string; items: ChatLog[] }>();
-  for (const l of logs) {
+  for (const l of shown) {
     const key = l.studentUid || l.studentEmail || "unknown";
     if (!groups.has(key)) groups.set(key, { name: l.studentName, email: l.studentEmail, items: [] });
     groups.get(key)!.items.push(l);
@@ -31,7 +34,8 @@ function AllChats() {
 
   return (
     <section className="local-jobs" aria-labelledby="chats-title">
-      <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><strong>{logs.length} from {grouped.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><strong>{shown.length} from {grouped.length}</strong></div>
+      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, company or text…" aria-label="Search chats" />
       {loading ? <p className="role-manager-state" role="status">Loading chats…</p>
         : grouped.length ? grouped.map((g) => (
           <details className="student-group" key={g.email || g.name}>
@@ -54,6 +58,7 @@ function AllChats() {
 /** Employer view: only their companies' chats, anonymized. */
 function CompanyChats({ companies }: { companies: string[] }) {
   const [byCompany, setByCompany] = useState<Record<string, ChatLog[]>>({});
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!companies.length) return;
@@ -62,12 +67,16 @@ function CompanyChats({ companies }: { companies: string[] }) {
     return () => unsubs.forEach((u) => u());
   }, [companies.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sorted = Object.values(byCompany).flat().sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt));
+  const q = query.trim().toLowerCase();
+  const sorted = Object.values(byCompany).flat()
+    .filter((l) => !q || [l.company, l.question, l.answer].some((f) => (f ?? "").toLowerCase().includes(q)))
+    .sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt));
 
   return (
     <section className="local-jobs" aria-labelledby="company-chats-title">
       <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="company-chats-title">Questions about your companies</h3></div><strong>{sorted.length}</strong></div>
       <p className="text-[11px] text-accent">🔒 Questions are anonymized — student identities are never shown to employers.</p>
+      {companies.length > 0 && <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by company or text…" aria-label="Search chats" />}
       {!companies.length ? (
         <div className="admin-jobs-empty"><strong>No companies yet</strong><p>Create a vacancy first. Chats mentioning your listed companies will appear here.</p></div>
       ) : sorted.length ? (

@@ -281,6 +281,10 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .access-approved-row small { color:var(--muted); }
 .role-pill { margin-left:.35rem; font-size:.6rem; font-weight:800; text-transform:capitalize; color:var(--blue); background:var(--blue-soft); border-radius:.3rem; padding:.15rem .4rem; }
 .access-revoke { border:0; background:none; color:var(--danger); font-weight:800; font-size:.7rem; }
+
+/* Shared search box for admin sub-views (approvals, resumes, activity, chats, access). */
+.admin-search { width:100%; height:2.6rem; margin:.6rem 0 1rem; border:1px solid var(--line); border-radius:.6rem; background:var(--surface-2); color:var(--ink); padding:0 .85rem; font-size:.75rem; }
+.admin-search:focus { border-color:var(--blue); box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 14%,transparent); outline:none; }
 .exhibitor-blurb { margin:0; color:var(--muted); font-size:.74rem; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .exhibitor-tags { display:flex; flex-wrap:wrap; gap:.4rem; }
 .exhibitor-tag { font-size:.62rem; font-weight:750; color:var(--blue); background:var(--blue-soft); border-radius:.35rem; padding:.28rem .48rem; }

@@ -20,10 +20,14 @@ function whenValue(ts: unknown): number {
 export function StudentActivity({ mode, companies = [] }: { mode: "all" | "company"; companies?: string[] }) {
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
 
   useEffect(() => subscribeApplications((rows) => { setApps(rows); setLoading(false); }), []);
 
-  const scoped = mode === "all" ? apps : apps.filter((a) => companies.includes(a.company));
+  const q = query.trim().toLowerCase();
+  const base = mode === "all" ? apps : apps.filter((a) => companies.includes(a.company));
+  const scoped = q ? base.filter((a) => [a.studentName, a.studentEmail, a.jobTitle, a.company].some((f) => (f ?? "").toLowerCase().includes(q))) : base;
+  const search = <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, email, job or company…" aria-label="Search activity" />;
 
   if (mode === "company") {
     const sorted = [...scoped].sort((a, b) => whenValue(b.appliedAt) - whenValue(a.appliedAt));
@@ -31,6 +35,7 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
       <section className="local-jobs" aria-labelledby="activity-title">
         <div className="local-jobs-head"><div><span className="detail-label">STUDENT ACTIVITY</span><h3 id="activity-title">Applications to your company</h3></div><strong>{sorted.length}</strong></div>
         <p className="text-[11px] text-accent">Only applications to your assigned company are shown.</p>
+        {search}
         {loading ? <p className="role-manager-state" role="status">Loading…</p>
           : !companies.length ? <div className="admin-jobs-empty"><strong>No company assigned</strong><p>Ask an admin to set your company.</p></div>
           : sorted.length ? (
@@ -60,6 +65,7 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
   return (
     <section className="local-jobs" aria-labelledby="activity-title">
       <div className="local-jobs-head"><div><span className="detail-label">STUDENT ACTIVITY</span><h3 id="activity-title">Applications by student</h3></div><strong>{scoped.length} from {grouped.length}</strong></div>
+      {search}
       {loading ? <p className="role-manager-state" role="status">Loading…</p>
         : grouped.length ? grouped.map((g) => (
           <details className="student-group" key={g.email || g.name}>

@@ -8,9 +8,10 @@ type Draft = { name: string; website: string; logoUrl: string; videoUrl: string;
 const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", order: "", boothNumber: "", logoBackground: "auto" };
 
 /**
- * Exhibitor editor. Admins manage every company (approve/edit/delete/clear all).
- * In employer mode it edits ONLY that employer's own single profile, which is
- * submitted as `pending` for admin approval before it appears on Home.
+ * Exhibitor editor. Admins manage every company (edit / delete / clear all;
+ * approval lives in the Approvals tab). In employer mode it edits ONLY that
+ * employer's own single profile — the company name is fixed by their admin
+ * assignment, and every save is submitted as `pending` for admin approval.
  */
 export function CompanyManager({ employer }: { employer?: { email: string; companyName: string } }) {
   const { user } = useAuth();
@@ -22,7 +23,6 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
 
   useEffect(() => subscribeCompanies((rows) => { setCompanies(rows); setLoaded(true); }, () => {}), []);
 
-  // Employer: auto-load their own profile into the form once companies arrive.
   const myCompany = employer ? companies.find((c) => normalizeEmail(c.createdBy) === employer.email) : undefined;
   useEffect(() => {
     if (!employer || !loaded || editingId !== null) return;
@@ -62,11 +62,6 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
 
   function edit(c: Company) { fill(c); setMessage("Editing exhibitor. Save to apply changes."); }
 
-  async function approve(c: Company) {
-    try { await saveCompany({ ...c, status: "approved" }, true, normalizeEmail(user?.email)); setMessage(`${c.name} approved.`); }
-    catch { setMessage("Could not approve."); }
-  }
-
   // ---- Employer mode: a single self-service profile form --------------------
   if (employer) {
     const pending = myCompany && !isApprovedCompany(myCompany);
@@ -76,8 +71,8 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
         {!employer.companyName
           ? <div className="admin-jobs-empty"><strong>No company assigned</strong><p>Ask an admin to set your company before adding a profile.</p></div>
           : <>
-            <p className="admin-intro">Edits go to an admin for approval before they show on the Home page.{pending ? " Your latest changes are awaiting review." : ""}</p>
-            <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} nameLocked={employer.companyName} showBooth={false} submitLabel={myCompany ? "Submit changes" : "Submit for approval"} />
+            <p className="admin-intro">You are posting as <b>{employer.companyName}</b> — the name is set by your admin. Edits go for approval before they show on Home.{pending ? " Your latest changes are awaiting review." : ""}</p>
+            <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName={false} showBooth={false} submitLabel={myCompany ? "Submit changes" : "Submit for approval"} />
             {message && <p className="admin-message mt-2" role="status" aria-live="polite">{message}</p>}
           </>}
       </section>
@@ -87,21 +82,23 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
   // ---- Admin mode -----------------------------------------------------------
   return (
     <section className="local-jobs" aria-labelledby="company-manager-title">
-      <div className="local-jobs-head"><div><span className="detail-label">EXHIBITORS</span><h3 id="company-manager-title">Companies on the Home page</h3></div><strong>{companies.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">EXHIBITORS</span><h3 id="company-manager-title">Add an exhibitor</h3></div><strong>{companies.length}</strong></div>
 
-      <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showBooth submitLabel={editingId ? "Save changes" : "Add exhibitor"}
+      <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel={editingId ? "Save changes" : "Add exhibitor"}
         onCancel={editingId ? () => { setEditingId(null); setDraft(emptyDraft); setMessage(""); } : undefined} />
       {message && <p className="admin-message mt-2" role="status" aria-live="polite">{message}</p>}
 
       {companies.length > 0 && (
         <>
-          <div className="local-jobs-head mt-4"><div><span className="detail-label">MANAGE</span></div><button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => setMessage("All exhibitors cleared.")); }}>Clear all exhibitors</button></div>
+          <div className="local-jobs-head mt-4">
+            <div><span className="detail-label">MANAGE</span><h3>All exhibitors</h3></div>
+            <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => setMessage("All exhibitors cleared.")); }}>Clear all</button>
+          </div>
           <div className="local-job-list">
             {companies.map((c) => (
               <div className="local-job" key={c.id}>
                 <span><b>{c.name} {!isApprovedCompany(c) && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Pending</span>}{c.boothNumber && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">Booth {c.boothNumber}</span>}</b><small>{[c.createdBy, c.website].filter(Boolean).join(" · ") || "No links"}</small></span>
                 <div className="local-job-actions">
-                  {!isApprovedCompany(c) && <button className="edit-local" onClick={() => approve(c)}>Approve</button>}
                   <button className="edit-local" onClick={() => edit(c)}>Edit</button>
                   <button className="delete-local" onClick={() => { if (confirm(`Remove "${c.name}" from the Home page?`)) deleteCompany(c.id).catch(() => {}); }}>Delete</button>
                 </div>
@@ -114,20 +111,18 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
   );
 }
 
-function CompanyForm({ draft, setDraft, onSubmit, onCancel, nameLocked, showBooth, submitLabel }: {
+function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth, submitLabel }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
   onSubmit: (e: FormEvent) => void;
   onCancel?: () => void;
-  nameLocked?: string;
+  showName: boolean;
   showBooth: boolean;
   submitLabel: string;
 }) {
   return (
     <form onSubmit={onSubmit} className="admin-form">
-      <label className="full">Company name{nameLocked
-        ? <input value={nameLocked} readOnly disabled />
-        : <input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />}</label>
+      {showName && <label className="full">Company name<input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>}
       <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
       {showBooth
         ? <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>

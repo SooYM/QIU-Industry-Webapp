@@ -264,6 +264,12 @@ export async function deleteCompany(id: number) {
   await deleteDoc(doc(requireDb(), COLLECTIONS.companies, String(id)));
 }
 
+/** Approve a pending employer-submitted exhibitor. Patch only — re-sending the
+ * whole doc would JSON-corrupt the createdAt Timestamp and the rule would reject it. */
+export async function approveCompany(id: number) {
+  await updateDoc(doc(requireDb(), COLLECTIONS.companies, String(id)), { status: "approved", updatedAt: serverTimestamp() });
+}
+
 /** One-click clear: remove every exhibitor (admin only, enforced by rules). */
 export async function clearCompanies(ids: number[]) {
   await Promise.all(ids.map((id) => deleteDoc(doc(requireDb(), COLLECTIONS.companies, String(id))).catch(() => {})));

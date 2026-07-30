@@ -261,6 +261,7 @@ export function RoleManager() {
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<UserRole>("employer");
   const [newCompany, setNewCompany] = useState("");
+  const [userQuery, setUserQuery] = useState("");
 
   const canManageRoles = role === "superadmin" || role === "admin";
   useEffect(() => {
@@ -387,11 +388,12 @@ export function RoleManager() {
       )}
 
       <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed.</p>
+      <input type="search" className="admin-search" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} placeholder="Search accounts by name or email…" aria-label="Search accounts" />
       {loading ? (
         <p className="role-manager-state" role="status">Loading accounts…</p>
       ) : (
         <div className="role-list">
-          {users.map((record) => {
+          {users.filter((record) => { const s = userQuery.trim().toLowerCase(); return !s || (record.displayName ?? "").toLowerCase().includes(s) || (record.email ?? "").toLowerCase().includes(s); }).map((record) => {
             const fixed = normalizeEmail(record.email) === SUPERADMIN_EMAIL;
             return (
               <div className="role-row" key={record.uid}>

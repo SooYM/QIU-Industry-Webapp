@@ -7,17 +7,22 @@ export function ResumeViewer() {
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => subscribeResumes((rows) => { setResumes(rows); setLoading(false); }), []);
 
+  const q = query.trim().toLowerCase();
+  const shown = q ? resumes.filter((r) => [r.studentName, r.studentEmail, r.course].some((f) => (f ?? "").toLowerCase().includes(q))) : resumes;
+
   return (
     <section className="local-jobs" aria-labelledby="resumes-title">
-      <div className="local-jobs-head"><div><span className="detail-label">RESUMES</span><h3 id="resumes-title">Submitted student resumes</h3></div><strong>{resumes.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">RESUMES</span><h3 id="resumes-title">Submitted student resumes</h3></div><strong>{shown.length}</strong></div>
+      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, email or course…" aria-label="Search resumes" />
       {loading ? (
         <p className="role-manager-state" role="status">Loading resumes…</p>
-      ) : resumes.length ? (
+      ) : shown.length ? (
         <div className="local-job-list">
-          {resumes.map((resume) => {
+          {shown.map((resume) => {
             const generated = hasGeneratedCV(resume.profile);
             const kinds = [generated && "Generated CV", resume.fileUrl && "Shared link"].filter(Boolean).join(" · ") || "No content";
             const isOpen = expanded === resume.id;
