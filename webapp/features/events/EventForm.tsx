@@ -3,6 +3,7 @@ import type { EventItem } from "../../lib/data/types";
 import { saveEvent } from "../../lib/data/firestore";
 import { normalizeEmail } from "../../app/auth-policy";
 import { Modal } from "../../components/Modal";
+import { ImagePreview } from "../../components/ImagePreview";
 
 type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds">;
 
@@ -73,6 +74,7 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
         <label>Speaker name<input value={draft.speakerName} onChange={(e) => setDraft({ ...draft, speakerName: e.target.value })} /></label>
         <label>QR rotate (seconds)<input type="number" min="5" max="600" value={rotateSeconds} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">How often the attendance QR changes. Default {defaultRotateSeconds}s.</small></label>
         <label className="full">Speaker photo URL <small className="field-label">Optional — paste a headshot image link (e.g. from their LinkedIn photo)</small><input type="url" value={speakerPhoto} placeholder="https://…/speaker.jpg" onChange={(e) => setSpeakerPhoto(e.target.value)} /></label>
+        <div className="full"><ImagePreview url={speakerPhoto} label="Speaker photo preview" /></div>
         <label className="full"><span className="field-label">Speaker links <small>Optional — LinkedIn / portfolio URLs, one per line</small></span><textarea rows={2} value={speakerLinksText} placeholder={"https://linkedin.com/in/speaker\nhttps://speaker.dev"} onChange={(e) => setSpeakerLinksText(e.target.value)} /></label>
         <label className="full"><span className="field-label">QR presenters <small>Optional — one or more emails allowed to show this event&apos;s QR (comma or space separated)</small></span><textarea rows={2} value={presentersText} placeholder="volunteer1@qiu.edu.my, staff2@qiu.edu.my, staff3@qiu.edu.my" onChange={(e) => setPresentersText(e.target.value)} /></label>
         <div className="admin-form-footer full">

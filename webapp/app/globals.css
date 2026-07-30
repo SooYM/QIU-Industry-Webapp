@@ -320,6 +320,12 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .register-logo-row input { flex:1; min-width:0; }
 .register-logo-btn { width:auto; flex:none; margin-top:0; white-space:nowrap; padding:0 .7rem; min-height:2.75rem; }
 
+/* Little preview window for a pasted image link. */
+.img-preview { display:inline-flex; flex-direction:column; gap:.35rem; margin-top:.2rem; padding:.6rem; border:1px solid var(--line); border-radius:.6rem; background:#fff; max-width:100%; }
+.img-preview-label { font-size:.58rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#5a6474; }
+.img-preview img { max-width:14rem; max-height:8rem; object-fit:contain; border-radius:.3rem; display:block; }
+.img-preview-fail { font-size:.72rem; color:var(--danger); max-width:16rem; line-height:1.4; }
+
 /* "Applied" corner sticker on vacancy cards. */
 .job-card.is-applied { border-color:color-mix(in srgb,var(--success) 45%,var(--line)); }
 .applied-ribbon { position:absolute; top:.85rem; right:-2.6rem; transform:rotate(45deg); background:var(--success); color:#fff; font-size:.6rem; font-weight:900; letter-spacing:.12em; padding:.28rem 2.8rem; box-shadow:0 .2rem .5rem rgba(0,0,0,.2); z-index:2; pointer-events:none; }

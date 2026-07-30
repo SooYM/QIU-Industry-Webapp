@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { isApprovedCompany, type Company } from "../../lib/data/types";
 import { useAuth } from "../../app/auth-context";
 import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
+import { ImagePreview } from "../../components/ImagePreview";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
 type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
@@ -149,6 +150,7 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
         <span className="register-logo-row"><input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /><button type="button" className="reset-admin-filters register-logo-btn" onClick={() => setDraft({ ...draft, logoUrl: logoFromWebsite(draft.website) })} disabled={!draft.website.trim()}>From website</button></span>
         <small className="field-label">Auto-fetches the brand logo from the website — or paste your own link.</small>
       </label>
+      <div className="full"><ImagePreview url={draft.logoUrl} label="Logo preview" /></div>
       <label className="full">Logo tile background<select value={draft.logoBackground} onChange={(e) => setDraft({ ...draft, logoBackground: e.target.value as Draft["logoBackground"] })}><option value="auto">Auto (detect from logo)</option><option value="light">Light</option><option value="dark">Dark</option></select><small className="field-label">Use Dark for white / light-coloured transparent logos so they stay visible.</small></label>
       <label className="full">Corporate video (YouTube URL)<input type="url" value={draft.videoUrl} placeholder="https://www.youtube.com/watch?v=…" onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })} /></label>
       <label className="full"><span className="field-label">Company profile / blurb</span><textarea rows={3} value={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} /></label>

@@ -14,6 +14,7 @@ import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryCourse, PEOPLE_SCOPE } from "../lib/auth/course-directory";
 import { submitSignup, subscribeMySignup } from "../lib/data/firestore";
 import type { EmployerSignup } from "../lib/data/types";
+import { ImagePreview } from "../components/ImagePreview";
 import {
   isAllowedAccessEmail,
   isAllowedQiuEmail,
@@ -310,6 +311,7 @@ function RegisterGate() {
           <label className="register-field">Logo image URL <small>optional</small>
             <span className="register-logo-row"><input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} maxLength={2048} placeholder="https://…/logo.png" /><button type="button" className="auth-secondary register-logo-btn" onClick={() => setLogoUrl(logoFromWebsite(website))} disabled={!website.trim()}>From website</button></span>
           </label>
+          <ImagePreview url={logoUrl} label="Logo preview" />
           <label className="register-field">Corporate video (YouTube) <small>optional</small><input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} maxLength={2048} placeholder="https://youtube.com/watch?v=…" /></label>
           <label className="register-field">Contact (phone / email) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
           <label className="register-field">Company profile / blurb <small>optional</small><textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={5000} /></label>
