@@ -1,4 +1,5 @@
 type RecommendationMode = "all" | "recommended";
+type SortOption = "default" | "newest" | "oldest" | "salary_high" | "salary_low";
 
 export function VacancyFilters({
   isStudent,
@@ -18,6 +19,8 @@ export function VacancyFilters({
   onType,
   maxSalary,
   onMaxSalary,
+  sort,
+  onSort,
   mobileFiltersOpen,
   onReset,
 }: {
@@ -38,6 +41,8 @@ export function VacancyFilters({
   onType: (value: string) => void;
   maxSalary: number;
   onMaxSalary: (value: number) => void;
+  sort: SortOption;
+  onSort: (value: SortOption) => void;
   mobileFiltersOpen: boolean;
   onReset: () => void;
 }) {
@@ -68,6 +73,13 @@ export function VacancyFilters({
       <label className="field"><span>Company</span><select value={company} onChange={(e) => onCompany(e.target.value)}>{companies.map(item => <option key={item}>{item}</option>)}</select></label>
       <label className="field"><span>Specialization</span><select value={specialization} onChange={(e) => onSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label>
       <label className="field"><span>Opportunity type</span><select value={type} onChange={(e) => onType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label>
+      <label className="field"><span>Sort by</span><select value={sort} onChange={(e) => onSort(e.target.value as SortOption)}>
+        <option value="default">{isStudent ? "Best match" : "Default (newest)"}</option>
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="salary_high">Salary: high to low</option>
+        <option value="salary_low">Salary: low to high</option>
+      </select></label>
       <label className="field salary-field"><span>Maximum monthly salary <b>RM {maxSalary.toLocaleString()}</b></span><input type="range" min="500" max="10000" step="100" value={maxSalary} onChange={(e) => onMaxSalary(Number(e.target.value))} /><div><small>RM 500</small><small>RM 10,000+</small></div></label>
     </aside>
   );

@@ -45,6 +45,7 @@ export default function Home() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
+  const [sort, setSort] = useState<"default" | "newest" | "oldest" | "salary_high" | "salary_low">("default");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [events, setEvents] = useState<EventItem[]>([]);
@@ -194,17 +195,27 @@ export default function Home() {
       (type === "All opportunities" || job.type === type) &&
       (job.salary === 0 || maxSalary === 10000 || job.salary <= maxSalary)
     );
-    if (!isStudent) return baseMatches;
-    // Recommend by the student's real course: matching jobs first (and optionally only).
-    const scored = baseMatches.map((job) => ({ job, match: jobMatchesCourse(job, course) }));
-    const kept = recommendationMode === "recommended" ? scored.filter((s) => s.match) : scored;
-    return kept.sort((a, b) => Number(b.match) - Number(a.match)).map((s) => s.job);
-  }, [jobs, query, company, specialization, type, maxSalary, recommendationMode, course, isStudent]);
+    // Students can filter to course matches only.
+    const kept = isStudent && recommendationMode === "recommended"
+      ? baseMatches.filter((job) => jobMatchesCourse(job, course))
+      : baseMatches;
+    const list = [...kept];
+    switch (sort) {
+      case "newest": list.sort((a, b) => b.id - a.id); break;      // id = Date.now() at creation
+      case "oldest": list.sort((a, b) => a.id - b.id); break;
+      case "salary_high": list.sort((a, b) => b.salary - a.salary); break;
+      case "salary_low": list.sort((a, b) => a.salary - b.salary); break;
+      default: // students: course matches first; managers: newest first
+        if (isStudent) list.sort((a, b) => Number(jobMatchesCourse(b, course)) - Number(jobMatchesCourse(a, course)));
+        else list.sort((a, b) => b.id - a.id);
+    }
+    return list;
+  }, [jobs, query, company, specialization, type, maxSalary, recommendationMode, course, isStudent, sort]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const currentPage = Math.min(page, pageCount);
   const visibleJobs = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
-  const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setPage(1); };
+  const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setSort("default"); setPage(1); };
 
   function withdrawFromJob(job: Job) {
     if (!user) return;
@@ -296,6 +307,8 @@ export default function Home() {
           onType={(value) => { setType(value); setPage(1); }}
           maxSalary={maxSalary}
           onMaxSalary={(value) => { setMaxSalary(value); setPage(1); }}
+          sort={sort}
+          onSort={(value) => { setSort(value); setPage(1); }}
           mobileFiltersOpen={mobileFiltersOpen}
           onReset={resetFilters}
         />
