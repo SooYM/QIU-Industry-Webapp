@@ -195,8 +195,11 @@ export function VacancyModal({
                     <label><input type="radio" name="resume-choice" checked={resumeChoice === "link"} onChange={() => setResumeChoice("link")} /> My uploaded resume link</label>
                   </fieldset>
                 )}
-                <button type="button" className="enquire-main" onClick={() => onApply?.(resumeChoice)}>Apply to this vacancy →</button>
-                <small className="text-accent">Applying records your interest and attaches your {hasGeneratedResume && hasResumeLink ? "chosen" : hasGeneratedResume ? "generated CV" : "resume link"}.</small>
+                <button type="button" className="enquire-main" onClick={() => {
+                  const label = resumeChoice === "generated" ? "generated CV" : "resume link";
+                  if (window.confirm(`Your ${label} will be shared with ${job.company} and QIU (Quest International University) for this application. Continue?`)) onApply?.(resumeChoice);
+                }}>Apply to this vacancy →</button>
+                <small className="text-accent">By applying, your {hasGeneratedResume && hasResumeLink ? "chosen resume" : hasGeneratedResume ? "generated CV" : "resume link"} is shared with <b>{job.company}</b> and <b>QIU</b>.</small>
               </>
             ) : (
               <>

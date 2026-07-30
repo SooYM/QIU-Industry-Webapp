@@ -45,7 +45,7 @@ export function AdminPanel({
   const canManageJobs = canManageVacancies(role);
   const isApprover = role === "admin" || role === "superadmin";
   const isEmployer = role === "employer";
-  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings" | "company">("manage");
+  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings" | "company">(role === "employer" ? "company" : "manage");
   const [draft, setDraft] = useState<AdminDraft>(emptyDraft);
   const [titleCommitted, setTitleCommitted] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -275,15 +275,22 @@ export function AdminPanel({
 
   if (!open || !canManageJobs) return null;
 
-  const tabs: { key: typeof adminView; label: string }[] = [
-    { key: "manage", label: "Vacancies" },
-    ...(isApprover ? [{ key: "approvals" as const, label: "Approvals" }] : []),
-    ...(isEmployer ? [{ key: "company" as const, label: "Company profile" }] : []),
-    { key: "resumes", label: "Resumes" },
-    { key: "activity", label: "Activity" },
-    { key: "chats", label: "Chats" },
-    ...(isApprover ? [{ key: "access" as const, label: "Access" }, { key: "settings" as const, label: "Settings" }] : []),
-  ];
+  const tabs: { key: typeof adminView; label: string }[] = isEmployer
+    ? [
+        { key: "company", label: "Company profile" },
+        { key: "manage", label: "Vacancies" },
+        { key: "resumes", label: "Resumes" },
+        { key: "activity", label: "Activity" },
+        { key: "chats", label: "Chats" },
+      ]
+    : [
+        { key: "manage", label: "Vacancies" },
+        ...(isApprover ? [{ key: "approvals" as const, label: "Approvals" }] : []),
+        { key: "resumes", label: "Resumes" },
+        { key: "activity", label: "Activity" },
+        { key: "chats", label: "Chats" },
+        ...(isApprover ? [{ key: "access" as const, label: "Access" }, { key: "settings" as const, label: "Settings" }] : []),
+      ];
   const viewTitle = adminView === "manage" ? (editingId ? "Edit vacancy" : "Add a vacancy")
     : adminView === "approvals" ? "Approval queue"
     : adminView === "company" ? "Company profile"
@@ -306,7 +313,7 @@ export function AdminPanel({
       </div>
 
       {adminView === "approvals" && isApprover && <ApprovalQueue jobs={customJobs} />}
-      {adminView === "resumes" && <ResumeViewer />}
+      {adminView === "resumes" && <ResumeViewer employer={isEmployer ? { companies: employerCompanies } : undefined} />}
       {adminView === "activity" && (isApprover ? <StudentActivity mode="all" /> : <StudentActivity mode="company" companies={employerCompanies} />)}
       {adminView === "chats" && (isApprover ? <ChatHistory mode="all" /> : <ChatHistory mode="company" companies={employerCompanies} />)}
       {adminView === "access" && isApprover && <RoleManager />}

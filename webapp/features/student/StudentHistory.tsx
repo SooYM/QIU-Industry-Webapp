@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Application, Job, ViewEvent } from "../../lib/data/types";
 import { deleteApplication } from "../../lib/data/firestore";
 
@@ -25,9 +26,12 @@ export function StudentHistory({
   views: ViewEvent[];
   onOpen: (job: Job) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const matchJob = (title: string, company: string) => !q || title.toLowerCase().includes(q) || company.toLowerCase().includes(q);
   const byId = new Map(jobs.map((job) => [job.id, job]));
-  const sortedApps = [...applications].sort((a, b) => whenValue(b.appliedAt) - whenValue(a.appliedAt));
-  const sortedViews = [...views].sort((a, b) => whenValue(b.viewedAt) - whenValue(a.viewedAt));
+  const sortedApps = [...applications].filter((a) => matchJob(a.jobTitle, a.company)).sort((a, b) => whenValue(b.appliedAt) - whenValue(a.appliedAt));
+  const sortedViews = [...views].filter((v) => matchJob(v.jobTitle, v.company)).sort((a, b) => whenValue(b.viewedAt) - whenValue(a.viewedAt));
 
   const row = (key: string, jobId: number, title: string, company: string, when: unknown) => {
     const job = byId.get(jobId);
@@ -46,6 +50,8 @@ export function StudentHistory({
   return (
     <section className="results" aria-labelledby="history-title">
       <div className="results-head"><div><span>HISTORY</span><h1 id="history-title">Your activity</h1></div><p>Jobs you applied to and recently viewed. Open any item to see its full details again.</p></div>
+
+      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search your applied and viewed jobs…" aria-label="Search history" />
 
       <section className="local-jobs" aria-labelledby="history-applied-title">
         <div className="local-jobs-head"><div><span className="detail-label">APPLIED</span><h3 id="history-applied-title">Jobs you applied to</h3></div><strong>{sortedApps.length}</strong></div>

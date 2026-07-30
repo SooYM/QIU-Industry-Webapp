@@ -61,6 +61,26 @@ export function StudentResume({
     }
   }
 
+  async function clearGeneratedCV() {
+    if (!confirm("Remove your generated CV? Your entered details will be cleared.")) return;
+    setBusy(true);
+    report("Clearing your generated CV…");
+    try {
+      await saveResume({
+        id: user.uid, studentUid: user.uid, studentEmail, studentName,
+        course: course ?? undefined, fileUrl: myResume?.fileUrl, fileName: myResume?.fileName,
+        source: myResume?.fileUrl ? "link" : "generated", profile: {},
+      });
+      setProfile({ ...emptyProfile });
+      setLinksText("");
+      report("Generated CV cleared.");
+    } catch {
+      report("Could not clear your generated CV. Please try again.", true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submitLink(event: FormEvent) {
     event.preventDefault();
     const url = link.trim();
@@ -94,7 +114,9 @@ export function StudentResume({
         <div className="resume-status-grid">
           <div className={`resume-status ${generatedOnFile ? "ready" : ""}`}>
             <strong>{generatedOnFile ? "✓ Generated CV ready" : "Generated CV not built yet"}</strong>
-            <small>{generatedOnFile ? "Built from your details below." : "Fill in the form below to create one."}</small>
+            {generatedOnFile
+              ? <div className="local-job-actions"><button type="button" className="delete-local" onClick={clearGeneratedCV} disabled={busy}>Clear CV</button></div>
+              : <small>Fill in the form below to create one.</small>}
           </div>
           <div className={`resume-status ${linkOnFile ? "ready" : ""}`}>
             <strong>{linkOnFile ? "✓ Resume link on file" : "No resume link yet"}</strong>

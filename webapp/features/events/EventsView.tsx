@@ -44,11 +44,15 @@ export function EventsView({
   const [editing, setEditing] = useState<EventItem | null>(null);
   const [presenting, setPresenting] = useState<EventItem | null>(null);
   const [viewing, setViewing] = useState<EventItem | null>(null);
+  const [query, setQuery] = useState("");
 
   const myLower = userEmail.trim().toLowerCase();
   const attendanceByEvent = new Map(myAttendance.map((a) => [a.eventId, a]));
   const order = { live: 0, upcoming: 1, ended: 2 } as const;
-  const sorted = [...events].sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || a.startAt.localeCompare(b.startAt));
+  const q = query.trim().toLowerCase();
+  const sorted = [...events]
+    .filter((e) => !q || [e.title, e.location, e.speakerName].some((f) => (f ?? "").toLowerCase().includes(q)))
+    .sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || a.startAt.localeCompare(b.startAt));
 
   return (
     <section className="results" aria-labelledby="events-title">
@@ -56,6 +60,8 @@ export function EventsView({
         <div><span>EVENTS</span><h1 id="events-title">Live &amp; upcoming events</h1></div>
         {canManageEvents && <button className="admin-button" onClick={() => { setEditing(null); setFormOpen(true); }}>＋ Add event</button>}
       </div>
+
+      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events by title, location or speaker…" aria-label="Search events" />
 
       {sorted.length ? (
         <div className="event-grid">
