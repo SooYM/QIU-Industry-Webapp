@@ -4,7 +4,7 @@ import type { EventItem } from "../../lib/data/types";
 import { ccaThresholdMinutes, setEventCode, stopEventCode } from "../../lib/data/firestore";
 import { Modal } from "../../components/Modal";
 
-const REFRESH_MS = 25000; // rotate every 25s; a screenshot expires almost immediately
+const REFRESH_MS = 30000; // rotate every 30s; a screenshot expires almost immediately
 
 function randomCode() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);

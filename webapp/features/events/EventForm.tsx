@@ -18,7 +18,8 @@ export function EventForm({ editing, userEmail, onClose }: { editing: EventItem 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.title.trim() || !draft.startAt || !draft.endAt) { setMessage("Title, start and end are required."); return; }
-    const presenters = presentersText.split(",").map((e) => normalizeEmail(e)).filter(Boolean);
+    // Accept multiple emails separated by comma, semicolon, space, or newline.
+    const presenters = Array.from(new Set(presentersText.split(/[\s,;]+/).map((e) => normalizeEmail(e)).filter(Boolean)));
     const record: EventItem = {
       id: editing?.id ?? Date.now(),
       title: draft.title.trim(),
@@ -50,7 +51,7 @@ export function EventForm({ editing, userEmail, onClose }: { editing: EventItem 
         <label>Session length (minutes)<input type="number" min="0" value={draft.sessionMinutes} onChange={(e) => setDraft({ ...draft, sessionMinutes: Number(e.target.value) })} /></label>
         <label>Speaker name<input value={draft.speakerName} onChange={(e) => setDraft({ ...draft, speakerName: e.target.value })} /></label>
         <label>Speaker email<input type="email" value={draft.speakerEmail} onChange={(e) => setDraft({ ...draft, speakerEmail: e.target.value })} /></label>
-        <label className="full"><span className="field-label">QR presenters <small>Optional — emails allowed to show this event&apos;s QR</small></span><input value={presentersText} placeholder="volunteer1@qiu.edu.my, staff2@qiu.edu.my" onChange={(e) => setPresentersText(e.target.value)} /></label>
+        <label className="full"><span className="field-label">QR presenters <small>Optional — one or more emails allowed to show this event&apos;s QR (comma or space separated)</small></span><textarea rows={2} value={presentersText} placeholder="volunteer1@qiu.edu.my, staff2@qiu.edu.my, staff3@qiu.edu.my" onChange={(e) => setPresentersText(e.target.value)} /></label>
         <div className="admin-form-footer full">
           {message && <p className="admin-message error" role="status">{message}</p>}
           <div className="admin-submit"><button className="save-job" type="submit">{editing ? "Save changes" : "Add event"}</button></div>
