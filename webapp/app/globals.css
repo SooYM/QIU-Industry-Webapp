@@ -320,6 +320,19 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .register-logo-row input { flex:1; min-width:0; }
 .register-logo-btn { width:auto; flex:none; margin-top:0; white-space:nowrap; padding:0 .7rem; min-height:2.75rem; }
 
+/* Global toast popups. */
+.toast-stack { position:fixed; z-index:9999; right:1rem; bottom:1rem; display:flex; flex-direction:column; gap:.55rem; max-width:min(24rem,calc(100vw - 2rem)); pointer-events:none; }
+.toast { pointer-events:auto; display:flex; align-items:flex-start; gap:.6rem; padding:.75rem .85rem; border-radius:.7rem; background:var(--surface); border:1px solid var(--line); box-shadow:0 .6rem 1.6rem rgba(0,0,0,.18); animation:toast-in .22s ease-out; }
+.toast p { margin:0; font-size:.78rem; line-height:1.45; color:var(--ink); flex:1; }
+.toast-icon { flex:none; width:1.35rem; height:1.35rem; display:grid; place-items:center; border-radius:50%; font-size:.72rem; font-weight:900; color:#fff; margin-top:.05rem; }
+.toast-success { border-left:3px solid var(--success); } .toast-success .toast-icon { background:var(--success); }
+.toast-error { border-left:3px solid var(--danger); } .toast-error .toast-icon { background:var(--danger); }
+.toast-info { border-left:3px solid var(--blue); } .toast-info .toast-icon { background:var(--blue); }
+.toast button { flex:none; border:0; background:none; color:var(--muted); font-size:1.1rem; line-height:1; padding:0 .1rem; cursor:pointer; }
+.toast button:hover { color:var(--ink); }
+@keyframes toast-in { from { opacity:0; transform:translateY(.6rem); } to { opacity:1; transform:none; } }
+@media (max-width:600px) { .toast-stack { right:.5rem; left:.5rem; bottom:.5rem; max-width:none; } }
+
 /* Little preview window for a pasted image link. */
 .img-preview { display:inline-flex; flex-direction:column; gap:.35rem; margin-top:.2rem; padding:.6rem; border:1px solid var(--line); border-radius:.6rem; background:#fff; max-width:100%; }
 .img-preview-label { font-size:.58rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#5a6474; }

@@ -5,6 +5,7 @@ import { EventForm } from "./EventForm";
 import { EventPresenter } from "./EventPresenter";
 import { EventAttendance } from "./EventAttendance";
 import { SpeakerAvatar } from "./SpeakerAvatar";
+import { notify } from "../../components/toast";
 
 function eventStatus(ev: EventItem): "upcoming" | "live" | "ended" {
   const now = Date.now();
@@ -102,7 +103,7 @@ export function EventsView({
                     {canPresent && <button className="edit-local" onClick={() => setPresenting(ev)}>▶ Present QR</button>}
                     {canManageEvents && <button className="edit-local" onClick={() => setViewing(ev)}>Attendance</button>}
                     {canManageEvents && <button className="edit-local" onClick={() => { setEditing(ev); setFormOpen(true); }}>Edit</button>}
-                    {canManageEvents && <button className="delete-local" onClick={() => { if (confirm(`Delete "${ev.title}"?`)) deleteEvent(ev.id); }}>Delete</button>}
+                    {canManageEvents && <button className="delete-local" onClick={() => { if (confirm(`Delete "${ev.title}"?`)) deleteEvent(ev.id).then(() => notify(`Deleted “${ev.title}”.`)).catch(() => notify("Could not delete event.", "error")); }}>Delete</button>}
                   </div>
                 )}
               </article>

@@ -3,6 +3,7 @@ import { isApprovedCompany, type Company } from "../../lib/data/types";
 import { useAuth } from "../../app/auth-context";
 import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
 import { ImagePreview } from "../../components/ImagePreview";
+import { notify } from "../../components/toast";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
 type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
@@ -58,18 +59,21 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
     // live one on Home) so an admin can review the diff before it goes public.
     const liveExists = existing && isApprovedCompany(existing);
     try {
+      let msg: string; let kind: "success" | "info" = "success";
       if (employer && liveExists) {
         await stageCompanyEdit(existing!.id, {
           website: record.website, logoUrl: record.logoUrl, videoUrl: record.videoUrl,
           summary: record.summary, logoBackground: record.logoBackground,
         });
-        setMessage("Changes submitted for admin approval.");
+        msg = "Changes submitted for admin approval."; kind = "info";
       } else {
         await saveCompany(record, editingId !== null, normalizeEmail(user?.email));
         if (!employer) { setDraft(emptyDraft); setEditingId(null); }
-        setMessage(employer ? "Submitted for admin approval." : editingId ? "Exhibitor updated." : "Exhibitor added.");
+        msg = employer ? "Submitted for admin approval." : editingId ? "Exhibitor updated." : "Exhibitor added.";
+        if (employer) kind = "info";
       }
-    } catch { setMessage("Could not save. Please try again."); }
+      setMessage(msg); notify(msg, kind);
+    } catch { setMessage("Could not save. Please try again."); notify("Could not save. Please try again.", "error"); }
   }
 
   function edit(c: Company) { fill(c); setMessage("Editing exhibitor. Save to apply changes."); }
@@ -109,7 +113,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
         <>
           <div className="local-jobs-head mt-4">
             <div><span className="detail-label">MANAGE</span><h3>All exhibitors</h3></div>
-            <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => setMessage("All exhibitors cleared.")); }}>Clear all</button>
+            <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => { setMessage("All exhibitors cleared."); notify("All exhibitors cleared."); }); }}>Clear all</button>
           </div>
           <div className="local-job-list">
             {companies.map((c) => (
@@ -117,7 +121,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
                 <span><b>{c.name} {!isApprovedCompany(c) && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Pending</span>}{c.boothNumber && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">Booth {c.boothNumber}</span>}</b><small>{[c.createdBy, c.website].filter(Boolean).join(" · ") || "No links"}</small></span>
                 <div className="local-job-actions">
                   <button className="edit-local" onClick={() => { edit(c); }}>Edit</button>
-                  <button className="delete-local" onClick={() => { if (confirm(`Remove "${c.name}" from the Home page?`)) deleteCompany(c.id).catch(() => {}); }}>Delete</button>
+                  <button className="delete-local" onClick={() => { if (confirm(`Remove "${c.name}" from the Home page?`)) deleteCompany(c.id).then(() => notify(`Removed ${c.name}.`)).catch(() => notify("Could not remove.", "error")); }}>Delete</button>
                 </div>
               </div>
             ))}

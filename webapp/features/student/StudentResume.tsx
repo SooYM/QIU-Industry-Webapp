@@ -3,6 +3,7 @@ import type { User } from "firebase/auth";
 import { deleteResume, saveResume } from "../../lib/data/firestore";
 import { hasGeneratedCV, type Resume, type ResumeProfile } from "../../lib/data/types";
 import { GeneratedCV } from "./GeneratedCV";
+import { notify } from "../../components/toast";
 
 const emptyProfile: ResumeProfile = {
   headline: "", summary: "", phone: "", cgpa: "", fypTitle: "", fypSummary: "",
@@ -30,6 +31,7 @@ export function StudentResume({
   const set = (patch: Partial<ResumeProfile>) => setProfile((p) => ({ ...p, ...patch }));
 
   function report(text: string, error = false) { setMessage(text); setIsError(error); }
+  function done(text: string, error = false) { report(text, error); notify(text, error ? "error" : "success"); }
 
   // Live preview reflects unsaved edits, including the links textarea.
   const previewProfile: ResumeProfile = {
@@ -40,7 +42,7 @@ export function StudentResume({
 
   async function saveProfile(event: FormEvent) {
     event.preventDefault();
-    if (!previewReady) { report("Add at least a summary, skills, or education before saving your CV.", true); return; }
+    if (!previewReady) { done("Add at least a summary, skills, or education before saving your CV.", true); return; }
     setBusy(true);
     report("Saving your CV details…");
     try {
@@ -53,9 +55,9 @@ export function StudentResume({
         source: myResume?.fileUrl ? "link" : "generated",
         profile: previewProfile,
       });
-      report("CV details saved. Employers and admins can view your generated CV.");
+      done("CV details saved. Employers and admins can view your generated CV.");
     } catch {
-      report("Could not save your CV details. Please try again.", true);
+      done("Could not save your CV details. Please try again.", true);
     } finally {
       setBusy(false);
     }
@@ -73,9 +75,9 @@ export function StudentResume({
       });
       setProfile({ ...emptyProfile });
       setLinksText("");
-      report("Generated CV cleared.");
+      done("Generated CV cleared.");
     } catch {
-      report("Could not clear your generated CV. Please try again.", true);
+      done("Could not clear your generated CV. Please try again.", true);
     } finally {
       setBusy(false);
     }
@@ -84,7 +86,7 @@ export function StudentResume({
   async function submitLink(event: FormEvent) {
     event.preventDefault();
     const url = link.trim();
-    if (!/^https?:\/\/.+/i.test(url)) { report("Enter a valid link starting with http:// or https://", true); return; }
+    if (!/^https?:\/\/.+/i.test(url)) { done("Enter a valid link starting with http:// or https://", true); return; }
     setBusy(true);
     report("Saving your resume link…");
     try {
@@ -93,10 +95,10 @@ export function StudentResume({
         course: course ?? undefined, fileUrl: url, fileName: "Resume link", source: "link",
         profile: myResume?.profile,
       });
-      report("Resume link saved. Employers and admins can now open it.");
+      done("Resume link saved. Employers and admins can now open it.");
       setLink("");
     } catch {
-      report("Could not save your link. Please try again.", true);
+      done("Could not save your link. Please try again.", true);
     } finally {
       setBusy(false);
     }
@@ -121,7 +123,7 @@ export function StudentResume({
           <div className={`resume-status ${linkOnFile ? "ready" : ""}`}>
             <strong>{linkOnFile ? "✓ Resume link on file" : "No resume link yet"}</strong>
             {linkOnFile
-              ? <div className="local-job-actions"><a className="admin-button" href={myResume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a><button type="button" className="delete-local" onClick={() => { if (confirm("Remove your submitted resume link?")) deleteResume(user.uid).catch(() => {}); }}>Remove</button></div>
+              ? <div className="local-job-actions"><a className="admin-button" href={myResume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a><button type="button" className="delete-local" onClick={() => { if (confirm("Remove your submitted resume link?")) deleteResume(user.uid).then(() => notify("Resume link removed.")).catch(() => notify("Could not remove.", "error")); }}>Remove</button></div>
               : <small>Optional — paste one below.</small>}
           </div>
         </div>

@@ -4,6 +4,7 @@ import { saveEvent } from "../../lib/data/firestore";
 import { normalizeEmail } from "../../app/auth-policy";
 import { Modal } from "../../components/Modal";
 import { ImagePreview } from "../../components/ImagePreview";
+import { notify } from "../../components/toast";
 
 type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds">;
 
@@ -56,8 +57,9 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
     };
     try {
       await saveEvent(record, Boolean(editing), normalizeEmail(userEmail));
+      notify(editing ? "Event updated." : "Event added.");
       onClose();
-    } catch { setMessage("Could not save the event."); }
+    } catch { setMessage("Could not save the event."); notify("Could not save the event.", "error"); }
   }
 
   return (

@@ -3,6 +3,7 @@ import type { AppSettings } from "../../lib/data/types";
 import { DEFAULT_SETTINGS, resetAllData, saveSettings, subscribeSettings } from "../../lib/data/firestore";
 import { useAuth } from "../../app/auth-context";
 import { normalizeEmail } from "../../app/auth-policy";
+import { notify } from "../../components/toast";
 
 const TAB_LABELS: { key: keyof AppSettings["tabs"]; label: string }[] = [
   { key: "home", label: "Home" },
@@ -30,8 +31,8 @@ export function SettingsPanel() {
     if (answer !== "CONFIRM-RESET") { setMessage(answer == null ? "" : "Reset cancelled — you must type CONFIRM-RESET exactly."); return; }
     setResetting(true);
     setMessage("Resetting all data…");
-    try { await resetAllData(normalizeEmail(user?.email)); setMessage("All data has been reset. The portal is now empty."); }
-    catch { setMessage("Reset failed — some records may remain. Try again."); }
+    try { await resetAllData(normalizeEmail(user?.email)); setMessage("All data has been reset. The portal is now empty."); notify("All data reset — portal is now empty."); }
+    catch { setMessage("Reset failed — some records may remain. Try again."); notify("Reset failed — some records may remain.", "error"); }
     finally { setResetting(false); }
   }
 
@@ -50,7 +51,8 @@ export function SettingsPanel() {
         ccaFloorMinutes: Math.min(1440, Math.max(0, Number(form.ccaFloorMinutes))),
       });
       setMessage("Settings saved. Changes apply to everyone immediately.");
-    } catch { setMessage("Could not save settings."); }
+      notify("Settings saved.");
+    } catch { setMessage("Could not save settings."); notify("Could not save settings.", "error"); }
     finally { setBusy(false); }
   }
 

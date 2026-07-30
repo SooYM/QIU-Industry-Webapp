@@ -7,6 +7,7 @@ import type { Company, EmployerSignup, Job } from "../../lib/data/types";
 import { getYouTubeEmbedUrl, normalizeEmail } from "../../app/auth-policy";
 import { useAuth } from "../../app/auth-context";
 import { Modal } from "../../components/Modal";
+import { notify } from "../../components/toast";
 import { jobStatusMeta } from "../vacancies/vacancy-utils";
 
 /** Vacancy staged-edit diff rows. */
@@ -69,7 +70,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
   const pendingSignups = signups.filter((s) => s.status === "pending").filter((s) => match(s.company, s.name, s.email));
   const companyCount = pendingCompanies.length + pendingSignups.length;
 
-  const run = async (fn: () => Promise<void>, ok: string, err: string) => { setMessage(""); try { await fn(); setMessage(ok); } catch { setMessage(err); } };
+  const run = async (fn: () => Promise<void>, ok: string, err: string) => { setMessage(""); try { await fn(); setMessage(ok); notify(ok); } catch { setMessage(err); notify(err, "error"); } };
 
   return (
     <section aria-labelledby="approval-title">
@@ -117,7 +118,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
                 <div className="local-job-actions">
                   <button className="edit-local" onClick={() => setPreview({ name: s.company, website: s.website, logoUrl: s.logoUrl, videoUrl: s.videoUrl, summary: s.summary })}>View</button>
                   <button className="edit-local" onClick={() => run(() => approveSignup(s, normalizeEmail(user?.email)), `Approved ${s.company} — added to exhibitors.`, "Could not approve.")}>Approve</button>
-                  <button className="delete-local" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email); }}>Reject</button>
+                  <button className="delete-local" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email).then(() => notify(`Rejected ${s.company}.`)); }}>Reject</button>
                 </div>
               </div>
             ))}
@@ -135,7 +136,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
                     <button className="edit-local" onClick={() => setPreview(isEdit ? { ...c, ...(c.pendingEdit ?? {}) } : c)}>View</button>
                     {isEdit
                       ? <><button className="edit-local" onClick={() => run(() => applyCompanyEdit(c), `Approved edit for ${c.name}.`, "Could not approve.")}>Approve edit</button><button className="delete-local" onClick={() => run(() => rejectCompanyEdit(c.id), `Reverted ${c.name}.`, "Could not reject.")}>Reject</button></>
-                      : <><button className="edit-local" onClick={() => run(() => approveCompany(c.id), `Approved ${c.name}.`, "Could not approve.")}>Approve</button><button className="delete-local" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCompany(c.id).catch(() => {}); }}>Delete</button></>}
+                      : <><button className="edit-local" onClick={() => run(() => approveCompany(c.id), `Approved ${c.name}.`, "Could not approve.")}>Approve</button><button className="delete-local" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCompany(c.id).then(() => notify(`Deleted ${c.name}.`)).catch(() => notify("Could not delete.", "error")); }}>Delete</button></>}
                   </div>
                 </div>
               );

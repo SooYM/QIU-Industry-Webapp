@@ -15,6 +15,7 @@ import { fetchDirectoryCourse, PEOPLE_SCOPE } from "../lib/auth/course-directory
 import { submitSignup, subscribeMySignup } from "../lib/data/firestore";
 import type { EmployerSignup } from "../lib/data/types";
 import { ImagePreview } from "../components/ImagePreview";
+import { notify } from "../components/toast";
 import {
   isAllowedAccessEmail,
   isAllowedQiuEmail,
@@ -283,8 +284,8 @@ function RegisterGate() {
     event.preventDefault();
     if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
     setBusy(true);
-    try { await submitSignup(email, { name, company: companyName, contact, website, logoUrl, videoUrl, summary }); setMessage(""); }
-    catch { setMessage("Could not submit your registration. Please try again."); }
+    try { await submitSignup(email, { name, company: companyName, contact, website, logoUrl, videoUrl, summary }); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
+    catch { setMessage("Could not submit your registration. Please try again."); notify("Could not submit registration.", "error"); }
     finally { setBusy(false); }
   }
 
@@ -394,8 +395,10 @@ export function RoleManager() {
       await updateDoc(doc(db, "users", record.uid), { role: nextRole, updatedAt: serverTimestamp() });
       setUsers((current) => current.map((item) => item.uid === record.uid ? { ...item, role: nextRole } : item));
       setMessage(`${record.email} is now ${nextRole}.`);
+      notify(`${record.email} is now ${nextRole}.`);
     } catch {
       setMessage(`Could not update ${record.email}.`);
+      notify(`Could not update ${record.email}.`, "error");
     }
   }
 
@@ -417,8 +420,10 @@ export function RoleManager() {
       setNewEmail("");
       setNewCompany("");
       setMessage(`Whitelisted non-QIU account ${emailToSave} with role ${newRole}${company ? ` (${company})` : ""}.`);
+      notify(`Approved ${emailToSave} as ${newRole}.`);
     } catch {
       setMessage(`Could not whitelist ${emailToSave}.`);
+      notify(`Could not approve ${emailToSave}.`, "error");
     }
   }
 
@@ -430,8 +435,10 @@ export function RoleManager() {
       // Delete doc
       setWhitelistedEmails((prev) => prev.filter((item) => item.id !== emailId));
       setMessage(`Removed ${emailId} from whitelist.`);
+      notify(`Access revoked for ${emailId}.`);
     } catch {
       setMessage(`Could not remove ${emailId}.`);
+      notify(`Could not revoke ${emailId}.`, "error");
     }
   }
 

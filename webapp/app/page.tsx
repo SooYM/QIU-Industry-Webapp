@@ -25,6 +25,7 @@ import { EventsView } from "../features/events/EventsView";
 import { EventDetail } from "../features/events/EventDetail";
 import { Guide } from "../features/Guide";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
+import { notify } from "../components/toast";
 
 type Tab = "summary" | "home" | "vacancies" | "history" | "resume" | "events" | "dashboard";
 
@@ -260,7 +261,9 @@ export default function Home() {
 
   function withdrawFromJob(job: Job) {
     if (!user) return;
-    deleteApplication(`${user.uid}_${job.id}`).catch(() => { /* best-effort */ });
+    deleteApplication(`${user.uid}_${job.id}`)
+      .then(() => notify(`Withdrew your application to ${job.title}.`))
+      .catch(() => notify("Could not withdraw. Please try again.", "error"));
   }
 
   function applyToJob(job: Job, choice: "generated" | "link") {
@@ -270,7 +273,9 @@ export default function Home() {
       studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Student",
       jobId: job.id, jobTitle: job.title, company: job.company,
       resumeId: user.uid, resumeChoice: choice,
-    }).catch(() => { /* Application logging is best-effort. */ });
+    })
+      .then(() => notify(`Applied to ${job.title} — saved to your History.`))
+      .catch(() => notify("Could not apply. Please try again.", "error"));
   }
 
   function glow(event: PointerEvent<HTMLElement>) {

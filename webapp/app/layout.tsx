@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthGate, AuthProvider } from "./auth-context";
+import { Toaster } from "../components/toast";
 import "./globals.css";
 
 const geistSans = { variable: "--font-geist-sans" };
@@ -26,6 +27,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider><AuthGate>{children}</AuthGate></AuthProvider>
+        <Toaster />
       </body>
     </html>
   );

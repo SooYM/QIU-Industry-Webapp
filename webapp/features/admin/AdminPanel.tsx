@@ -6,6 +6,7 @@ import { db } from "../../app/firebase-client";
 import { deleteJob, isApproved, saveJob, stageJobEdit } from "../../lib/data/firestore";
 import { positionTooltip } from "../../app/map-tooltip";
 import type { TooltipPosition } from "../../app/map-tooltip";
+import { notify } from "../../components/toast";
 import {
   countryPath, emptyDraft, jobStatusMeta, malaysiaStates,
   type AdminDraft, type CountryShape, type GeoFeature,
@@ -181,7 +182,8 @@ export function AdminPanel({
         setEditingId(null);
         setTitleCommitted(false);
         setAdminMessage("Edit submitted — awaiting admin approval.");
-      } catch { setAdminMessage("Vacancy could not be saved."); }
+        notify("Edit submitted for admin approval.", "info");
+      } catch { setAdminMessage("Vacancy could not be saved."); notify("Vacancy could not be saved.", "error"); }
       return;
     }
 
@@ -191,10 +193,10 @@ export function AdminPanel({
       setDraft(emptyDraft);
       setEditingId(null);
       setTitleCommitted(false);
-      if (isEditing) setAdminMessage(isApprover ? "Vacancy updated." : "Vacancy updated — awaiting admin approval.");
-      else if (isApprover) { setAdminMessage(""); onCreated(); }
-      else setAdminMessage("Vacancy submitted — awaiting admin approval.");
-    } catch { setAdminMessage("Vacancy could not be saved."); }
+      if (isEditing) { setAdminMessage(isApprover ? "Vacancy updated." : "Vacancy updated — awaiting admin approval."); notify(isApprover ? "Vacancy updated." : "Vacancy update submitted for approval.", isApprover ? "success" : "info"); }
+      else if (isApprover) { setAdminMessage(""); notify(`“${newJob.title}” published.`); onCreated(); }
+      else { setAdminMessage("Vacancy submitted — awaiting admin approval."); notify("Vacancy submitted for approval.", "info"); }
+    } catch { setAdminMessage("Vacancy could not be saved."); notify("Vacancy could not be saved.", "error"); }
   }
 
   async function removeCustomJob(id: number) {
@@ -208,7 +210,8 @@ export function AdminPanel({
       await deleteJob(id);
       if (editingId === id) { setEditingId(null); setDraft(emptyDraft); }
       setAdminMessage("Vacancy deleted.");
-    } catch { setAdminMessage("Vacancy could not be deleted."); }
+      notify("Vacancy deleted.");
+    } catch { setAdminMessage("Vacancy could not be deleted."); notify("Vacancy could not be deleted.", "error"); }
   }
 
   function editCustomJob(job: Job) {
