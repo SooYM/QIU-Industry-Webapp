@@ -109,6 +109,10 @@ export async function saveResume(resume: Resume) {
     { ...clean(resume), updatedAt: serverTimestamp() }, { merge: true });
 }
 
+export async function deleteResume(uid: string) {
+  await deleteDoc(doc(requireDb(), COLLECTIONS.resumes, uid));
+}
+
 export function subscribeResumes(onData: (rows: Resume[]) => void) {
   return onSnapshot(collection(requireDb(), COLLECTIONS.resumes),
     (snap) => onData(snap.docs.map((d) => d.data() as Resume)));

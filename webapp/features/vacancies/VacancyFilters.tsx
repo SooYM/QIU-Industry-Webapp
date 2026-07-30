@@ -69,7 +69,6 @@ export function VacancyFilters({
       <label className="field"><span>Specialization</span><select value={specialization} onChange={(e) => onSpecialization(e.target.value)}>{specializations.map(item => <option key={item}>{item}</option>)}</select></label>
       <label className="field"><span>Opportunity type</span><select value={type} onChange={(e) => onType(e.target.value)}>{types.map(item => <option key={item}>{item}</option>)}</select></label>
       <label className="field salary-field"><span>Maximum monthly salary <b>RM {maxSalary.toLocaleString()}</b></span><input type="range" min="500" max="10000" step="100" value={maxSalary} onChange={(e) => onMaxSalary(Number(e.target.value))} /><div><small>RM 500</small><small>RM 10,000+</small></div></label>
-      <div className="data-note"><span>i</span><p><strong>Market salary context</strong><br/>Details use 2024 DOSM occupation or sector means. They are benchmarks, not employer offers.</p></div>
     </aside>
   );
 }

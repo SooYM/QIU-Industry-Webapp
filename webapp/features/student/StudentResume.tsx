@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import type { User } from "firebase/auth";
-import { saveResume } from "../../lib/data/firestore";
+import { deleteResume, saveResume } from "../../lib/data/firestore";
 import type { Resume } from "../../lib/data/types";
 
 export function StudentResume({
@@ -51,7 +51,10 @@ export function StudentResume({
         {myResume?.fileUrl ? (
           <div className="local-job">
             <span><b>Resume link</b><small>Submitted — visible to employers &amp; admins</small></span>
-            <div className="local-job-actions"><a className="admin-button" href={myResume.fileUrl} target="_blank" rel="noreferrer">Open resume ↗</a></div>
+            <div className="local-job-actions">
+              <a className="admin-button" href={myResume.fileUrl} target="_blank" rel="noreferrer">Open resume ↗</a>
+              <button type="button" className="delete-local" onClick={() => { if (confirm("Remove your submitted resume?")) deleteResume(user.uid).catch(() => {}); }}>Remove</button>
+            </div>
           </div>
         ) : (
           <div className="admin-jobs-empty"><strong>No resume submitted yet</strong><p>Add a resume link below to appear in the employer resume viewer.</p></div>
