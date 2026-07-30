@@ -34,8 +34,8 @@ function AllChats() {
       <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><strong>{logs.length} from {grouped.length}</strong></div>
       {loading ? <p className="role-manager-state" role="status">Loading chats…</p>
         : grouped.length ? grouped.map((g) => (
-          <div className="student-group" key={g.email || g.name}>
-            <div className="student-group-head"><b>{g.name || g.email || "Unknown"}</b><small>{g.email} · {g.items.length} question{g.items.length === 1 ? "" : "s"}</small></div>
+          <details className="student-group" key={g.email || g.name}>
+            <summary className="student-group-head"><b>{g.name || g.email || "Unknown"}</b><small>{g.email} · {g.items.length} question{g.items.length === 1 ? "" : "s"}</small></summary>
             {g.items.map((log) => (
               <div className="local-job" key={log.id} style={{ alignItems: "flex-start" }}>
                 <span>
@@ -45,7 +45,7 @@ function AllChats() {
                 </span>
               </div>
             ))}
-          </div>
+          </details>
         )) : <div className="admin-jobs-empty"><strong>No chats yet</strong><p>Assistant conversations will appear here.</p></div>}
     </section>
   );

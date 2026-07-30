@@ -62,14 +62,14 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
       <div className="local-jobs-head"><div><span className="detail-label">STUDENT ACTIVITY</span><h3 id="activity-title">Applications by student</h3></div><strong>{scoped.length} from {grouped.length}</strong></div>
       {loading ? <p className="role-manager-state" role="status">Loading…</p>
         : grouped.length ? grouped.map((g) => (
-          <div className="student-group" key={g.email || g.name}>
-            <div className="student-group-head"><b>{g.name || g.email || "Student"}</b><small>{g.email} · {g.items.length} application{g.items.length === 1 ? "" : "s"}</small></div>
+          <details className="student-group" key={g.email || g.name}>
+            <summary className="student-group-head"><b>{g.name || g.email || "Student"}</b><small>{g.email} · {g.items.length} application{g.items.length === 1 ? "" : "s"}</small></summary>
             {g.items.map((app) => (
               <div className="local-job" key={app.id}>
                 <span><b>{app.jobTitle}</b><small>{app.company} · {formatWhen(app.appliedAt)}</small></span>
               </div>
             ))}
-          </div>
+          </details>
         )) : <div className="admin-jobs-empty"><strong>No applications yet</strong><p>Student applications will appear here.</p></div>}
     </section>
   );

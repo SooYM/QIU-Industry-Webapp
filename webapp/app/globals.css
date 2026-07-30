@@ -155,6 +155,10 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .student-group-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:.5rem; padding:.5rem 0 .3rem; border-bottom:2px solid var(--line); }
 .student-group-head b { font-size:.82rem; }
 .student-group-head small { color:var(--muted); font-size:.68rem; }
+.student-group>summary { cursor:pointer; list-style:none; }
+.student-group>summary::-webkit-details-marker { display:none; }
+.student-group>summary::before { content:"▸"; margin-right:.45rem; color:var(--muted); font-size:.7rem; }
+.student-group[open]>summary::before { content:"▾"; }
 
 /* Getting-started guide. */
 .guide-sections { display:grid; gap:1rem; margin-top:1rem; }
@@ -174,6 +178,7 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 
 .scan-banner { max-width:1500px; margin:0 auto; display:flex; align-items:center; gap:.75rem; padding:.75rem clamp(1rem,4vw,3rem); background:var(--blue-soft); color:var(--ink); border-bottom:1px solid var(--line); font-size:.82rem; font-weight:700; }
 .scan-banner button { margin-left:auto; border:0; background:none; font-size:1.15rem; color:var(--muted); }
+.scan-banner .nudge-btn { margin-left:auto; border:0; background:var(--blue); color:var(--color-on-primary); border-radius:.55rem; padding:.5rem .85rem; font-size:.76rem; font-weight:800; }
 
 .event-presenter { text-align:center; }
 .presenter-steps { display:flex; gap:.5rem; justify-content:center; margin:.9rem 0; }

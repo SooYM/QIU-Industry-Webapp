@@ -5,32 +5,71 @@ type Section = { heading: string; points: string[] };
 
 const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: string; sections: Section[] }> = {
   student: {
-    title: "Welcome — here's how to use the portal",
-    intro: "Find opportunities matched to your course, apply, and check in to Industry Day sessions.",
+    title: "Welcome to QIU Industry Day 2026",
+    intro: "Here's a quick tour of everything you can do. You can reopen this guide any time from the ? button in the top bar.",
     sections: [
-      { heading: "🎯 Vacancies", points: ["Jobs matching your course are badged 🌟 and sorted first.", "Use “Recommended for my course” to filter, or browse all.", "Open any job to see scope, requirements, salary and the company video."] },
-      { heading: "📄 My Resume", points: ["Add a shareable resume link (Google Drive / OneDrive — set to “anyone with the link”).", "You must submit a resume before you can apply to a job."] },
-      { heading: "✅ Applying & History", points: ["Open a job → Apply. It’s saved under History.", "Changed your mind? Withdraw an application from History."] },
-      { heading: "✦ Ask about this job", points: ["Inside a job, use “Ask about this job” — it answers only from that listing."] },
-      { heading: "📅 Events & attendance", points: ["Open Events to see live/upcoming sessions.", "At the hall, scan the QR on screen to CHECK IN, and again at the end to CHECK OUT.", "CCA credit needs enough time between check-in and check-out — don’t leave early."] },
+      { heading: "1 · Add your resume first", points: [
+        "Go to the My Resume tab.",
+        "Paste a shareable link to your resume — Google Drive, OneDrive or Dropbox — and set its sharing to “Anyone with the link”. PDF is preferred.",
+        "You'll need a resume on file before you can apply, so it's best to do this first.",
+      ] },
+      { heading: "2 · Browse vacancies matched to your course", points: [
+        "The Vacancies tab shows every opening. Roles that fit your course carry a 🌟 badge and appear first.",
+        "Switch “Course recommendation” to “Recommended for my course” to see only those, or use the filters (company, specialization, salary) to narrow things down.",
+        "Tap any card to read the full job scope, requirements, salary and — if provided — the company's intro video.",
+      ] },
+      { heading: "3 · Apply (and change your mind freely)", points: [
+        "Inside a job, press “Apply to this vacancy”. Your application is saved to the History tab.",
+        "If you change your mind, you can withdraw the application from History or from the job itself — no problem at all.",
+      ] },
+      { heading: "4 · Ask about a specific job", points: [
+        "Each job has an “Ask about this job” assistant near the Apply button.",
+        "It answers only from that listing's details — great for quick questions about scope, requirements or salary.",
+      ] },
+      { heading: "5 · Attend Industry Day sessions", points: [
+        "The Events tab lists live and upcoming sessions with their speakers.",
+        "At the venue, scan the QR shown on the hall screen to CHECK IN. Scan again at the end to CHECK OUT.",
+        "CCA credit needs enough time between the two scans, so please stay for the session and remember to check out before you leave.",
+      ] },
     ],
   },
   employer: {
-    title: "Welcome, employer — here's your dashboard",
-    intro: "Post roles under your company, review candidates, and see questions about your company.",
+    title: "Welcome — your Employer Dashboard",
+    intro: "Post roles for your company, review candidates, and see what students are asking. Reopen this guide any time from the ? button.",
     sections: [
-      { heading: "➕ Post a vacancy", points: ["Employer dashboard → Vacancies. Your company is set by the admin — you don’t type it.", "New posts and edits go to the admin for approval before students see them."] },
-      { heading: "📄 Resumes & applicants", points: ["Resumes tab: open student resume links.", "Activity tab: see who applied to your company’s roles."] },
-      { heading: "💬 Company questions", points: ["Chats tab: questions students asked about your company — shown anonymously."] },
+      { heading: "1 · Post a vacancy", points: [
+        "Open the Employer dashboard and go to the Vacancies tab, then fill in the role details.",
+        "Your company name is filled in automatically from your account, so you can leave that part to us.",
+        "Every new listing (and any later edit) is sent to an admin for a quick approval before students can see it.",
+      ] },
+      { heading: "2 · Review candidates", points: [
+        "Resumes tab: open the resume links students have submitted.",
+        "Activity tab: see which students applied to your roles.",
+      ] },
+      { heading: "3 · Questions about your company", points: [
+        "Chats tab shows questions students asked the assistant about your company.",
+        "These are shown anonymously — you'll see the questions, not who asked them.",
+      ] },
     ],
   },
   admin: {
-    title: "Welcome, admin — full control",
-    intro: "Manage vacancies and events, approve employer posts, and oversee student activity.",
+    title: "Welcome — Admin overview",
+    intro: "You manage vacancies and events, approve employer posts, and oversee student activity. Reopen this guide any time from the ? button.",
     sections: [
-      { heading: "🗂 Vacancies & approvals", points: ["Admin dashboard → Vacancies to add/edit/delete any listing.", "Approvals tab: approve or reject employer submissions — or “Approve all”."] },
-      { heading: "📅 Events", points: ["Events tab → Add event (date, time, speaker).", "▶ Present QR on the projector — it rotates every 30s (anti-cheat).", "Assign QR presenters (emails) so a volunteer can run one event’s QR only.", "Export each event’s attendance to Excel."] },
-      { heading: "👥 People & oversight", points: ["Access tab: assign roles and whitelist non-QIU employers (set their company).", "Activity & Chats tabs: student applications and assistant questions, grouped by student."] },
+      { heading: "1 · Vacancies & approvals", points: [
+        "Admin dashboard → Vacancies to add, edit or delete any listing.",
+        "The Approvals tab holds employer submissions waiting for review — approve or reject each one, or use “Approve all”.",
+      ] },
+      { heading: "2 · Events & attendance", points: [
+        "Events tab → “Add event” to set the date & time (calendar + clock), location and speaker.",
+        "Use “▶ Present QR” on the projector — the code rotates every 30 seconds so a screenshot can't be reused.",
+        "You can assign QR presenters (their emails) so a volunteer can run just that one event's QR.",
+        "Open “Attendance” on any event to review who attended and export the list to Excel.",
+      ] },
+      { heading: "3 · People & oversight", points: [
+        "Access tab: assign roles, and approve non-QIU employer accounts (and set which company they represent).",
+        "Activity & Chats tabs list student applications and assistant questions, grouped by student — click a student to expand their entries.",
+      ] },
     ],
   },
 };

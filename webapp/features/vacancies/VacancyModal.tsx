@@ -5,7 +5,7 @@ import { useAuth } from "../../app/auth-context";
 import { logChat } from "../../lib/data/firestore";
 import { RichText } from "../../app/RichText";
 import { Modal } from "../../components/Modal";
-import { benchmarkFor, formatSalary, DOSM_SOURCE } from "./vacancy-utils";
+import { formatSalary } from "./vacancy-utils";
 
 /** Deterministic answer grounded ONLY in this job's own fields — no cross-listing search. */
 function answerAboutJob(question: string, job: Job): string {
@@ -111,6 +111,7 @@ export function VacancyModal({
   applied = false,
   hasResume = false,
   onApply,
+  onWithdraw,
   onGoToResume,
   onClose,
 }: {
@@ -120,10 +121,10 @@ export function VacancyModal({
   applied?: boolean;
   hasResume?: boolean;
   onApply?: () => void;
+  onWithdraw?: () => void;
   onGoToResume?: () => void;
   onClose: () => void;
 }) {
-  const benchmark = benchmarkFor(job);
   const hasVideo = Boolean(job.youtubeUrl && job.youtubeUrl.trim());
   return (
     <Modal className="job-detail" labelledBy="job-detail-title" closeLabel="Close job details" onClose={onClose}>
@@ -168,13 +169,16 @@ export function VacancyModal({
             </section>
           )}
         </div>
-        <aside className="market-card"><span className="detail-label">MALAYSIA MARKET CONTEXT</span><strong>RM {benchmark.amount.toLocaleString()}</strong><p>{benchmark.label}, monthly, DOSM Salaries & Wages Survey 2024.</p>{job.type.toLowerCase().includes("intern") && <div className="benchmark-note">This workforce benchmark is not an internship allowance estimate.</div>}<a href={DOSM_SOURCE} target="_blank" rel="noreferrer">View official source ↗</a><hr/><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email employer →</a> : <p>No enquiry email supplied.</p>}
+        <aside className="market-card"><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email employer →</a> : <p>No enquiry email supplied.</p>}
         {isStudent && (
           <>
             <hr/>
             <span className="detail-label">APPLICATION</span>
             {applied ? (
-              <p className="rounded-lg px-3 py-2 text-xs font-bold tone-success" role="status">✓ Applied — saved to your History.</p>
+              <>
+                <p className="rounded-lg px-3 py-2 text-xs font-bold tone-success" role="status">✓ Applied — saved to your History.</p>
+                <button type="button" className="cancel-edit" style={{ width: "100%", marginTop: ".5rem" }} onClick={onWithdraw}>Withdraw application</button>
+              </>
             ) : hasResume ? (
               <>
                 <button type="button" className="enquire-main" onClick={onApply}>Apply to this vacancy →</button>

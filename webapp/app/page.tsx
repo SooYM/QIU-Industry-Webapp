@@ -5,7 +5,7 @@ import { AuthAccount, useAuth } from "./auth-context";
 import { canManageVacancies } from "./auth-policy";
 import { db } from "./firebase-client";
 import {
-  checkInAttendance, checkOutAttendance, getMyAttendance, isApproved,
+  checkInAttendance, checkOutAttendance, deleteApplication, getMyAttendance, isApproved,
   recordApplication, recordView, subscribeApplications, subscribeAttendance,
   subscribeEvents, subscribeMyResume, subscribeVacancies, subscribeViews,
 } from "../lib/data/firestore";
@@ -29,6 +29,7 @@ export default function Home() {
   const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [myViews, setMyViews] = useState<ViewEvent[]>([]);
   const [myResume, setMyResume] = useState<Resume | null>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [company, setCompany] = useState("All companies");
@@ -59,8 +60,7 @@ export default function Home() {
       if ([6, 9, 12, 24].includes(prefs.perPage ?? 0)) setPerPage(prefs.perPage!);
       if ([2, 3].includes(prefs.columns ?? 0)) setColumns(prefs.columns!);
       if (["default", "large", "xlarge"].includes(prefs.textScale ?? "")) setTextScale(prefs.textScale!);
-      const preferredTheme = prefs.theme ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-      setTheme(preferredTheme);
+      setTheme(prefs.theme ?? "light"); // default light regardless of system setting
     } catch { /* Ignore malformed device-local preferences. */ }
   }, []);
 
@@ -79,7 +79,7 @@ export default function Home() {
     if (!user || !db || canManageVacancies(role)) return;
     const unsubApps = subscribeApplications(setMyApplications, user.uid);
     const unsubViews = subscribeViews(setMyViews, user.uid);
-    const unsubResume = subscribeMyResume(user.uid, setMyResume);
+    const unsubResume = subscribeMyResume(user.uid, (r) => { setMyResume(r); setResumeChecked(true); });
     return () => { unsubApps(); unsubViews(); unsubResume(); };
   }, [user, role]);
 
@@ -204,6 +204,11 @@ export default function Home() {
   const visibleJobs = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
   const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setPage(1); };
 
+  function withdrawFromJob(job: Job) {
+    if (!user) return;
+    deleteApplication(`${user.uid}_${job.id}`).catch(() => { /* best-effort */ });
+  }
+
   function applyToJob(job: Job) {
     if (!user || !myResume) return; // must submit a resume before applying
     recordApplication({
@@ -241,6 +246,13 @@ export default function Home() {
 
       {scanMsg && (
         <div className="scan-banner" role="status" aria-live="polite"><span>{scanMsg}</span><button type="button" onClick={() => setScanMsg("")} aria-label="Dismiss">×</button></div>
+      )}
+
+      {isStudent && resumeChecked && !myResume && tab !== "resume" && (
+        <div className="scan-banner" role="status">
+          <span>📄 You haven&apos;t submitted a resume yet — add one so you can apply to vacancies.</span>
+          <button type="button" className="nudge-btn" onClick={() => setTab("resume")}>Add resume</button>
+        </div>
       )}
 
       <nav className="utility-bar main-tabs" aria-label="Sections" style={{ minHeight: "auto", gap: ".4rem", flexWrap: "wrap" }}>
@@ -333,6 +345,7 @@ export default function Home() {
           applied={appliedJobIds.has(selectedJob.id)}
           hasResume={Boolean(myResume)}
           onApply={() => applyToJob(selectedJob)}
+          onWithdraw={() => withdrawFromJob(selectedJob)}
           onGoToResume={() => { setSelectedJob(null); setTab("resume"); }}
           onClose={() => setSelectedJob(null)}
         />
