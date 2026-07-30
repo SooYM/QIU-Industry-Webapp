@@ -19,6 +19,7 @@ import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
 import { EventsView } from "../features/events/EventsView";
 import { EventDetail } from "../features/events/EventDetail";
+import { Guide } from "../features/Guide";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
 
 export default function Home() {
@@ -44,6 +45,7 @@ export default function Home() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [myAttendance, setMyAttendance] = useState<Attendance[]>([]);
   const [scanMsg, setScanMsg] = useState("");
@@ -143,7 +145,14 @@ export default function Home() {
     }).catch(() => { /* View logging is best-effort. */ });
   }, [selectedJob, user, role]);
 
-  const isAnyModalOpen = Boolean(selectedJob || adminOpen || selectedEvent);
+  // Show the role-specific guide once per account on first sign-in.
+  useEffect(() => {
+    if (!user || !role) return;
+    const k = `guide-seen-${user.uid}`;
+    try { if (!localStorage.getItem(k)) { setGuideOpen(true); localStorage.setItem(k, "1"); } } catch { /* ignore */ }
+  }, [user, role]);
+
+  const isAnyModalOpen = Boolean(selectedJob || adminOpen || selectedEvent || guideOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -223,6 +232,7 @@ export default function Home() {
       <header className="topbar">
         {brand}
         <div className="header-actions">
+          <button className="icon-button" onClick={() => setGuideOpen(true)} aria-label="How to use this portal" title="Guide">?</button>
           <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
           {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>{role === "employer" ? "Employer dashboard" : "Admin dashboard"}</button>}
           <AuthAccount />
@@ -349,6 +359,8 @@ export default function Home() {
           onClose={() => setSelectedEvent(null)}
         />
       )}
+
+      {guideOpen && <Guide role={role} onClose={() => setGuideOpen(false)} />}
     </main>
   );
 }

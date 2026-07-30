@@ -26,10 +26,15 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
     try { await rejectJob(job.id); setMessage(`Rejected "${job.title}".`); }
     catch { setMessage("Could not reject the vacancy."); }
   }
+  async function approveAll() {
+    setMessage("");
+    try { await Promise.all(pending.map((j) => approveJob(j))); setMessage(`Approved ${pending.length} vacancies.`); }
+    catch { setMessage("Some vacancies could not be approved."); }
+  }
 
   return (
     <section className="local-jobs" aria-labelledby="approval-title">
-      <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Vacancies awaiting review</h3></div><strong aria-live="polite">{pending.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Vacancies awaiting review</h3></div>{pending.length > 0 ? <button type="button" className="admin-button" onClick={approveAll}>✓ Approve all ({pending.length})</button> : <strong aria-live="polite">0</strong>}</div>
       {message && <p className="admin-message" role="status" aria-live="polite">{message}</p>}
       {pending.length ? (
         <div className="local-job-list">

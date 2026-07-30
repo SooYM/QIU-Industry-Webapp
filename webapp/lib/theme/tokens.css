@@ -24,9 +24,9 @@
   --color-text-muted:  #6b6b72; /* secondary / helper text */
   --color-text-inverse:#ffffff; /* text on dark/primary surfaces */
 
-  --color-primary:     #17171a; /* primary action = black (monochrome) */
-  --color-primary-hover:#000000;
-  --color-primary-soft:#f1f1f2; /* tinted primary background */
+  --color-primary:     #d12a32; /* QIU brand red (matches qiu.edu.my) */
+  --color-primary-hover:#b21f27;
+  --color-primary-soft:#fbe9ea; /* tinted primary background */
   --color-on-primary:  #ffffff;
   --color-accent:      #52525b; /* graphite secondary accent */
 
@@ -67,10 +67,10 @@
   --color-text-muted:  #a1a1aa;
   --color-text-inverse:#17171a;
 
-  --color-primary:     #fafafa; /* primary = white on dark */
-  --color-primary-hover:#ffffff;
-  --color-primary-soft:#232327;
-  --color-on-primary:  #17171a;
+  --color-primary:     #ef5a60; /* QIU red, brightened for dark surfaces */
+  --color-primary-hover:#f4787d;
+  --color-primary-soft:#3a1c1e;
+  --color-on-primary:  #ffffff;
   --color-accent:      #a1a1aa;
 
   --color-border:      #2a2a30;

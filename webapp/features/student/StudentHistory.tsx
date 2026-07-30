@@ -1,4 +1,5 @@
 import type { Application, Job, ViewEvent } from "../../lib/data/types";
+import { deleteApplication } from "../../lib/data/firestore";
 
 /** Firestore Timestamp → readable date, tolerant of the pending serverTimestamp. */
 function formatWhen(ts: unknown): string {
@@ -49,7 +50,18 @@ export function StudentHistory({
       <section className="local-jobs" aria-labelledby="history-applied-title">
         <div className="local-jobs-head"><div><span className="detail-label">APPLIED</span><h3 id="history-applied-title">Jobs you applied to</h3></div><strong>{sortedApps.length}</strong></div>
         {sortedApps.length
-          ? <div className="local-job-list">{sortedApps.map((a) => row(`app-${a.id}`, a.jobId, a.jobTitle, a.company, a.appliedAt))}</div>
+          ? <div className="local-job-list">{sortedApps.map((a) => {
+              const job = byId.get(a.jobId);
+              return (
+                <div className="local-job" key={`app-${a.id}`}>
+                  <span><b>{a.jobTitle}</b><small>{a.company} · {formatWhen(a.appliedAt)}</small></span>
+                  <div className="local-job-actions">
+                    {job && <button className="edit-local" onClick={() => onOpen(job)}>Open</button>}
+                    <button className="delete-local" onClick={() => { if (confirm(`Withdraw your application to ${a.jobTitle}?`)) deleteApplication(a.id).catch(() => {}); }}>Withdraw</button>
+                  </div>
+                </div>
+              );
+            })}</div>
           : <div className="admin-jobs-empty"><strong>No applications yet</strong><p>Open a vacancy and choose Apply to record your interest.</p></div>}
       </section>
 

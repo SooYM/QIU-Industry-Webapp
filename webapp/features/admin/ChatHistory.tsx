@@ -13,31 +13,40 @@ function whenValue(ts: unknown): number {
   return Number.MAX_SAFE_INTEGER;
 }
 
-/** Admin view: every chat, with student identity. */
+/** Admin view: chats grouped by student. */
 function AllChats() {
   const [logs, setLogs] = useState<ChatLog[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => subscribeAllChats((rows) => { setLogs(rows); setLoading(false); }), []);
-  const sorted = [...logs].sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt));
+
+  const groups = new Map<string, { name: string; email: string; items: ChatLog[] }>();
+  for (const l of logs) {
+    const key = l.studentUid || l.studentEmail || "unknown";
+    if (!groups.has(key)) groups.set(key, { name: l.studentName, email: l.studentEmail, items: [] });
+    groups.get(key)!.items.push(l);
+  }
+  const grouped = [...groups.values()]
+    .map((g) => ({ ...g, items: g.items.sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt)) }))
+    .sort((a, b) => whenValue(b.items[0]?.createdAt) - whenValue(a.items[0]?.createdAt));
 
   return (
     <section className="local-jobs" aria-labelledby="chats-title">
-      <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">Student assistant history</h3></div><strong>{sorted.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><strong>{logs.length} from {grouped.length}</strong></div>
       {loading ? <p className="role-manager-state" role="status">Loading chats…</p>
-        : sorted.length ? (
-          <div className="local-job-list">
-            {sorted.map((log) => (
+        : grouped.length ? grouped.map((g) => (
+          <div className="student-group" key={g.email || g.name}>
+            <div className="student-group-head"><b>{g.name || g.email || "Unknown"}</b><small>{g.email} · {g.items.length} question{g.items.length === 1 ? "" : "s"}</small></div>
+            {g.items.map((log) => (
               <div className="local-job" key={log.id} style={{ alignItems: "flex-start" }}>
                 <span>
-                  <b>{log.studentName || log.studentEmail || "Unknown"}</b>
-                  <small>{log.studentEmail}{log.company ? ` · about ${log.company}` : ""} · {formatWhen(log.createdAt)}</small>
+                  <small>{log.company ? `about ${log.company} · ` : ""}{formatWhen(log.createdAt)}</small>
                   <span className="mt-1 block text-[11px]"><b>Q:</b> {log.question}</span>
                   <span className="block text-[11px] text-accent"><b>A:</b> {log.answer}</span>
                 </span>
               </div>
             ))}
           </div>
-        ) : <div className="admin-jobs-empty"><strong>No chats yet</strong><p>Assistant conversations will appear here.</p></div>}
+        )) : <div className="admin-jobs-empty"><strong>No chats yet</strong><p>Assistant conversations will appear here.</p></div>}
     </section>
   );
 }

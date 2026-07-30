@@ -80,6 +80,11 @@ export async function recordApplication(app: Application) {
     { ...clean(app), appliedAt: serverTimestamp() }, { merge: true });
 }
 
+/** Student withdraws an application they changed their mind about. */
+export async function deleteApplication(id: string) {
+  await deleteDoc(doc(requireDb(), COLLECTIONS.applications, id));
+}
+
 export async function recordView(event: ViewEvent) {
   await setDoc(doc(requireDb(), COLLECTIONS.viewEvents, event.id),
     { ...clean(event), viewedAt: serverTimestamp() }, { merge: true });
