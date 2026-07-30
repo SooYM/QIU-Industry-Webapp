@@ -76,7 +76,9 @@ export function StudentResume({
           />
           <button type="submit" className="save-job" disabled={busy || !link.trim()}>{busy ? "Saving…" : "Save link"}</button>
         </form>
-        <small className="text-accent mt-2 block">Paste a Google Drive / OneDrive / Dropbox link and set sharing to <b>&ldquo;Anyone with the link&rdquo;</b>. PDF preferred.</small>
+        <div className="resume-hint" role="note">
+          <b>How to share:</b> paste a <b>Google Drive / OneDrive / Dropbox</b> link, then set its sharing to <b>&ldquo;Anyone with the link&rdquo;</b> so employers and admins can open it. <b>PDF preferred.</b>
+        </div>
         {message && <p className={`admin-message ${isError ? "error" : ""} mt-2`} role="status" aria-live="polite">{message}</p>}
       </div>
     </section>

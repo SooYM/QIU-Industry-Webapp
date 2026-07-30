@@ -7,7 +7,7 @@ import { db } from "./firebase-client";
 import {
   checkInAttendance, checkOutAttendance, deleteApplication, getMyAttendance, isApproved,
   recordApplication, recordView, subscribeApplications, subscribeAttendance,
-  subscribeEvents, subscribeMyResume, subscribeVacancies, subscribeViews,
+  subscribeEvents, subscribeJobStats, subscribeMyResume, subscribeVacancies, subscribeViews,
 } from "../lib/data/firestore";
 import type { Application, Attendance, EventItem, Job, Resume, ViewEvent } from "../lib/data/types";
 import { jobMatchesCourse, resolveCourse } from "../lib/data/course-map";
@@ -49,6 +49,7 @@ export default function Home() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [events, setEvents] = useState<EventItem[]>([]);
   const [myAttendance, setMyAttendance] = useState<Attendance[]>([]);
+  const [jobStats, setJobStats] = useState<Record<number, number>>({});
   const [scanMsg, setScanMsg] = useState("");
   const scanHandled = useRef(false);
 
@@ -88,7 +89,8 @@ export default function Home() {
     if (!user || !db) return;
     const unsubEvents = subscribeEvents(setEvents, () => {});
     const unsubAtt = subscribeAttendance(setMyAttendance, user.uid);
-    return () => { unsubEvents(); unsubAtt(); };
+    const unsubStats = subscribeJobStats(setJobStats);
+    return () => { unsubEvents(); unsubAtt(); unsubStats(); };
   }, [user]);
 
   // Process a scanned attendance QR (?ev=&s=&c=) once the events + user are ready.
@@ -344,6 +346,7 @@ export default function Home() {
           recommended={isStudent && jobMatchesCourse(selectedJob, course)}
           applied={appliedJobIds.has(selectedJob.id)}
           hasResume={Boolean(myResume)}
+          applicantCount={jobStats[selectedJob.id] ?? 0}
           onApply={() => applyToJob(selectedJob)}
           onWithdraw={() => withdrawFromJob(selectedJob)}
           onGoToResume={() => { setSelectedJob(null); setTab("resume"); }}

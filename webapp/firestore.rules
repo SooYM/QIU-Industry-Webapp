@@ -308,6 +308,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Public per-job applicant tally (a single number, no identities). Any allowed
+    // user can read it and increment it when they apply/withdraw.
+    match /job_stats/{jobId} {
+      allow read: if isAllowedUser();
+      allow write: if isAllowedUser()
+        && request.resource.data.keys().hasOnly(['applicants'])
+        && request.resource.data.applicants is number;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

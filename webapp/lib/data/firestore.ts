@@ -2,7 +2,7 @@
 // database. Feature modules call these helpers; they never touch Firestore SDK
 // directly. Swapping backends later means reimplementing only this file.
 import {
-  collection, deleteDoc, doc, getDoc, onSnapshot, query, serverTimestamp,
+  collection, deleteDoc, doc, getDoc, increment, onSnapshot, query, serverTimestamp,
   setDoc, updateDoc, where, type Firestore,
 } from "firebase/firestore";
 import { db } from "../../app/firebase-client";
@@ -19,6 +19,7 @@ export const COLLECTIONS = {
   events: "events",
   eventCodes: "event_codes",
   attendance: "attendance",
+  jobStats: "job_stats",
 } as const;
 
 function requireDb(): Firestore {
@@ -75,14 +76,33 @@ export async function rejectJob(id: number) {
 
 // ---- Applications & view history ------------------------------------------
 
+/** Public per-job applicant tally (no identities). Read by all; incremented on apply/withdraw. */
+async function bumpApplicants(jobId: number, delta: number) {
+  await setDoc(doc(requireDb(), COLLECTIONS.jobStats, String(jobId)), { applicants: increment(delta) }, { merge: true }).catch(() => {});
+}
+
+export function subscribeJobStats(onData: (counts: Record<number, number>) => void) {
+  return onSnapshot(collection(requireDb(), COLLECTIONS.jobStats), (snap) => {
+    const counts: Record<number, number> = {};
+    snap.docs.forEach((d) => { counts[Number(d.id)] = Math.max(0, (d.data().applicants as number) || 0); });
+    onData(counts);
+  });
+}
+
 export async function recordApplication(app: Application) {
-  await setDoc(doc(requireDb(), COLLECTIONS.applications, app.id),
-    { ...clean(app), appliedAt: serverTimestamp() }, { merge: true });
+  const ref = doc(requireDb(), COLLECTIONS.applications, app.id);
+  const existed = (await getDoc(ref)).exists();
+  await setDoc(ref, { ...clean(app), appliedAt: serverTimestamp() }, { merge: true });
+  if (!existed) await bumpApplicants(app.jobId, 1); // count each student once
 }
 
 /** Student withdraws an application they changed their mind about. */
 export async function deleteApplication(id: string) {
-  await deleteDoc(doc(requireDb(), COLLECTIONS.applications, id));
+  const ref = doc(requireDb(), COLLECTIONS.applications, id);
+  const existed = (await getDoc(ref)).exists();
+  await deleteDoc(ref);
+  const jobId = Number(id.split("_")[1]);
+  if (existed && jobId) await bumpApplicants(jobId, -1);
 }
 
 export async function recordView(event: ViewEvent) {

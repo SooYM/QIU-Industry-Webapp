@@ -110,6 +110,7 @@ export function VacancyModal({
   recommended = false,
   applied = false,
   hasResume = false,
+  applicantCount = 0,
   onApply,
   onWithdraw,
   onGoToResume,
@@ -120,6 +121,7 @@ export function VacancyModal({
   recommended?: boolean;
   applied?: boolean;
   hasResume?: boolean;
+  applicantCount?: number;
   onApply?: () => void;
   onWithdraw?: () => void;
   onGoToResume?: () => void;
@@ -192,6 +194,8 @@ export function VacancyModal({
             )}
           </>
         )}
+        <hr/>
+        <p className="applicant-stat"><b>{applicantCount}</b> {applicantCount === 1 ? "student has" : "students have"} applied</p>
         <JobAssistant job={job} />
         </aside>
       </div>
