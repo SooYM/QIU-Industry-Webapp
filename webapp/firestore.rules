@@ -133,7 +133,7 @@ service cloud.firestore {
 
     function validCompany(data) {
       return data.keys().hasAll(['id', 'name', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'boothNumber', 'logoBackground', 'status', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'boothNumber', 'logoBackground', 'status', 'pendingEdit', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.name is string && data.name.size() > 0 && data.name.size() <= 200
         && (!('website' in data) || (data.website is string && data.website.size() <= 2048))
