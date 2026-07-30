@@ -3,80 +3,105 @@
 > [!NOTE]
 > **Status:** Active Internal Testing Phase — Currently undergoing internal validation. Live deployment links and public hosting URLs are strictly withheld during testing.
 
-**QIU Industry Webapp** is a full-fledged industry career, event & vacancy discovery web application built for **QIU (Quest International University)** students, academic staff, and participating industry partner employers. Built with Next.js 16 (App Router static export), React 19, TypeScript 5.9, Tailwind CSS v4.2, Cloud Firestore, and Firebase Authentication.
+**QIU Industry Webapp** is an industry career, event & vacancy discovery web application built for **QIU (Quest International University)** students, academic staff, and participating industry partner employers. Built with Next.js 16 (App Router static export), React 19, TypeScript 5.9, Tailwind CSS v4.2, Cloud Firestore, and Firebase Authentication.
 
 > [!IMPORTANT]
-> **Privacy & Security Boundary:** Private source files (CSV, XLSX, XLS, TSV) and generated vacancy files (`data/jobs.json`) are strictly excluded from version control and static website export bundles. Shared vacancy, application, and event records are securely managed in Cloud Firestore and protected by server-enforced Firestore Security Rules (`firestore.rules`).
+> **Privacy & Security Boundary:** Private source files (`*.csv`, `*.xlsx`, `*.xls`, `*.tsv`) and generated vacancy datasets (`data/jobs.json`) are strictly excluded from version control and static export bundles. Shared vacancy, application, company, and event records are securely managed in Cloud Firestore and protected by server-enforced Firestore Security Rules ([firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules)).
+
+---
+
+## Technical Documentation Hub
+
+This repository maintains comprehensive, multi-page technical documentation for developers, system administrators, security reviewers, and academic stakeholders:
+
+1. **[webapp/README.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/README.md)** *(Webapp Architecture & Developer Quickstart)*  
+   Developer onboarding guide, local environment configuration, build pipelines, directory structure, quality gates, and deployment scripts.
+
+2. **[SOFTWARE_DOCUMENTATION.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SOFTWARE_DOCUMENTATION.md)** *(Comprehensive System Architecture Specification)*  
+   Complete system context, architectural design decisions, component design hierarchy, sequence diagrams, technology stack, and production procedures.
+
+3. **[SECURITY_AND_RULES.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SECURITY_AND_RULES.md)** *(Security Model, Firestore Security Rules & 30s Dynamic QR Math)*  
+   Deep dive into authentication gates, the 4-role RBAC matrix, line-by-line Firestore security rules, 30-second TOTP-style dynamic QR anti-cheat logic, and CCA duration algorithms.
+
+4. **[DATA_MODELS_AND_SCHEMAS.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md)** *(Data Dictionary, TypeScript Interfaces & Firestore Collections)*  
+   Exhaustive data dictionary, canonical TypeScript interfaces, Firestore collection specifications (`job_stats`, `companies`, `events`, `event_codes`, `attendance`, `employer_signups`, `app_settings`, etc.), real-time subscriptions, and batch import pipeline.
+
+5. **[FEATURE_MODULES_GUIDE.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/FEATURE_MODULES_GUIDE.md)** *(Feature Modules Technical Specification)*  
+   Detailed technical guide covering Home Directory RAG, logo luminance analysis (`useLogoBackdrop.ts`), employer self-registration queue, admin sub-tabs, generated CV engine (`cv-download.ts`), global toast system, image preview component, and events anti-cheat module.
 
 ---
 
 ## Brand & Visual Identity: Signature QIU-Red Design System
 
-QIU Industry Webapp features a bespoke visual identity built around QIU's signature brand colors and high-contrast typography:
+QIU Industry Webapp features a visual identity built around QIU's signature brand colors and high-contrast typography:
 
 - **QIU-Red Palette**: Core brand identity anchored by QIU-Red (`#ba1a1a` / `#900010` / `--color-primary: #d12a32`, hovering at `#b21f27`, and brightened to `#ef5a60` in dark mode).
 - **Prominent Salary Callouts**: Styled salary metadata blocks displaying clean, high-visibility wage figures (e.g. `RM 3,500 / monthly`) across vacancy cards and detail modals.
 - **Enlarged QIU Brand Logo & Theme Inversion**: Prominent logo asset sizing (`height: 3.2rem` desktop / `3rem` mobile) across header, authentication modal, and mobile header, automatically inverted on dark surfaces (`filter: invert(1) brightness(1.9)`).
-- **Light Default Theme with Seamless Dark Mode**: Designed with a clean light default theme that automatically respects system preferences or user toggles, adjusting backgrounds, surface tokens, and contrast levels dynamically without layout shifts.
+- **Light Default Theme with Seamless Dark Mode**: Designed with a light default theme that automatically respects system preferences or user toggles, adjusting backgrounds, surface tokens, and contrast levels dynamically without layout shifts.
 
 ---
 
-## Core Features & Workflow Architecture
+## Core Feature Modules Summary
 
-### 1. Interactive Role Guide System (`webapp/features/Guide.tsx`)
-- **Tailored Role Onboarding**: Step-by-step interactive onboarding guides customized for `student`/`user`, `employer`, `admin`, and `superadmin` roles, reopenable anytime via the `?` topbar button.
-- **Live-Styled Button Snapshots**: Features rendered visual previews of key action buttons and status badges (`<Demo>` & `<Chip>`) directly inside the guide, matching live theme styles (`tone-accent`, `save-job`, `tone-success`, `enquire-main`, `cancel-edit`, `job-assistant-toggle`, `admin-button`, `edit-local`).
+### 1. Home Directory & Company RAG ([HomeView.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/HomeView.tsx) & [useLogoBackdrop.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/useLogoBackdrop.ts))
+- **Exhibitor Directory & YouTube Embeds**: Interactive directory of approved Industry Day exhibitors featuring corporate summaries, booth numbers, and embedded YouTube promotional videos.
+- **Automated Logo Luminance Sampling**: The `useLogoBackdrop.ts` hook samples logo image pixels via an HTML5 2D Canvas to calculate relative luminance ($Y = 0.2126R + 0.7152G + 0.0722B$). Bright logos ($Y > 170$) automatically receive dark backdrop tiles for high contrast.
+- **In-Modal Grounded Company Assistant**: Grounded typewriter streaming assistant (`CompanyAssistant`) that answers student queries strictly using the selected company's profile and vacancy data.
 
-### 2. Multi-Criteria Vacancy Sorting System (`webapp/features/vacancies/VacancyFilters.tsx`)
-- **5-Mode Sorting Engine**: Dedicated **Sort By** dropdown control supporting instant re-ordering of vacancy listings across 5 modes:
-  - `default`: Best match for students (prioritizing course recommendations); Newest first for managers.
-  - `newest`: Newest published vacancies first (by creation timestamp `id`).
-  - `oldest`: Oldest vacancies first.
-  - `salary_high`: Highest monthly salary first (descending).
-  - `salary_low`: Lowest monthly salary first (ascending).
-- **Reactive Filter Integration & 1-Click Reset**: Fully integrated into the reactive vacancy search and multi-criteria filter pipeline (keyword search, company, specialization, opportunity type, max salary range slider), complete with a 1-click filter reset (`resetFilters`).
+### 2. Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx))
+- **Self-Service Employer Onboarding**: Non-QIU external partner employers can self-register via `employer_signups`.
+- **Admin Approval & Email Whitelisting**: Approving a signup automatically adds the email to `whitelisted_emails`, assigns the employer role, and creates an exhibitor profile in `companies`.
+- **Staged Edits & Bulk "Approve All"**: Employer updates to approved vacancies or profiles stage a `pendingEdit` diff without affecting live views. Admins review diffs and can execute 1-click bulk approvals (`approveAll`).
 
-### 3. Mobile UX & Header Polish (`webapp/app/globals.css` & `webapp/app/page.tsx`)
-- **Enlarged Brand Logo**: Prominent logo asset sizing (`height: 3.2rem` desktop / `3rem` mobile) across topbar header, auth modal, and mobile header views.
-- **Non-Wrapping Tab Navigation**: Added `white-space: nowrap` to main section tabs (`Vacancies`, `History`, `My Resume`, `Events`) ensuring tab navigation titles never line-wrap on smaller screens.
-- **Responsive Auth Header Layout**: Optimizes mobile screens (<600px) by hiding secondary account text (`.auth-account small, .auth-account strong`) to give maximum breathing room to the enlarged QIU logo and avatar/Sign Out controls.
+### 3. Admin Dashboard Architecture Rework ([AdminPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminPanel.tsx))
+Modular sub-tab navigation dividing administrative tasks into specialized components:
+- [AdminSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminSummary.tsx): High-level system metrics and top vacancy/event bar charts.
+- [ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx): Pending employer signups, vacancy submissions, and staged edit diffs.
+- [CompanyManager.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/CompanyManager.tsx): Exhibitor profile manager with website logo auto-fetching.
+- [StudentActivity.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/StudentActivity.tsx): Candidate application feeds with expandable student accordions.
+- [ResumeViewer.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ResumeViewer.tsx): Candidate resume reviewer supporting PDF, link, and generated CV views.
+- [SettingsPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/SettingsPanel.tsx): System-wide configuration (portal title, tagline, QR rotation speed, CCA thresholds).
 
-### 4. Enhanced Candidate & Vacancy Workflows
-- **Real-Time Applicant Counter**: Live applicant tallies displayed per job on cards and modal popups, backed by atomic `increment()` counters in the `job_stats` collection.
-- **Application Withdrawal**: Students can withdraw submitted job applications directly from their Student History tab (`StudentHistory.tsx`) or inside `VacancyModal.tsx`, atomically decrementing the per-job applicant tally.
-- **Flexible Resume Management**: Candidates can submit shareable links (Google Drive, OneDrive, Dropbox) for zero-cost Firebase Spark plan hosting or direct PDF upload via Firebase Storage, with full resume removal/deletion capabilities.
-- **In-Modal Streaming Assistant**: Embedded directly below the Apply/Resume section in `VacancyModal.tsx`, providing grounded, typewriter-streaming answers auto-scrolling to newest responses.
+### 4. Single-Company Employer Scope ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx))
+- **Employer Analytics**: Scoped overview displaying total application tallies, unique applicants, vacancies applied to, and assistant question feeds.
+- **Tenant Scope Isolation**: Strict single-company data filtering ensuring employers can only view applications and chat logs bound to their assigned organization.
 
-### 5. Admin & Employer Grouped Views + Bulk Actions
-- **Grouped Candidate Activity Feeds**: Admins view candidate applications grouped by student with expandable details (`StudentActivity.tsx`), while employers view flat feeds scoped strictly to their assigned company.
-- **Bulk "Approve All" Feature**: Admins can batch-approve all pending employer vacancy posts and staged edits in 1 click (`ApprovalQueue.tsx`).
+### 5. Generated CV Engine & Printable HTML Engine ([GeneratedCV.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/GeneratedCV.tsx) & [cv-download.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/cv-download.ts))
+- **Built-in HTML/PDF CV Generator**: Candidates fill structured profile fields (headline, CGPA, FYP title, education, experience, skills, links) rendered by `GeneratedCV.tsx`.
+- **Zero-Cost Storage Download**: 1-click download generator (`cv-download.ts`) exports a standalone, beautifully styled HTML document that prints directly to PDF without requiring cloud storage subscriptions.
 
-### 6. Events & 30-Second Dynamic QR Anti-Cheat Attendance Module
-- **Live Presenter View (`EventPresenter.tsx`)**: Presenters launch a dedicated live screen displaying a **Dynamic 30-Second Rotating QR Code** and dynamic 6-character code (`REFRESH_MS = 30000`). Active step (`checkin` vs `checkout`), code, and expiry timestamp (`codeExpiry`) update server-side in `event_codes/{eventId}`.
-- **WhatsApp/Proxy Anti-Cheat Protection**: The `event_codes` collection is **strictly unreadable by client queries**. Server-side Firestore Security Rules evaluate `eventCode(eventId)` to verify step, code match, and timestamp validity (`request.time.toMillis() < codeExpiry`). Photos shared via messaging apps expire within 30 seconds and become invalid.
-- **Two-Step Duration Verification for CCA Points**: Requires students to perform both a **Check-In** at session start and a **Check-Out** at session end. System calculates elapsed duration vs scheduled `sessionMinutes` (threshold: ≥ 80% of `sessionMinutes` or 45 min floor) to award Co-Curricular Activity (CCA) eligibility (`caEligible`).
-- **Presenter Delegation**: Admins can assign guest speaker emails to `events/{eventId}.presenters`, granting live QR display rights without full administrative permissions.
+### 6. Reactive Global Toast System ([toast.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/toast.tsx))
+- **Real-Time Feedback Engine**: Global event-driven notification engine delivering non-blocking feedback (`success`, `error`, `info`) on save, edit, delete, apply, check-in, check-out, and withdrawal operations.
+
+### 7. Live Image Preview Component ([ImagePreview.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/ImagePreview.tsx))
+- **Real-Time Form Preview**: Embedded URL previewer positioned under logo and video link inputs, featuring automatic URL validation and broken-link error warnings.
+
+### 8. Events UX & 30-Second Dynamic QR Anti-Cheat Attendance ([EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx) & [SpeakerAvatar.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/SpeakerAvatar.tsx))
+- **Live Projector Screen**: Presenters launch a live display screen generating a dynamic 30-second rotating QR code (`REFRESH_MS = 30000`).
+- **Server-Enforced Anti-Cheat**: `event_codes` collection is strictly unreadable by client queries (`allow read: if isAdmin()`). Server-side Firestore rules evaluate `eventCode(eventId)` assertions, invalidating screenshots shared over WhatsApp.
+- **Two-Step Duration Math for CCA Points**: Requires both Check-In and Check-Out. System computes elapsed time vs `sessionMinutes` (threshold: $\ge 80\%$ of session length or 45-minute floor) to assign `caEligible` status.
+
+### 9. Multi-Criteria Vacancy Sorting ([VacancyFilters.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/vacancies/VacancyFilters.tsx))
+- **5-Mode Sorting Engine**: 5-mode dropdown supporting sorting by `default` (course recommendation fit), `newest`, `oldest`, `salary_high` (descending), and `salary_low` (ascending).
 
 ---
 
-## Access Model & Roles Matrix
+## 4-Role Access Control & RBAC Matrix
 
-Authentication requires a verified Google account. Access rights and capabilities are governed by server-side Firestore Security Rules and pre-whitelisted account entries.
+Authentication requires a verified Google account. Access rights are governed by server-enforced Firestore Security Rules ([firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules)) and email whitelist entries.
 
-| Role | Target Identity | Granted Capabilities & Scope |
+| Role | Target Identity | Granted Capabilities & Tenant Scope |
 | --- | --- | --- |
-| `user` | Standard QIU student or staff (`@qiu.edu.my`) | Default role upon Google sign-in. Browse and filter vacancies, view course-driven recommendations, interact with in-modal streaming assistant, manage resume (link or PDF), apply/withdraw applications, scan 30s dynamic QR codes for check-in/checkout, and view attendance history. |
-| `employer` | External partner email whitelisted in `whitelisted_emails` | Granted access via pre-whitelisted email entry bound to a specific `company` name. Post vacancies and stage edits, view candidate resumes and flat application feeds for their assigned company. |
-| `admin` | Internal user promoted by Superadmin | Inherits all `user` capabilities plus full webapp-wide vacancy management (create, edit, delete, single or bulk "Approve All" review), creating/managing Industry Day events, presenting live 30s QR screens, exporting attendance CSV reports, viewing grouped candidate activity, and promoting users to `admin`. |
-| `superadmin` | Fixed identity (`ai@qiu.edu.my`) | Master administrator. Inherits all `admin` capabilities plus initial bulk JSON data import, system maintenance, and user role management. Immutable role that cannot be demoted or deleted. |
-| *(Delegated Presenter)* | Email listed in event's `presenters` array | Non-admin users whose email is explicitly listed in an event's `presenters` field. Granted write access to `event_codes/{eventId}` to present the dynamic live 30s QR screen for that specific event. |
-
-> [!NOTE]
-> Signing in with a non-whitelisted, non-QIU Google account results in an immediate authorization rejection; Firestore Security Rules deny all read/write access to vacancy, user, application, event, and attendance collections.
+| `user` | QIU Student / Academic Staff (`@qiu.edu.my`) | Default student role. Browse/filter vacancies, view course recommendations, interact with in-modal assistant, manage resume (link, upload, generated CV), apply/withdraw applications, scan 30s dynamic QR codes for check-in/checkout, and view attendance history. |
+| `employer` | External email in `whitelisted_emails` bound to `company` | Granted via pre-whitelisted email or approved self-registration. Post vacancies and stage profile edits (submitted as `pending`), view candidate resumes and application feeds scoped strictly to their assigned company. |
+| `admin` | Internal user promoted by Superadmin | Inherits all `user` capabilities plus full webapp vacancy management (create, edit, delete, single or bulk "Approve All" review), event management, live 30s QR presenter mode, attendance CSV export, and user role promotion. |
+| `superadmin` | Fixed identity (`ai@qiu.edu.my`) | Master administrator. Inherits all `admin` capabilities plus initial bulk JSON data import (`data/jobs.json`), system resets, and immutable role management. |
+| *(Delegated Presenter)* | Email listed in event `presenters` array | Non-admin user whose email is explicitly listed in an event's `presenters` array. Granted write access to `event_codes/{eventId}` to present the dynamic live 30s QR screen for that specific event. |
 
 ---
 
-## Top-Down Architecture Diagram
+## Top-Down System Architecture Diagram
 
 ```mermaid
 flowchart TD
@@ -90,10 +115,14 @@ flowchart TD
         Resumes[("resumes")]
         ChatLogs[("chat_logs")]
         Events[("events")]
-        EventCodes[("event_codes (Hidden from Client Reads)")]
+        EventCodes[("event_codes (Unreadable by Client Reads)")]
         Attendance[("attendance")]
         JobStats[("job_stats")]
+        Companies[("companies")]
+        Signups[("employer_signups")]
+        Settings[("app_settings")]
         Whitelist[("whitelisted_emails")]
+      Users[("users")]
     end
     
     Rules --> Vacancies
@@ -104,120 +133,110 @@ flowchart TD
     Rules --> EventCodes
     Rules --> Attendance
     Rules --> JobStats
+    Rules --> Companies
+    Rules --> Signups
+    Rules --> Settings
     Rules --> Whitelist
+    Rules --> Users
 
     subgraph LiveAttendanceModule ["30-Second Dynamic Anti-Cheat QR Attendance Module"]
         Presenter["Presenter View (EventPresenter.tsx)"] -->|"Write 30s Rotating Code"| EventCodes
-        Student["Student Scan / Submit Code"] -->|"Server-Side Security Rules Check"| Attendance
+        Student["Student Scan / Submit Code"] -->|"Server-Side Rule Assertion Check"| Attendance
         EventCodes -.->|"get() Rule Check (Timestamp & Code Expiry)"| Attendance
-        Attendance -->|"Check-in + Checkout Duration"| CCA["CCA Eligibility (caEligible)"]
+        Attendance -->|"Check-in + Checkout Duration"| CCA["CCA Points Eligibility (caEligible)"]
     end
 
-    subgraph ClientFeatures ["Client Features Scope"]
+    subgraph ClientFeatures ["Client Features & Modules Scope"]
+        HomeView["Home Directory & RAG (HomeView.tsx)"]
         Guide["Interactive Role Guide (Guide.tsx)"]
         Modal["Vacancy Modal & Streaming Assistant (VacancyModal.tsx)"]
         Queue["Approval Queue & Bulk Approve (ApprovalQueue.tsx)"]
-        EventsView["Industry Day Events (EventsView.tsx)"]
-        History["Student History & Withdrawal (StudentHistory.tsx)"]
+        CompanyMgr["Exhibitor Profile Manager (CompanyManager.tsx)"]
+        CVEngine["Generated CV Engine & Printable Download (GeneratedCV.tsx)"]
+        Toaster["Global Toast System (toast.tsx)"]
     end
 
+    Client --> HomeView
     Client --> Guide
     Client --> Modal
     Client --> Queue
-    Client --> EventsView
-    Client --> History
+    Client --> CompanyMgr
+    Client --> CVEngine
+    Client --> Toaster
     Client --> Presenter
     Client --> Student
-    Modal <--> Storage[("Firebase Storage (PDF Resumes)")]
+    Modal <--> Storage[("Firebase Storage (Optional PDF Resumes)")]
 ```
 
 ---
 
-## Data Models & Schemas Summary
+## Data Models Summary Table
 
 | Model / Collection | Document ID | Purpose & Key Schema Fields |
 | --- | --- | --- |
-| `Job` (`vacancies`) | `{id}` (numeric) | Vacancy details, salary, scope, requirements, status (`approved`/`pending`/`pending_edit`/`rejected`), location, company binding, `createdBy`, `createdAt`, `updatedAt`. |
-| `Application` (`applications`) | `{studentUid}_{jobId}` | Candidate application submission record containing `studentUid`, `studentEmail`, `studentName`, `jobId`, `jobTitle`, `company`, optional `resumeId`, and `appliedAt` server timestamp. |
-| `Resume` (`resumes`) | `{studentUid}` | Candidate resume on file with `source` (`upload` \| `generated` \| `link`), optional PDF `fileUrl` (Firebase Storage or share link), `fileName`, `course`, and `updatedAt`. |
-| `ChatLog` (`chat_logs`) | `{id}` | Grounded assistant conversation turn containing `studentUid`, `studentEmail`, `studentName`, `company` (optional filter), `question`, `answer`, and `createdAt`. |
-| `EventItem` (`events`) | `{id}` (numeric) | Industry Day event schedule item containing `title`, `description`, `location`, `speakerName`, `speakerEmail`, `startAt`, `endAt`, `sessionMinutes`, `presenters` email array, and `createdBy`. |
-| `EventCode` (`event_codes`) | `{eventId}` | **Secret server-side active code** (unreadable by client queries) containing `activeStep` (`checkin` \| `checkout` \| `none`), `activeCode` (30s rotating hash), and `codeExpiry` (epoch timestamp). |
-| `Attendance` (`attendance`) | `{eventId}_{studentUid}` | Attendance verification record containing `eventId`, `eventTitle`, `studentUid`, `studentEmail`, `studentName`, `code`, `step` (`checkin` \| `checkout`), `checkInMs`, `checkOutMs`, `durationMinutes`, and `caEligible` status. |
-| `JobStats` (`job_stats`) | `{jobId}` | Public applicant tally per vacancy containing `applicants` numeric counter (updated via Firestore `increment()`). |
-| `UserRecord` (`users`) | `{uid}` | Profile document containing `uid`, `email`, `displayName`, `photoURL`, `role`, `course`, `courseCode`, `company`, and `updatedAt`. |
-| `WhitelistedEmail` (`whitelisted_emails`) | `{email}` | Normalized whitelisted email entry containing `email`, `company` binding, `addedBy`, and `createdAt`. |
+| `Job` ([vacancies](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#33-vacanciesvacancyid)) | `{id}` (numeric) | Vacancy details, salary, scope, requirements, status (`approved`/`pending`/`pending_edit`/`rejected`), `pendingEdit`, `createdBy`, timestamps. |
+| `Application` ([applications](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#34-applicationsappid-doc-id-studentuid_jobid)) | `{studentUid}_{jobId}` | Candidate application record containing student metadata, `jobId`, `jobTitle`, `company`, `resumeId`, `resumeChoice`, and `appliedAt`. |
+| `Resume` ([resumes](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#36-resumesuid-doc-id-studentuid)) | `{studentUid}` | Resume profile document with `source` (`upload` \| `generated` \| `link`), `fileUrl`, `profile` map (headline, summary, CGPA, FYP, skills, links), and `updatedAt`. |
+| `ChatLog` ([chat_logs](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#37-chat_logsid)) | `{id}` | Grounded assistant conversation turn containing `studentUid`, `studentEmail`, `studentName`, target `company`, `question`, `answer`, and `createdAt`. |
+| `EventItem` ([events](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#38-eventseventid)) | `{id}` (numeric) | Industry Day talk schedule containing `title`, `description`, `location`, `speakerName`, `speakerLinks`, `sessionMinutes`, `presenters` array, and `createdBy`. |
+| `EventCode` ([event_codes](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#39-event_codeseventid-secret-server-only-collection)) | `{eventId}` | **Secret server-side active code** (unreadable by client queries) holding `activeStep`, `activeCode` (30s hash), and `codeExpiry` epoch timestamp. |
+| `Attendance` ([attendance](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#310-attendanceattendanceid-doc-id-eventid_studentuid)) | `{eventId}_{studentUid}` | Attendance verification document holding `code`, `step`, `checkInMs`, `checkOutMs`, calculated `durationMinutes`, and `caEligible` status. |
+| `JobStats` ([job_stats](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#311-job_statsjobid-public-real-time-tally-collection)) | `{jobId}` | Public applicant tally per vacancy containing atomic `applicants` counter (updated via `increment()`). |
+| `Company` ([companies](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#312-companiescompanyid)) | `{companyId}` | Industry Day exhibitor entry containing `name`, `website`, `logoUrl`, `videoUrl`, `summary`, `boothNumber`, `logoBackground`, `status`, and `pendingEdit`. |
+| `EmployerSignup` ([employer_signups](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#314-employer_signupsemailid)) | `{email}` | Self-service employer registration request containing applicant metadata, `company`, profile links, and approval status. |
+| `AppSettings` ([app_settings](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md#313-app_settingsdocid)) | `default` | Global configuration document storing portal title, tagline, `qrRotateSeconds`, `ccaPercent`, `ccaFloorMinutes`, and tab visibility toggles. |
 
 ---
 
-## Technical Stack
+## Technical Stack Summary
 
-| Layer | Technology | Description |
+| Layer | Technology | Operational Purpose |
 | --- | --- | --- |
-| **UI** | React 19, TypeScript 5.9, Tailwind CSS 4.2 | Component-driven UI, QIU-Red design system, responsive layout, dark mode, modal management |
-| **Framework** | Next.js 16 (App Router) | Static site generation with `output: "export"` outputting bundle to `out/` |
-| **Authentication** | Firebase Authentication | Google OAuth provider gate restricted to `@qiu.edu.my` domain and `whitelisted_emails` |
-| **Database & Security** | Cloud Firestore & Security Rules | NoSQL database governed by 4-role RBAC and server-side assertion functions in `firestore.rules` |
-| **Realtime State** | Firestore Reactive Subscriptions | Live data sync using `onSnapshot` for vacancies, applications, job stats, events, and presenter dynamic QR codes |
-| **Storage** | Firebase Storage | Optional PDF resume file uploads with security rules enforcement |
-| **Hosting** | Firebase Hosting | Production static asset distribution with custom header security policies |
-| **AI Assistant** | In-Modal Streaming Assistant | High-performance deterministic keyword matching engine grounded strictly to single vacancy context with typewriter streaming UI |
-| **Testing & Verification** | Node Test Runner & Firebase Emulator | Local unit test suite (`npm test`) and Firestore Security Rules emulator tests (`npm run test:rules`) |
+| **UI Framework** | React 19, TypeScript 5.9 | Component hierarchy, modal dialogs, reactive hooks, dark mode |
+| **Styling** | Tailwind CSS 4.2, `tokens.css` | Design token architecture, signature QIU-Red palette (`#ba1a1a` / `#900010`) |
+| **App Framework** | Next.js 16 (App Router) | Static export generation (`output: "export"`) writing bundle to `out/` |
+| **Authentication** | Firebase Authentication | Google OAuth 2.0 provider restricted to `@qiu.edu.my` and whitelisted emails |
+| **Database & Security** | Cloud Firestore & Security Rules | NoSQL database governed by 4-role RBAC and server assertions in [firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules) |
+| **Realtime Sync** | Firestore `onSnapshot` Subscriptions | Live reactive updates for vacancies, applications, job stats, events, and dynamic presenter codes |
+| **Storage** | Firebase Storage | Candidate PDF resume uploads governed by ownership security rules |
+| **Testing & Emulators** | Node Test Runner & Firebase Emulator | Local unit test suite (`npm test`) and Firestore Security Rules emulator tests (`npm run test:rules`) |
 
 ---
 
-## Setup & Verification Commands
+## Setup & Local Verification Commands
 
 ### Prerequisites
-
 - **Node.js**: `22.13.0` or newer
 - **npm**: Included with Node.js
 - **Java Runtime**: Required for local Firestore emulator security rules testing (`npm run test:rules`)
-- **Firebase Project**: A Firebase project with Google Auth, Cloud Firestore, and Firebase Storage enabled.
 
-### 1. Installation
-
-Navigate into the `webapp/` directory and install project dependencies:
+### Installation & Environment Setup
 
 ```bash
+# Navigate to webapp directory
 cd webapp
+
+# Install dependencies
 npm ci
-```
 
-### 2. Environment Setup
-
-Create your local environment configuration file:
-
-```bash
+# Configure environment variables
 cp .env.example .env.local
 ```
 
-Configure your Firebase Web App credentials in `.env.local`:
-
-```dotenv
-NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
-```
-
-### 3. Execution & Verification Commands
+### Verification Command Matrix
 
 Inside `webapp/`:
 
-| Command | Description |
+| Command | Operational Purpose |
 | --- | --- |
 | `npm run dev` | Start Next.js development server at `http://localhost:3000` |
-| `npm run build` | Build static export bundle into `out/` |
-| `npm run start` | Serve static build locally via `npx serve out` |
-| `npm run lint` | Run ESLint syntax and code quality checks |
-| `npm test` | Build application and run unit & regression test suite |
-| `npm run test:rules` | Run authorization tests against local Firestore emulator |
+| `npm run build` | Compile static export bundle into `out/` |
+| `npm run start` | Preview static export build locally via `npx serve out` |
+| `npm run lint` | Run ESLint syntax, typing, and code quality checks |
+| `npm test` | Execute unit and regression test suite |
+| `npm run test:rules` | Execute authorization assertion tests against local Firestore Emulator |
 
 Recommended quality gates before committing changes:
-
 ```bash
 npm run lint
 npm test
@@ -226,93 +245,19 @@ npm run test:rules
 
 ---
 
-## Initial Private Data Import
+## Data Privacy & Verification Protocol
 
-Private source files (CSV/XLSX) are never compiled into the client bundle. To seed or update vacancy records:
+Private source files (`*.csv`, `*.xlsx`, `*.xls`, `*.tsv`) and intermediate data files (`data/jobs.json`) are strictly excluded from version control and static client bundles.
 
-1. Run the Python data normalization script to generate `data/jobs.json` (git-ignored):
-   ```bash
-   python3 scripts/generate_data.py
-   ```
-2. Sign in to QIU Industry Webapp as Superadmin (`ai@qiu.edu.my`).
-3. Open **Admin Tools** -> **Initial Data Import**.
-4. Upload `data/jobs.json` to perform bulk batch writes into the Firestore `vacancies` collection.
-
----
-
-## Deployment
-
-Deploy security rules, composite indexes, and static hosting bundle to Firebase:
-
-```bash
-cd webapp
-npm run build
-npx firebase-tools deploy --only firestore:rules,firestore:indexes,hosting
-```
-
----
-
-## Security & Data Privacy
-
-To guarantee confidentiality and protect sensitive internal data:
-- Source data files (`*.csv`, `*.xlsx`, `*.xls`, `*.tsv`) and intermediate files (`data/jobs.json`) are strictly excluded from Git.
-- Local configuration files containing credentials (`.env`, `.env.local`) are ignored by version control.
-- `event_codes` collection is strictly unreadable by client subscriptions to prevent QR proxy leaks across WhatsApp or social media.
-
-### Verification Command
-
-Run this command before pushing commits to verify that no sensitive files or environment variables are tracked:
-
+Run this verification command prior to pushing commits:
 ```bash
 git ls-files -- data/jobs.json '*.csv' '*.xlsx' '*.xls' '*.tsv' '.env' '.env.local'
 ```
-
 *Expected output: Empty output (no files returned).*
 
 ---
 
-## Project Structure
+## License & Operational Note
 
-```text
-QIU-Industry-Webapp/
-├── webapp/
-│   ├── app/
-│   │   ├── auth-context.tsx         # Auth state, Google sign-in gate, role manager
-│   │   ├── auth-policy.ts           # Email whitelist & role verification helpers
-│   │   ├── chat.ts                  # Grounded assistant retrieval logic
-│   │   ├── firebase-client.ts       # Firebase SDK setup (Auth, Firestore, Storage)
-│   │   ├── globals.css              # Tailwind v4 & QIU-Red styling system
-│   │   ├── layout.tsx               # Root layout & providers
-│   │   └── page.tsx                 # Main application dashboard & layout shell
-│   ├── components/                  # Global UI components (Modal, etc.)
-│   ├── docs/                        # Project documentation (SOFTWARE_DOCUMENTATION.md)
-│   ├── features/                    # Modular feature components
-│   │   ├── admin/                   # Admin panel, ApprovalQueue (bulk approve), StudentActivity
-│   │   ├── chat/                    # Grounded per-job assistant dialog
-│   │   ├── events/                  # Events module (EventsView, EventPresenter 30s QR, EventAttendance)
-│   │   ├── student/                 # Student profile, StudentResume, StudentHistory (withdrawal)
-│   │   └── vacancies/               # Vacancy listing, filters, VacancyModal, cards
-│   ├── lib/
-│   │   ├── auth/                    # Course directory mappings
-│   │   ├── data/                    # Types (types.ts) and Firestore access layer (firestore.ts)
-│   │   └── theme/                   # QIU-Red design tokens (tokens.css)
-│   ├── public/                      # Static assets & QIU branding logos
-│   ├── scripts/                     # Data processing scripts (generate_data.py)
-│   ├── tests/                       # Unit, regression, and Firestore rules emulator tests
-│   ├── firebase.json                # Firebase Hosting and emulator configuration
-│   ├── firestore.indexes.json       # Composite index definitions
-│   ├── firestore.rules              # Security rules for Firestore collections
-│   ├── storage.rules                # Security rules for Firebase Storage
-│   ├── next.config.ts               # Next.js config (output: 'export')
-│   └── package.json                 # Dependencies & scripts
-└── README.md                        # Repository homepage documentation
-```
-
----
-
-## System Notes
-
-- **Active Internal Testing Phase**: Undergoing internal validation with no public live URLs disclosed.
-- **30-Second Dynamic QR Anti-Cheat Engine**: Prevents proxy attendance by rotating single-use codes every 30 seconds stored in client-unreadable Firestore collections and verified server-side.
-- **In-Modal Streaming Assistant**: Embedded typewriter assistant operates on fast deterministic lexical matching grounded strictly to single vacancy scope, eliminating API token costs and hallucination risks.
-- **Firebase Quotas & Scalability**: Operations are calibrated for production-ready performance; monitor storage and Firestore read/write limits during peak recruitment activity.
+- **Active Internal Testing Phase**: Undergoing internal validation; no public deployment links disclosed.
+- **Copyright & Ownership**: Quest International University (QIU). Proprietary system — reuse or redistribution without explicit written permission is strictly prohibited.
