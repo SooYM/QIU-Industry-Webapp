@@ -266,7 +266,8 @@ export function AdminPanel({
   const tabs: { key: typeof adminView; label: string }[] = isEmployer
     ? [
         { key: "company", label: "Company profile" },
-        { key: "manage", label: "Vacancies" },
+        { key: "addVac", label: "Add vacancy" },
+        { key: "manageVac", label: "Manage vacancies" },
         { key: "resumes", label: "View applicants" },
         { key: "activity", label: "Activity" },
         { key: "chats", label: "Chats" },
@@ -319,7 +320,7 @@ export function AdminPanel({
       {adminView === "settings" && isApprover && <SettingsPanel />}
 
       {(adminView === "manage" || adminView === "addVac" || adminView === "manageVac") && <>
-      {(adminView === "manage" || adminView === "addVac") && <form onSubmit={saveVacancy} className="admin-form"><label>Job title<input required value={draft.title} onChange={e => { setDraft({ ...draft, title: e.target.value }); setTitleCommitted(false); }} onBlur={() => setTitleCommitted(true)}/></label>{isApprover
+      {(adminView === "manage" || adminView === "addVac" || editingId !== null) && <form onSubmit={saveVacancy} className="admin-form"><label>Job title<input required value={draft.title} onChange={e => { setDraft({ ...draft, title: e.target.value }); setTitleCommitted(false); }} onBlur={() => setTitleCommitted(true)}/></label>{isApprover
   ? <label>Company<input required value={draft.company} onChange={e => setDraft({ ...draft, company: e.target.value })}/></label>
   : <label>Company<input value={employerCompany ?? "No company assigned"} readOnly disabled/><small className="field-label">Posted under your assigned company.</small></label>}<label>Type<select value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })}><option>Permanent</option><option>Internship</option><option>Contract</option><option>Part-time</option></select></label><label>Specialization<select required value={draft.specialization} onChange={e => setDraft({ ...draft, specialization: e.target.value })}><option value="" disabled>Select specialization</option>{PREDEFINED_SPECS.map(item => <option key={item} value={item}>{item}</option>)}<option value="Other">Other (Specify below)</option></select></label>
         {draft.specialization === "Other" && <label className="full"><span className="field-label">Custom Specialization Title <small>Required for &apos;Other&apos;</small></span><input required value={draft.customSpecialization ?? ""} placeholder="e.g. Culinary Art & Hospitality" onChange={e => setDraft({ ...draft, customSpecialization: e.target.value })}/></label>}

@@ -1,6 +1,7 @@
 import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
 import { ccaThresholdMinutes } from "../../lib/data/firestore";
 import { Modal } from "../../components/Modal";
+import { SpeakerAvatar } from "./SpeakerAvatar";
 
 function status(ev: EventItem): "upcoming" | "live" | "ended" {
   const now = Date.now();
@@ -53,21 +54,19 @@ export function EventDetail({
         {event.description && <section><span className="detail-label">ABOUT</span><p style={{ whiteSpace: "pre-wrap" }}>{event.description}</p></section>}
 
         <section><span className="detail-label">SPEAKER</span>
-          {event.speakerName || speakerLinks.length || event.speakerPhotoUrl ? (
-            <div className="speaker-block">
-              {event.speakerPhotoUrl && <img className="speaker-photo" src={event.speakerPhotoUrl} alt={event.speakerName || "Speaker"} />}
-              <div>
-                <p><b>{event.speakerName || "TBA"}</b></p>
-                {speakerLinks.length > 0 && (
-                  <p className="speaker-links">
-                    {speakerLinks.map((href) => (
-                      <a key={href} href={/^https?:\/\//i.test(href) ? href : `https://${href}`} target="_blank" rel="noreferrer">{href.replace(/^https?:\/\//i, "")} ↗</a>
-                    ))}
-                  </p>
-                )}
-              </div>
+          <div className="speaker-block">
+            <SpeakerAvatar photo={event.speakerPhotoUrl} name={event.speakerName} className="speaker-photo" />
+            <div>
+              <p>{event.speakerName ? <b>{event.speakerName}</b> : <span className="text-accent">To be announced</span>}</p>
+              {speakerLinks.length > 0 && (
+                <p className="speaker-links">
+                  {speakerLinks.map((href) => (
+                    <a key={href} href={/^https?:\/\//i.test(href) ? href : `https://${href}`} target="_blank" rel="noreferrer">{href.replace(/^https?:\/\//i, "")} ↗</a>
+                  ))}
+                </p>
+              )}
             </div>
-          ) : <p className="text-accent">To be announced.</p>}
+          </div>
         </section>
 
         <section><span className="detail-label">DETAILS</span>

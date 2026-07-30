@@ -195,7 +195,7 @@ export default function Home() {
   // browse tabs. Summary/Dashboard are always on for managers.
   const visibleTabs = useMemo(() => {
     if (!isStudent) {
-      const toggleable: [Tab, string][] = ([["home", "Home"], ["events", "Events"], ["vacancies", "Vacancies"]] as [Tab, string][])
+      const toggleable: [Tab, string][] = ([["home", role === "employer" ? "Companies" : "Home"], ["events", "Events"], ["vacancies", "Vacancies"]] as [Tab, string][])
         .filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
       return [["summary", "Summary"] as [Tab, string], ["dashboard", role === "employer" ? "Employer tools" : "Admin tools"] as [Tab, string], ...toggleable];
     }

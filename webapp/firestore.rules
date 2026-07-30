@@ -143,7 +143,8 @@ service cloud.firestore {
         && (!('order' in data) || (data.order is number))
         && (!('boothNumber' in data) || (data.boothNumber is string && data.boothNumber.size() <= 40))
         && (!('logoBackground' in data) || data.logoBackground in ['auto', 'light', 'dark'])
-        && (!('status' in data) || data.status in ['approved', 'pending'])
+        && (!('status' in data) || data.status in ['approved', 'pending', 'pending_edit'])
+        && (!('pendingEdit' in data) || data.pendingEdit is map || data.pendingEdit == null)
         && data.createdBy is string
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }
@@ -356,18 +357,21 @@ service cloud.firestore {
     // (inline role checks — see the vacancy note on the 1000-expression limit).
     match /companies/{companyId} {
       allow read: if isAllowedUser();
+      // Admins may create for anyone (e.g. approving a registration sets the
+      // employer as createdBy); employers may only self-submit as 'pending'.
       allow create: if isAllowedUser()
         && validCompany(request.resource.data)
-        && (request.resource.data.createdBy == request.auth.uid || request.resource.data.createdBy == request.auth.token.email.lower())
         && (isSuperAdmin() || getUserRole() == 'admin'
-          || (getUserRole() == 'employer' && request.resource.data.status == 'pending'));
+          || (getUserRole() == 'employer'
+            && (request.resource.data.createdBy == request.auth.uid || request.resource.data.createdBy == request.auth.token.email.lower())
+            && request.resource.data.status == 'pending'));
       allow update: if isAllowedUser()
         && validCompany(request.resource.data)
         && request.resource.data.createdBy == resource.data.createdBy
         && (isSuperAdmin() || getUserRole() == 'admin'
           || (getUserRole() == 'employer'
             && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower())
-            && request.resource.data.status == 'pending'));
+            && request.resource.data.status in ['pending', 'pending_edit']));
       allow delete: if isAdmin();
     }
 

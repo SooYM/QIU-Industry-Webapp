@@ -99,7 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let whitelisted: string[] = [];
       try {
         const whitelistSnap = await getDocs(collection(activeDb, "whitelisted_emails"));
-        whitelisted = whitelistSnap.docs.map((doc) => normalizeEmail(doc.data().email || doc.id));
+        // A revoked entry (active === false) no longer grants access.
+        whitelisted = whitelistSnap.docs.filter((doc) => doc.data().active !== false).map((doc) => normalizeEmail(doc.data().email || doc.id));
       } catch {
         // Fallback to empty whitelist if network fails
       }
@@ -368,7 +369,7 @@ export function RoleManager() {
     );
 
     const loadWhitelist = getDocs(collection(activeDb, "whitelisted_emails")).then((snapshot) =>
-      setWhitelistedEmails(snapshot.docs.map((entry) => ({
+      setWhitelistedEmails(snapshot.docs.filter((entry) => entry.data().active !== false).map((entry) => ({
         id: entry.id,
         email: entry.data().email ?? entry.id,
         role: (entry.data().role as UserRole) || "employer",

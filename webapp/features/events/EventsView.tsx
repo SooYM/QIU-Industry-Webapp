@@ -4,6 +4,7 @@ import { deleteEvent } from "../../lib/data/firestore";
 import { EventForm } from "./EventForm";
 import { EventPresenter } from "./EventPresenter";
 import { EventAttendance } from "./EventAttendance";
+import { SpeakerAvatar } from "./SpeakerAvatar";
 
 function eventStatus(ev: EventItem): "upcoming" | "live" | "ended" {
   const now = Date.now();
@@ -45,14 +46,16 @@ export function EventsView({
   const [presenting, setPresenting] = useState<EventItem | null>(null);
   const [viewing, setViewing] = useState<EventItem | null>(null);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"default" | "newest" | "oldest">("default");
 
   const myLower = userEmail.trim().toLowerCase();
   const attendanceByEvent = new Map(myAttendance.map((a) => [a.eventId, a]));
   const order = { live: 0, upcoming: 1, ended: 2 } as const;
   const q = query.trim().toLowerCase();
-  const sorted = [...events]
-    .filter((e) => !q || [e.title, e.location, e.speakerName].some((f) => (f ?? "").toLowerCase().includes(q)))
-    .sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || a.startAt.localeCompare(b.startAt));
+  const filtered = [...events].filter((e) => !q || [e.title, e.location, e.speakerName].some((f) => (f ?? "").toLowerCase().includes(q)));
+  const sorted = sort === "newest" ? filtered.sort((a, b) => b.startAt.localeCompare(a.startAt))
+    : sort === "oldest" ? filtered.sort((a, b) => a.startAt.localeCompare(b.startAt))
+    : filtered.sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || a.startAt.localeCompare(b.startAt));
 
   return (
     <section className="results" aria-labelledby="events-title">
@@ -61,7 +64,10 @@ export function EventsView({
         {canManageEvents && <button className="admin-button" onClick={() => { setEditing(null); setFormOpen(true); }}>＋ Add event</button>}
       </div>
 
-      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events by title, location or speaker…" aria-label="Search events" />
+      <div className="event-toolbar">
+        <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search events by title, location or speaker…" aria-label="Search events" />
+        <label className="event-sort">Sort<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="default">Live first</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+      </div>
 
       {sorted.length ? (
         <div className="event-grid">
@@ -85,12 +91,10 @@ export function EventsView({
                 <p className="text-accent text-xs">{when(ev.startAt)} → {when(ev.endAt)}{ev.location ? ` · ${ev.location}` : ""}</p>
                 <div className="event-speaker">
                   <span className="detail-label">SPEAKER</span>
-                  {ev.speakerName || (ev.speakerLinks ?? []).length || ev.speakerPhotoUrl
-                    ? <div className="event-speaker-row">
-                        {ev.speakerPhotoUrl && <img className="speaker-photo-sm" src={ev.speakerPhotoUrl} alt={ev.speakerName || "Speaker"} />}
-                        <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
-                      </div>
-                    : <p className="text-accent text-sm">To be announced.</p>}
+                  <div className="event-speaker-row">
+                    <SpeakerAvatar photo={ev.speakerPhotoUrl} name={ev.speakerName} />
+                    <p className="text-sm">{ev.speakerName ? <b>{ev.speakerName}</b> : <span className="text-accent">To be announced</span>}{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
+                  </div>
                 </div>
                 <p className="view-job mt-2">View details <span>→</span></p>
                 {(canPresent || canManageEvents) && (

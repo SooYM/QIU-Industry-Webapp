@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { isApprovedCompany, type Company } from "../../lib/data/types";
 import { useAuth } from "../../app/auth-context";
 import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
-import { clearCompanies, deleteCompany, saveCompany, subscribeCompanies } from "../../lib/data/firestore";
+import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
 type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
 const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", order: "", boothNumber: "", logoBackground: "auto" };
@@ -53,10 +53,21 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
       logoBackground: draft.logoBackground,
       status: employer ? "pending" : "approved",
     };
+    // An employer editing an already-live profile stages the change (keeps the
+    // live one on Home) so an admin can review the diff before it goes public.
+    const liveExists = existing && isApprovedCompany(existing);
     try {
-      await saveCompany(record, editingId !== null, normalizeEmail(user?.email));
-      if (!employer) { setDraft(emptyDraft); setEditingId(null); }
-      setMessage(employer ? "Submitted for admin approval." : editingId ? "Exhibitor updated." : "Exhibitor added.");
+      if (employer && liveExists) {
+        await stageCompanyEdit(existing!.id, {
+          website: record.website, logoUrl: record.logoUrl, videoUrl: record.videoUrl,
+          summary: record.summary, logoBackground: record.logoBackground,
+        });
+        setMessage("Changes submitted for admin approval.");
+      } else {
+        await saveCompany(record, editingId !== null, normalizeEmail(user?.email));
+        if (!employer) { setDraft(emptyDraft); setEditingId(null); }
+        setMessage(employer ? "Submitted for admin approval." : editingId ? "Exhibitor updated." : "Exhibitor added.");
+      }
     } catch { setMessage("Could not save. Please try again."); }
   }
 

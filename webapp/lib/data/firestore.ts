@@ -271,6 +271,25 @@ export async function approveCompany(id: number) {
   await updateDoc(doc(requireDb(), COLLECTIONS.companies, String(id)), { status: "approved", updatedAt: serverTimestamp() });
 }
 
+/** Employer edit to an approved profile: stage it, keep the live profile on Home. */
+export async function stageCompanyEdit(id: number, edit: Partial<Company>) {
+  await updateDoc(doc(requireDb(), COLLECTIONS.companies, String(id)), {
+    status: "pending_edit", pendingEdit: clean(edit), updatedAt: serverTimestamp(),
+  });
+}
+
+/** Admin approves a staged company edit: apply the change, clear the stage. Patch only. */
+export async function applyCompanyEdit(company: Company) {
+  const patch: Record<string, unknown> = { status: "approved", pendingEdit: null, updatedAt: serverTimestamp() };
+  if (company.pendingEdit) Object.assign(patch, clean(company.pendingEdit));
+  await updateDoc(doc(requireDb(), COLLECTIONS.companies, String(company.id)), patch);
+}
+
+/** Admin rejects a staged edit: revert to the live approved profile. */
+export async function rejectCompanyEdit(id: number) {
+  await updateDoc(doc(requireDb(), COLLECTIONS.companies, String(id)), { status: "approved", pendingEdit: null, updatedAt: serverTimestamp() });
+}
+
 /** One-click clear: remove every exhibitor (admin only, enforced by rules). */
 export async function clearCompanies(ids: number[]) {
   await Promise.all(ids.map((id) => deleteDoc(doc(requireDb(), COLLECTIONS.companies, String(id))).catch(() => {})));

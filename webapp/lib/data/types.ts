@@ -195,12 +195,14 @@ export interface Company {
   boothNumber?: string;    // booth/stand number at the venue
   logoBackground?: "auto" | "light" | "dark"; // tile behind the logo; auto = detect
   /** Employer submissions are gated; admin listings publish immediately. Absent = approved. */
-  status?: "approved" | "pending";
+  status?: "approved" | "pending" | "pending_edit";
+  /** An employer's edit to an already-approved profile, staged until an admin approves. */
+  pendingEdit?: Partial<Company> | null;
   createdBy?: string;
 }
 
-/** A company with no explicit status is admin-created and counts as approved. */
-export const isApprovedCompany = (c: Company) => !c.status || c.status === "approved";
+/** Shown on Home while live: approved, legacy (no status), or an approved profile with a staged edit. */
+export const isApprovedCompany = (c: Company) => !c.status || c.status === "approved" || c.status === "pending_edit";
 
 /**
  * A self-service employer registration request (doc id = lowercased email).
