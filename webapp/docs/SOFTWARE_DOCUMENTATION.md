@@ -13,6 +13,8 @@
 The system delivers:
 - **Visual Identity & QIU-Red Design System**: Signature QIU-Red brand color theme (`#ba1a1a` / `#900010` / `--color-primary: #d12a32`, hovering at `#b21f27`, brightened to `#ef5a60` on dark surfaces), clean default light theme with seamless dark mode support, and prominent large salary callouts across cards and detail popups.
 - **Interactive Role Guides & Live Snapshots (`webapp/features/Guide.tsx`)**: Comprehensive onboarding system providing step-by-step guides for `student`/`user`, `employer`, `admin`, and `superadmin` roles (reopenable anytime via the `?` topbar button). Includes live-styled visual button snapshots (`<Demo>` and `<Chip>`) previewing key action buttons and status badges.
+- **Multi-Criteria Vacancy Sorting System (`webapp/features/vacancies/VacancyFilters.tsx`)**: 5-mode sorting dropdown (`default`, `newest`, `oldest`, `salary_high`, `salary_low`) reactively bound into the filtering pipeline with 1-click filter reset (`resetFilters`).
+- **Mobile UX & Header Polish (`webapp/app/globals.css` & `webapp/app/page.tsx`)**: Enlarged QIU brand logo asset sizing (`height: 3.2rem` desktop / `3rem` mobile) with dark surface logo inversion (`filter: invert(1) brightness(1.9)`), non-wrapping tab navigation (`white-space: nowrap`), and responsive mobile header layout (<600px) that hides secondary account text for clean logo and avatar display.
 - **Enhanced Candidate & Vacancy Workflows**:
   - **Real-Time Applicant Counter**: Live applicant counts displayed per job on cards and modal popups, backed by atomic `increment()` counters in the `job_stats` collection.
   - **Application Withdrawal**: Students can withdraw submitted job applications directly from their Student History tab (`StudentHistory.tsx`) or inside `VacancyModal.tsx`, atomically decrementing the per-job applicant tally.
@@ -40,6 +42,8 @@ The system delivers:
 | **Static Next.js Export** | Operates on standard Firebase Hosting without requiring Node.js server runtimes or serverless function overhead | All rendering and state management execute client-side in the browser |
 | **QIU-Red Token Architecture** | Single re-theme seam in `tokens.css` anchoring QIU brand red (`#ba1a1a` / `#900010` / `#d12a32`) | Allows seamless dark mode adjustment (`#ef5a60`) without modifying component markup |
 | **Interactive Role Guide System** | Provides clear role-specific onboarding for all user types with live-styled button snapshots | Reduces user friction and onboarding support queries across student, employer, and admin personas |
+| **Multi-Criteria Vacancy Sorting Engine** | Supports 5 sorting modes (`default`, `newest`, `oldest`, `salary_high`, `salary_low`) integrated with 1-click filter reset | Delivers instant client-side vacancy re-ordering without database query overhead |
+| **Mobile UX & Header Polish** | Enlarges QIU brand logo (`3.2rem` / `3rem`), prevents tab line-wrapping (`white-space: nowrap`), and hides secondary account text on mobile (<600px) | Maximizes screen real estate and brand prominence across mobile viewports while preventing layout clipping |
 | **Unreadable `event_codes` Collection** | Prevents students from inspecting Firestore subscriptions to extract active attendance codes or sharing QR codes via WhatsApp/social proxy | Security rules evaluate `eventCode(eventId)` via internal `get()` assertions server-side; client reads are blocked |
 | **30-Second Dynamic QR Refresh** | invalidates screenshot photos shared over instant messaging apps almost instantly | Presenter screens must remain open during presentation; photos expire in 30 seconds |
 | **Two-Step Attendance Verification** | Enforces actual physical attendance for the entire session to prevent quick check-in-and-leave proxy fraud | Students must perform both Check-In and Check-Out; `caEligible` calculation enforces minimum elapsed duration |
@@ -170,7 +174,8 @@ flowchart LR
 - Renders live-styled button snapshots (`<Demo>` & `<Chip>`) previewing live UI buttons and status chips (`tone-accent`, `save-job`, `tone-success`, `enquire-main`, `cancel-edit`, `job-assistant-toggle`, `admin-button`, `edit-local`).
 
 ### 5.3 Vacancy & Application Components (`features/vacancies/*`, `features/student/*`)
-- `VacancyList.tsx` / `VacancyCard.tsx`: Displays authorized vacancies with real-time search, category filtering, location mapping, and real-time applicant counts.
+- `VacancyFilters.tsx`: Renders the multi-criteria search and filtering sidebar, providing company, specialization, opportunity type dropdowns, maximum salary range slider, course recommendation filter, 5-mode sorting dropdown (`default`, `newest`, `oldest`, `salary_high`, `salary_low`), and a 1-click filter reset (`resetFilters`).
+- `VacancyList.tsx` / `VacancyCard.tsx`: Displays authorized vacancies with real-time search, multi-criteria sorting, location mapping, and real-time applicant counts.
 - `VacancyModal.tsx`: Displays vacancy details, requirements, scope, salary callouts, corporate intro videos, applicant counter, application apply/withdraw controls, and the embedded `JobAssistant` streaming typewriter interface.
 - `StudentResume.tsx`: Manages candidate resume submissions (shareable external link or PDF file upload to Firebase Storage) with full removal/deletion support.
 - `StudentHistory.tsx`: Displays candidate's applied and viewed vacancies with one-click application withdrawal support (`deleteApplication`).
@@ -568,7 +573,9 @@ npx firebase-tools deploy --only firestore:rules,firestore:indexes,hosting
 - `webapp/app/auth-context.tsx` — Authentication state, profile bootstrap, role manager
 - `webapp/app/auth-policy.ts` — Domain validation and superadmin policies
 - `webapp/app/firebase-client.ts` — Firebase Web SDK initialization
+- `webapp/app/globals.css` — QIU-Red design system, dark mode logo inversion, non-wrapping tab styles, and responsive mobile header breakpoints
 - `webapp/features/Guide.tsx` — Interactive role onboarding guide with live visual snapshots
+- `webapp/features/vacancies/VacancyFilters.tsx` — Multi-criteria vacancy filters, 5-mode sorting dropdown (`default`, `newest`, `oldest`, `salary_high`, `salary_low`), and 1-click filter reset control
 - `webapp/features/vacancies/VacancyModal.tsx` — Vacancy detail popup with in-modal streaming assistant & applicant counter
 - `webapp/features/admin/ApprovalQueue.tsx` — Pending vacancy review queue with bulk "Approve All"
 - `webapp/features/admin/StudentActivity.tsx` — Grouped application feeds by student/company

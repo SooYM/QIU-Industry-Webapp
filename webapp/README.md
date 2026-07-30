@@ -16,6 +16,7 @@ QIU Industry Webapp features a bespoke visual identity built around QIU's signat
 
 - **QIU-Red Palette**: Core brand identity anchored by QIU-Red (`#ba1a1a` / `#900010` / `--color-primary: #d12a32`, hovering at `#b21f27`, and brightened to `#ef5a60` in dark mode).
 - **Prominent Salary Callouts**: Styled salary metadata blocks displaying clean, high-visibility wage figures (e.g. `RM 3,500 / monthly`) across vacancy cards and detail modals.
+- **Enlarged QIU Brand Logo & Theme Inversion**: Prominent logo asset sizing (`height: 3.2rem` desktop / `3rem` mobile) across header, authentication modal, and mobile header, automatically inverted on dark surfaces (`filter: invert(1) brightness(1.9)`).
 - **Light Default Theme with Seamless Dark Mode**: Designed with a clean light default theme that automatically respects system preferences or user toggles, adjusting backgrounds, surface tokens, and contrast levels dynamically without layout shifts.
 
 ---
@@ -26,17 +27,31 @@ QIU Industry Webapp features a bespoke visual identity built around QIU's signat
 - **Tailored Role Onboarding**: Step-by-step interactive onboarding guides customized for `student`/`user`, `employer`, `admin`, and `superadmin` roles, reopenable anytime via the `?` topbar button.
 - **Live-Styled Button Snapshots**: Features rendered visual previews of key action buttons and status badges (`<Demo>` & `<Chip>`) directly inside the guide, matching live theme styles (`tone-accent`, `save-job`, `tone-success`, `enquire-main`, `cancel-edit`, `job-assistant-toggle`, `admin-button`, `edit-local`).
 
-### 2. Enhanced Candidate & Vacancy Workflows
+### 2. Multi-Criteria Vacancy Sorting System (`features/vacancies/VacancyFilters.tsx`)
+- **5-Mode Sorting Engine**: Dedicated **Sort By** dropdown control supporting instant re-ordering of vacancy listings across 5 modes:
+  - `default`: Best match for students (prioritizing course recommendations); Newest first for managers.
+  - `newest`: Newest published vacancies first (by creation timestamp `id`).
+  - `oldest`: Oldest vacancies first.
+  - `salary_high`: Highest monthly salary first (descending).
+  - `salary_low`: Lowest monthly salary first (ascending).
+- **Reactive Filter Integration & 1-Click Reset**: Fully integrated into the reactive vacancy search and multi-criteria filter pipeline (keyword search, company, specialization, opportunity type, max salary range slider), complete with a 1-click filter reset (`resetFilters`).
+
+### 3. Mobile UX & Header Polish (`app/globals.css` & `app/page.tsx`)
+- **Enlarged Brand Logo**: Prominent logo asset sizing (`height: 3.2rem` desktop / `3rem` mobile) across topbar header, auth modal, and mobile header views.
+- **Non-Wrapping Tab Navigation**: Added `white-space: nowrap` to main section tabs (`Vacancies`, `History`, `My Resume`, `Events`) ensuring tab navigation titles never line-wrap on smaller screens.
+- **Responsive Auth Header Layout**: Optimizes mobile screens (<600px) by hiding secondary account text (`.auth-account small, .auth-account strong`) to give maximum breathing room to the enlarged QIU logo and avatar/Sign Out controls.
+
+### 4. Enhanced Candidate & Vacancy Workflows
 - **Real-Time Applicant Counter**: Live applicant tallies displayed per job on cards and modal popups, backed by atomic `increment()` counters in the `job_stats` collection.
 - **Application Withdrawal**: Students can withdraw submitted job applications directly from their Student History tab (`StudentHistory.tsx`) or inside `VacancyModal.tsx`, atomically decrementing the per-job applicant tally.
 - **Flexible Resume Management**: Candidates can submit shareable links (Google Drive, OneDrive, Dropbox) for zero-cost Firebase Spark plan hosting or direct PDF upload via Firebase Storage, with full resume removal/deletion capabilities.
 - **In-Modal Streaming Assistant**: Embedded directly below the Apply/Resume section in `VacancyModal.tsx`, providing grounded, typewriter-streaming answers auto-scrolling to newest responses.
 
-### 3. Admin & Employer Grouped Views + Bulk Actions
+### 5. Admin & Employer Grouped Views + Bulk Actions
 - **Grouped Candidate Activity Feeds**: Admins view candidate applications grouped by student with expandable details (`StudentActivity.tsx`), while employers view flat feeds scoped strictly to their assigned company.
 - **Bulk "Approve All" Feature**: Admins can batch-approve all pending employer vacancy posts and staged edits in 1 click (`ApprovalQueue.tsx`).
 
-### 4. Events & 30-Second Dynamic QR Anti-Cheat Attendance Module
+### 6. Events & 30-Second Dynamic QR Anti-Cheat Attendance Module
 - **Live Presenter View (`EventPresenter.tsx`)**: Presenters launch a dedicated live screen displaying a **Dynamic 30-Second Rotating QR Code** and dynamic 6-character code (`REFRESH_MS = 30000`). Active step (`checkin` vs `checkout`), code, and expiry timestamp (`codeExpiry`) update server-side in `event_codes/{eventId}`.
 - **WhatsApp/Proxy Anti-Cheat Protection**: The `event_codes` collection is **strictly unreadable by client queries**. Server-side Firestore Security Rules evaluate `eventCode(eventId)` to verify step, code match, and timestamp validity (`request.time.toMillis() < codeExpiry`). Photos shared via messaging apps expire within 30 seconds and become invalid.
 - **Two-Step Duration Verification for CCA Points**: Requires students to perform both a **Check-In** at session start and a **Check-Out** at session end. System calculates elapsed duration vs scheduled `sessionMinutes` (threshold: ≥ 80% of `sessionMinutes` or 45 min floor) to award Co-Curricular Activity (CCA) eligibility (`caEligible`).
