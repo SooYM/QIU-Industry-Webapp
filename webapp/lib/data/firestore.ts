@@ -90,19 +90,19 @@ export function subscribeJobStats(onData: (counts: Record<number, number>) => vo
 }
 
 export async function recordApplication(app: Application) {
-  const ref = doc(requireDb(), COLLECTIONS.applications, app.id);
-  const existed = (await getDoc(ref)).exists();
-  await setDoc(ref, { ...clean(app), appliedAt: serverTimestamp() }, { merge: true });
-  if (!existed) await bumpApplicants(app.jobId, 1); // count each student once
+  // No pre-read: security rules deny reading a not-yet-existing application doc,
+  // which previously made apply fail. The Apply button is UI-gated to a single
+  // application per job, so the counter stays accurate.
+  await setDoc(doc(requireDb(), COLLECTIONS.applications, app.id),
+    { ...clean(app), appliedAt: serverTimestamp() }, { merge: true });
+  await bumpApplicants(app.jobId, 1);
 }
 
 /** Student withdraws an application they changed their mind about. */
 export async function deleteApplication(id: string) {
-  const ref = doc(requireDb(), COLLECTIONS.applications, id);
-  const existed = (await getDoc(ref)).exists();
-  await deleteDoc(ref);
+  await deleteDoc(doc(requireDb(), COLLECTIONS.applications, id));
   const jobId = Number(id.split("_")[1]);
-  if (existed && jobId) await bumpApplicants(jobId, -1);
+  if (jobId) await bumpApplicants(jobId, -1);
 }
 
 export async function recordView(event: ViewEvent) {
