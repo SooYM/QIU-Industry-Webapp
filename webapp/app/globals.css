@@ -245,6 +245,42 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .exhibitor-logo-lg { width:3.4rem; height:3.4rem; flex:none; object-fit:contain; border:1px solid var(--line); border-radius:.6rem; padding:.35rem; }
 .logo-light { background:#fff; }
 .logo-dark { background:#1b1e26; border-color:#2b2f3a; }
+
+/* Booth number chip (Home card + company/detail headers). */
+.booth-chip { flex:none; font-size:.62rem; font-weight:800; color:var(--blue); background:var(--blue-soft); border-radius:.35rem; padding:.24rem .5rem; letter-spacing:.02em; white-space:nowrap; }
+
+/* Course-matched vacancy: an obvious success ring (no layout shift) on cards and
+   in the company profile list. */
+.job-card.is-recommended { border-color:var(--success); box-shadow:0 0 0 2px color-mix(in srgb,var(--success) 55%,transparent); }
+.company-vacancies { display:flex; flex-direction:column; gap:.5rem; margin-top:.6rem; }
+.company-vacancy { display:flex; align-items:center; gap:.75rem; width:100%; text-align:left; padding:.7rem .85rem; border:1px solid var(--line); border-radius:.6rem; background:var(--surface-2); color:inherit; }
+.company-vacancy:hover { border-color:var(--blue); }
+.company-vacancy>span:first-child { flex:1; min-width:0; }
+.company-vacancy b { display:block; font-size:.8rem; }
+.company-vacancy small { display:block; color:var(--muted); font-size:.68rem; margin-top:.15rem; }
+.company-vacancy .view-job { flex:none; }
+.company-vacancy.is-recommended { border-color:var(--success); box-shadow:0 0 0 2px color-mix(in srgb,var(--success) 45%,transparent); }
+
+/* Anchors used as action buttons (e.g. ResumeViewer "Open link") match buttons. */
+.local-job-actions a { display:inline-flex; align-items:center; min-height:2.25rem; border-radius:.5rem; padding:.45rem .65rem; font-size:.68rem; font-weight:750; text-decoration:none; }
+
+/* Access: collapsible "Approve external account", themed like the rest. */
+.access-approve { border:1px solid var(--color-border); border-radius:.8rem; padding:.35rem .9rem; }
+.access-approve>summary { list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.6rem 0; font-weight:800; font-size:.82rem; }
+.access-approve>summary::-webkit-details-marker { display:none; }
+.access-approve>summary::before { content:"▸"; margin-right:.45rem; color:var(--muted); font-size:.72rem; }
+.access-approve[open]>summary::before { content:"▾"; }
+.access-approve>summary small { color:var(--muted); font-weight:700; font-size:.68rem; }
+.access-approve-body { padding:.2rem 0 .7rem; }
+.access-approve-body>p { color:var(--muted); font-size:.72rem; line-height:1.5; margin:0 0 .7rem; }
+.access-approve-form { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+.access-approve-form input,.access-approve-form select { flex:1; min-width:12rem; height:2.5rem; border:1px solid var(--line); border-radius:.55rem; background:var(--surface); color:var(--ink); padding:0 .7rem; font-size:.75rem; }
+.access-approve-form .save-job { flex:none; min-height:2.5rem; }
+.access-approved-list { margin-top:.9rem; display:flex; flex-direction:column; gap:.4rem; }
+.access-approved-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.5rem .7rem; border:1px solid var(--line); border-radius:.5rem; background:var(--surface); font-size:.74rem; }
+.access-approved-row small { color:var(--muted); }
+.role-pill { margin-left:.35rem; font-size:.6rem; font-weight:800; text-transform:capitalize; color:var(--blue); background:var(--blue-soft); border-radius:.3rem; padding:.15rem .4rem; }
+.access-revoke { border:0; background:none; color:var(--danger); font-weight:800; font-size:.7rem; }
 .exhibitor-blurb { margin:0; color:var(--muted); font-size:.74rem; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .exhibitor-tags { display:flex; flex-wrap:wrap; gap:.4rem; }
 .exhibitor-tag { font-size:.62rem; font-weight:750; color:var(--blue); background:var(--blue-soft); border-radius:.35rem; padding:.28rem .48rem; }

@@ -264,6 +264,11 @@ export async function deleteCompany(id: number) {
   await deleteDoc(doc(requireDb(), COLLECTIONS.companies, String(id)));
 }
 
+/** One-click clear: remove every exhibitor (admin only, enforced by rules). */
+export async function clearCompanies(ids: number[]) {
+  await Promise.all(ids.map((id) => deleteDoc(doc(requireDb(), COLLECTIONS.companies, String(id))).catch(() => {})));
+}
+
 // ---- App settings ----------------------------------------------------------
 
 const SETTINGS_DOC = "app";

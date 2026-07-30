@@ -352,57 +352,39 @@ export function RoleManager() {
         <small>{users.length} registered accounts</small>
       </div>
 
-      {/* Admins & superadmin can approve external (non-QIU) accounts and set the employer's company. */}
-      {canManageRoles && <div className="rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/30 p-4 space-y-3">
-        <h4 className="font-bold text-sm text-indigo-900 dark:text-indigo-200">➕ Approve Non-@qiu.edu.my Account</h4>
-        <p className="text-xs text-slate-600 dark:text-slate-400">By default, non-QIU emails cannot log in. Approve external emails (e.g. Employers or External Admins) here. For an employer, set which company they represent.</p>
-        <form onSubmit={addWhitelistedEmail} className="flex flex-wrap gap-2 items-center">
-          <input
-            type="email"
-            required
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            placeholder="e.g. employer@company.com"
-            className="flex-1 min-w-[200px] px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-          />
-          <select
-            value={newRole}
-            onChange={(e) => setNewRole(e.target.value as UserRole)}
-            className="px-2.5 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-          >
-            <option value="employer">Employer (Own Jobs Only)</option>
-            <option value="admin">Admin (All Jobs)</option>
-            <option value="user">User / Student (Browse Only)</option>
-          </select>
-          {newRole === "employer" && (
-            <input
-              type="text"
-              required
-              value={newCompany}
-              onChange={(e) => setNewCompany(e.target.value)}
-              placeholder="Company name"
-              className="flex-1 min-w-[160px] px-3 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-            />
-          )}
-          <button type="submit" className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors shadow-sm">
-            Approve External Email
-          </button>
-        </form>
-
-        {whitelistedEmails.length > 0 && (
-          <div className="mt-3 space-y-1.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Approved External Accounts ({whitelistedEmails.length}):</span>
-            <div className="space-y-1">
-              {whitelistedEmails.map((item) => (
-                <div key={item.id} className="flex items-center justify-between px-3 py-1.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs">
-                  <span className="font-medium text-slate-800 dark:text-slate-200">{item.email} <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">{item.role}</span>{item.company ? <span className="ml-1 text-[10px] text-slate-500 dark:text-slate-400">· {item.company}</span> : null}</span>
-                  <button type="button" onClick={() => removeWhitelistedEmail(item.id)} className="text-[11px] text-rose-600 hover:text-rose-700 dark:text-rose-400 font-semibold">Revoke</button>
-                </div>
-              ))}
-            </div>
+      {/* Admins & superadmin can approve external (non-QIU) accounts and set the
+          employer's company. Collapsed by default, themed like the rest of the panel. */}
+      {canManageRoles && (
+        <details className="access-approve panel-accent">
+          <summary><span>➕ Approve Non-@qiu.edu.my account</span><small>{whitelistedEmails.length} approved</small></summary>
+          <div className="access-approve-body">
+            <p>By default, non-QIU emails cannot log in. Approve external emails (e.g. Employers or External Admins) here. For an employer, set which company they represent.</p>
+            <form onSubmit={addWhitelistedEmail} className="access-approve-form">
+              <input type="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="e.g. employer@company.com" />
+              <select value={newRole} onChange={(e) => setNewRole(e.target.value as UserRole)}>
+                <option value="employer">Employer (Own Jobs Only)</option>
+                <option value="admin">Admin (All Jobs)</option>
+                <option value="user">User / Student (Browse Only)</option>
+              </select>
+              {newRole === "employer" && (
+                <input type="text" required value={newCompany} onChange={(e) => setNewCompany(e.target.value)} placeholder="Company name" />
+              )}
+              <button type="submit" className="save-job">Approve external email</button>
+            </form>
+            {whitelistedEmails.length > 0 && (
+              <div className="access-approved-list">
+                <span className="detail-label">Approved external accounts ({whitelistedEmails.length})</span>
+                {whitelistedEmails.map((item) => (
+                  <div key={item.id} className="access-approved-row">
+                    <span>{item.email} <span className="role-pill">{item.role}</span>{item.company ? <small> · {item.company}</small> : null}</span>
+                    <button type="button" className="access-revoke" onClick={() => removeWhitelistedEmail(item.id)}>Revoke</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>}
+        </details>
+      )}
 
       <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed.</p>
       {loading ? (

@@ -133,7 +133,7 @@ service cloud.firestore {
 
     function validCompany(data) {
       return data.keys().hasAll(['id', 'name', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'logoBackground', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'boothNumber', 'logoBackground', 'status', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.name is string && data.name.size() > 0 && data.name.size() <= 200
         && (!('website' in data) || (data.website is string && data.website.size() <= 2048))
@@ -141,7 +141,9 @@ service cloud.firestore {
         && (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() <= 2048))
         && (!('summary' in data) || (data.summary is string && data.summary.size() <= 5000))
         && (!('order' in data) || (data.order is number))
+        && (!('boothNumber' in data) || (data.boothNumber is string && data.boothNumber.size() <= 40))
         && (!('logoBackground' in data) || data.logoBackground in ['auto', 'light', 'dark'])
+        && (!('status' in data) || data.status in ['approved', 'pending'])
         && data.createdBy is string
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }
@@ -346,10 +348,23 @@ service cloud.firestore {
         && request.resource.data.applicants is number;
     }
 
-    // Exhibitor showcase on the Home landing. Everyone allowed reads; admins manage.
+    // Exhibitor showcase on the Home landing. Everyone allowed reads; admins
+    // manage any; an employer may submit/edit ONLY their own profile as 'pending'
+    // (inline role checks — see the vacancy note on the 1000-expression limit).
     match /companies/{companyId} {
       allow read: if isAllowedUser();
-      allow create, update: if isAdmin() && validCompany(request.resource.data);
+      allow create: if isAllowedUser()
+        && validCompany(request.resource.data)
+        && (request.resource.data.createdBy == request.auth.uid || request.resource.data.createdBy == request.auth.token.email.lower())
+        && (isSuperAdmin() || getUserRole() == 'admin'
+          || (getUserRole() == 'employer' && request.resource.data.status == 'pending'));
+      allow update: if isAllowedUser()
+        && validCompany(request.resource.data)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && (isSuperAdmin() || getUserRole() == 'admin'
+          || (getUserRole() == 'employer'
+            && (resource.data.createdBy == request.auth.uid || resource.data.createdBy == request.auth.token.email.lower())
+            && request.resource.data.status == 'pending'));
       allow delete: if isAdmin();
     }
 

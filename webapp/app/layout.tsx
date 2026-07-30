@@ -5,8 +5,8 @@ import "./globals.css";
 const geistSans = { variable: "--font-geist-sans" };
 const geistMono = { variable: "--font-geist-mono" };
 
-const title = "QIU Industry Day 2026 — Vacancy Portal";
-const description = "Browse Industry Day vacancies matched to your course, compare listed salaries with official Malaysian market context, and view grounded job details.";
+const title = "QIU Industry Day 2026";
+const description = "Explore QIU Industry Day 2026 — attending companies, vacancies matched to your course, events and attendance.";
 export const metadata: Metadata = {
   title,
   description,

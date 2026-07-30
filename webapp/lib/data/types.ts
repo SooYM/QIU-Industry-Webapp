@@ -188,12 +188,18 @@ export interface Company {
   name: string;
   website?: string;
   logoUrl?: string;
-  videoUrl?: string;       // YouTube URL
+  videoUrl?: string;       // YouTube corporate video URL
   summary?: string;
   order?: number;          // manual sort weight (lower first)
+  boothNumber?: string;    // booth/stand number at the venue
   logoBackground?: "auto" | "light" | "dark"; // tile behind the logo; auto = detect
+  /** Employer submissions are gated; admin listings publish immediately. Absent = approved. */
+  status?: "approved" | "pending";
   createdBy?: string;
 }
+
+/** A company with no explicit status is admin-created and counts as approved. */
+export const isApprovedCompany = (c: Company) => !c.status || c.status === "approved";
 
 /**
  * Portal-wide settings an admin can edit from the Settings panel — no code

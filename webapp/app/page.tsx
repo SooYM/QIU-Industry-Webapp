@@ -132,6 +132,8 @@ export default function Home() {
     })();
   }, [user, events]);
 
+  useEffect(() => { document.title = settings.portalTitle; }, [settings.portalTitle]);
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -303,7 +305,7 @@ export default function Home() {
 
       {tab === "home" && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <HomeView companies={exhibitors} settings={{ portalTitle: settings.portalTitle, portalTagline: settings.portalTagline }} />
+          <HomeView companies={exhibitors} jobs={jobs} isStudent={isStudent} course={course} settings={{ portalTitle: settings.portalTitle, portalTagline: settings.portalTagline }} onOpenJob={setSelectedJob} />
         </section>
       )}
 

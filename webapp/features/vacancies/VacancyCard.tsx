@@ -17,7 +17,7 @@ export function VacancyCard({
 }) {
   const status = showStatus ? jobStatusMeta(job) : null;
   return (
-    <article className="job-card" tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
+    <article className={`job-card${recommended ? " is-recommended" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${recommended ? " — recommended for your course" : ""}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
       <div className="card-top">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`type ${job.type.toLowerCase().includes("intern") ? "intern" : ""}`}>{job.type}</span>

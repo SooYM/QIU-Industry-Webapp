@@ -1,5 +1,4 @@
-import { ChangeEvent, FormEvent, MouseEvent as ReactMouseEvent, PointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { doc, serverTimestamp, writeBatch } from "firebase/firestore";
+import { FormEvent, MouseEvent as ReactMouseEvent, PointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Job } from "../../lib/data/types";
 import { RoleManager, useAuth } from "../../app/auth-context";
 import { canEditOrDeleteJob, canManageVacancies, normalizeEmail } from "../../app/auth-policy";
@@ -9,7 +8,7 @@ import { positionTooltip } from "../../app/map-tooltip";
 import type { TooltipPosition } from "../../app/map-tooltip";
 import { Modal } from "../../components/Modal";
 import {
-  benchmarkFor, countryPath, emptyDraft, jobStatusMeta, malaysiaStateAliases, malaysiaStates,
+  benchmarkFor, countryPath, emptyDraft, jobStatusMeta, malaysiaStates,
   type AdminDraft, type CountryShape, type GeoFeature,
 } from "../vacancies/vacancy-utils";
 import { ApprovalQueue } from "./ApprovalQueue";
@@ -17,6 +16,7 @@ import { ResumeViewer } from "./ResumeViewer";
 import { ChatHistory } from "./ChatHistory";
 import { StudentActivity } from "./StudentActivity";
 import { SettingsPanel } from "./SettingsPanel";
+import { CompanyManager } from "./CompanyManager";
 
 const PREDEFINED_SPECS = [
   "IT - Software", "IT - Network/Sys/DB Admin", "IT - Hardware", "Accounting/Finance",
@@ -45,7 +45,7 @@ export function AdminPanel({
   const canManageJobs = canManageVacancies(role);
   const isApprover = role === "admin" || role === "superadmin";
   const isEmployer = role === "employer";
-  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings">("manage");
+  const [adminView, setAdminView] = useState<"manage" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings" | "company">("manage");
   const [draft, setDraft] = useState<AdminDraft>(emptyDraft);
   const [titleCommitted, setTitleCommitted] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -221,35 +221,6 @@ export function AdminPanel({
     } catch { setAdminMessage("Vacancy could not be deleted."); }
   }
 
-  async function importVacancies(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || role !== "superadmin" || !db || !user) return;
-    try {
-      const activeDb = db;
-      const imported = JSON.parse(await file.text()) as Job[];
-      if (!Array.isArray(imported) || imported.length > 500 || imported.some((job) => !job.id || !job.title || !job.company)) throw new Error();
-      const batch = writeBatch(activeDb);
-      imported.forEach((job) => {
-        const malaysiaState = malaysiaStates.includes(job.location) ? job.location : malaysiaStateAliases[job.location];
-        batch.set(doc(activeDb, "vacancies", String(job.id)), {
-          ...JSON.parse(JSON.stringify(job)) as Job,
-          isCustom: true,
-          location: malaysiaState ?? job.location,
-          locationMode: malaysiaState ? "malaysia" : "international",
-          state: malaysiaState ?? "",
-          country: malaysiaState ? "" : job.location,
-          youtubeUrl: job.youtubeUrl ?? "",
-          createdBy: normalizeEmail(user.email),
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      });
-      await batch.commit();
-      setAdminMessage(`${imported.length} vacancies imported.`);
-    } catch { setAdminMessage("Import failed. Choose a valid vacancy JSON file with no more than 500 records."); }
-  }
-
   function editCustomJob(job: Job) {
     if (!canEditOrDeleteJob(job, user?.email, role)) {
       setAdminMessage("Employers can only edit their own created vacancies.");
@@ -307,6 +278,7 @@ export function AdminPanel({
   const tabs: { key: typeof adminView; label: string }[] = [
     { key: "manage", label: "Vacancies" },
     ...(isApprover ? [{ key: "approvals" as const, label: "Approvals" }] : []),
+    ...(isEmployer ? [{ key: "company" as const, label: "Company profile" }] : []),
     { key: "resumes", label: "Resumes" },
     { key: "activity", label: "Activity" },
     { key: "chats", label: "Chats" },
@@ -314,6 +286,7 @@ export function AdminPanel({
   ];
   const viewTitle = adminView === "manage" ? (editingId ? "Edit vacancy" : "Add a vacancy")
     : adminView === "approvals" ? "Approval queue"
+    : adminView === "company" ? "Company profile"
     : adminView === "resumes" ? "Student resumes"
     : adminView === "activity" ? "Student activity"
     : adminView === "access" ? "Access control"
@@ -336,10 +309,8 @@ export function AdminPanel({
       {adminView === "resumes" && <ResumeViewer />}
       {adminView === "activity" && (isApprover ? <StudentActivity mode="all" /> : <StudentActivity mode="company" companies={employerCompanies} />)}
       {adminView === "chats" && (isApprover ? <ChatHistory mode="all" /> : <ChatHistory mode="company" companies={employerCompanies} />)}
-      {adminView === "access" && isApprover && <>
-        {role === "superadmin" && <label className="import-vacancies">Initial data import<input type="file" accept="application/json,.json" onChange={importVacancies}/><small>Select private vacancy JSON. File stays local and only its records are uploaded to Firestore.</small></label>}
-        <RoleManager />
-      </>}
+      {adminView === "access" && isApprover && <RoleManager />}
+      {adminView === "company" && isEmployer && <CompanyManager employer={{ email: normalizeEmail(user?.email), companyName: employerCompany ?? "" }} />}
       {adminView === "settings" && isApprover && <SettingsPanel />}
 
       {adminView === "manage" && <>
