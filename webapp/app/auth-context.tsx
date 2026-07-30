@@ -12,11 +12,12 @@ import {
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryCourse, PEOPLE_SCOPE } from "../lib/auth/course-directory";
-import { approveSignup, deleteSignup, submitSignup, subscribeMySignup, subscribeSignups } from "../lib/data/firestore";
+import { submitSignup, subscribeMySignup } from "../lib/data/firestore";
 import type { EmployerSignup } from "../lib/data/types";
 import {
   isAllowedAccessEmail,
   isAllowedQiuEmail,
+  logoFromWebsite,
   normalizeEmail,
   roleForEmail,
   SUPERADMIN_EMAIL,
@@ -63,6 +64,10 @@ function readableAuthError(error: unknown) {
   if (code.includes("popup-closed-by-user")) return "Sign-in window closed before completion.";
   if (code.includes("popup-blocked")) return "Browser blocked the sign-in window. Allow pop-ups and try again.";
   if (code.includes("network-request-failed")) return "Could not reach Google sign-in. Check your connection and try again.";
+  const msg = typeof error === "object" && error && "message" in error ? String((error as { message: unknown }).message) : "";
+  if (code.includes("missing-initial-state") || msg.includes("missing initial state")) {
+    return "Your browser blocked the sign-in handshake (often in private mode or with strict tracking protection). Allow pop-ups and third-party cookies for this site, or try a normal Chrome window, then sign in again.";
+  }
   return "Sign-in failed. Try again with your Google account.";
 }
 
@@ -260,6 +265,10 @@ function RegisterGate() {
   const [name, setName] = useState(user?.displayName ?? "");
   const [companyName, setCompanyName] = useState("");
   const [contact, setContact] = useState("");
+  const [website, setWebsite] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [summary, setSummary] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -272,7 +281,7 @@ function RegisterGate() {
     event.preventDefault();
     if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
     setBusy(true);
-    try { await submitSignup(email, { name, company: companyName, contact }); setMessage(""); }
+    try { await submitSignup(email, { name, company: companyName, contact, website, logoUrl, videoUrl, summary }); setMessage(""); }
     catch { setMessage("Could not submit your registration. Please try again."); }
     finally { setBusy(false); }
   }
@@ -293,10 +302,16 @@ function RegisterGate() {
         <form onSubmit={submit} className="auth-copy">
           <span className="detail-label">COMPANY REGISTRATION</span>
           <h1 id="register-title">Register your company</h1>
-          <p>Signed in as <b>{email}</b>. Tell us about your company — an admin approves it, then you can add your profile and vacancies.</p>
+          <p>Signed in as <b>{email}</b>. Fill in your company profile — once an admin approves, it appears on the Home page and you can add vacancies.</p>
           <label className="register-field">Your name<input value={name} onChange={(e) => setName(e.target.value)} required maxLength={160} /></label>
           <label className="register-field">Company name<input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={200} placeholder="e.g. Acme Sdn Bhd" /></label>
-          <label className="register-field">Contact (phone / website) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
+          <label className="register-field">Website <small>optional</small><input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} maxLength={2048} placeholder="https://acme.com" /></label>
+          <label className="register-field">Logo image URL <small>optional</small>
+            <span className="register-logo-row"><input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} maxLength={2048} placeholder="https://…/logo.png" /><button type="button" className="auth-secondary register-logo-btn" onClick={() => setLogoUrl(logoFromWebsite(website))} disabled={!website.trim()}>From website</button></span>
+          </label>
+          <label className="register-field">Corporate video (YouTube) <small>optional</small><input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} maxLength={2048} placeholder="https://youtube.com/watch?v=…" /></label>
+          <label className="register-field">Contact (phone / email) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
+          <label className="register-field">Company profile / blurb <small>optional</small><textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={5000} /></label>
           {message && <p className="auth-error" role="alert">{message}</p>}
           <button className="google-sign-in" type="submit" disabled={busy}>{busy ? "Submitting…" : "Submit registration"}</button>
           <button className="auth-secondary" type="button" onClick={signOut}>Cancel &amp; sign out</button>
@@ -336,15 +351,8 @@ export function RoleManager() {
   const [newRole, setNewRole] = useState<UserRole>("employer");
   const [newCompany, setNewCompany] = useState("");
   const [userQuery, setUserQuery] = useState("");
-  const [signups, setSignups] = useState<EmployerSignup[]>([]);
 
   const canManageRoles = role === "superadmin" || role === "admin";
-  useEffect(() => { if (canManageRoles && db) return subscribeSignups(setSignups); }, [canManageRoles]);
-  const pendingSignups = signups.filter((s) => s.status === "pending");
-  async function approveRegistration(s: EmployerSignup) {
-    try { await approveSignup(s, normalizeEmail(user?.email)); setMessage(`Approved ${s.company}.`); }
-    catch { setMessage(`Could not approve ${s.company}.`); }
-  }
   useEffect(() => {
     if (!canManageRoles || !db) return;
     const activeDb = db;
@@ -468,29 +476,7 @@ export function RoleManager() {
         </details>
       )}
 
-      {canManageRoles && (
-        <details className="access-approve panel-accent" open={pendingSignups.length > 0}>
-          <summary><span>🏢 Company registration requests</span><small>{pendingSignups.length} pending</small></summary>
-          <div className="access-approve-body">
-            <p>Companies that registered themselves. Approving one whitelists them as an employer with their company — no need to add emails one by one.</p>
-            {pendingSignups.length ? (
-              <div className="access-approved-list">
-                {pendingSignups.map((s) => (
-                  <div key={s.email} className="access-approved-row">
-                    <span><b>{s.company}</b> <span className="role-pill">employer</span><small> · {s.name} · {s.email}{s.contact ? ` · ${s.contact}` : ""}</small></span>
-                    <span className="flex gap-2">
-                      <button type="button" className="save-job" style={{ minHeight: "2.1rem", padding: "0 .7rem" }} onClick={() => approveRegistration(s)}>Approve</button>
-                      <button type="button" className="access-revoke" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email); }}>Reject</button>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : <p className="text-accent text-xs">No pending registrations.</p>}
-          </div>
-        </details>
-      )}
-
-      <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed.</p>
+      <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed. Approve new company registrations in the Approvals tab.</p>
       <input type="search" className="admin-search" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} placeholder="Search accounts by name or email…" aria-label="Search accounts" />
       {loading ? (
         <p className="role-manager-state" role="status">Loading accounts…</p>

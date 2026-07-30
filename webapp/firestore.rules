@@ -314,6 +314,7 @@ service cloud.firestore {
         || (isAllowedUser()
           && exists(/databases/$(database)/documents/events/$(eventId))
           && (request.auth.token.email.lower() in get(/databases/$(database)/documents/events/$(eventId)).data.presenters));
+      allow delete: if isAdmin();
     }
 
     // Attendance: a student checks in / out only with the currently-valid code for
@@ -347,6 +348,7 @@ service cloud.firestore {
       allow write: if isAllowedUser()
         && request.resource.data.keys().hasOnly(['applicants'])
         && request.resource.data.applicants is number;
+      allow delete: if isAdmin();
     }
 
     // Exhibitor showcase on the Home landing. Everyone allowed reads; admins
@@ -386,17 +388,20 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && emailId == request.auth.token.email.lower()
         && request.resource.data.email == request.auth.token.email.lower()
-        && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'website', 'logoUrl', 'videoUrl', 'summary', 'status', 'createdAt', 'updatedAt'])
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 160
         && request.resource.data.company is string && request.resource.data.company.size() > 0 && request.resource.data.company.size() <= 200
         && (!('contact' in request.resource.data) || (request.resource.data.contact is string && request.resource.data.contact.size() <= 200))
+        && (!('website' in request.resource.data) || (request.resource.data.website is string && request.resource.data.website.size() <= 2048))
+        && (!('logoUrl' in request.resource.data) || (request.resource.data.logoUrl is string && request.resource.data.logoUrl.size() <= 2048))
+        && (!('videoUrl' in request.resource.data) || (request.resource.data.videoUrl is string && request.resource.data.videoUrl.size() <= 2048))
+        && (!('summary' in request.resource.data) || (request.resource.data.summary is string && request.resource.data.summary.size() <= 5000))
         && request.resource.data.status == 'pending';
       // …the owner may resubmit (stays pending); an admin may mark it approved.
       allow update: if isAdmin()
         || (isAuthenticated()
           && emailId == request.auth.token.email.lower()
           && request.resource.data.email == request.auth.token.email.lower()
-          && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'status', 'createdAt', 'updatedAt'])
           && request.resource.data.status == 'pending');
       allow delete: if isAdmin();
     }

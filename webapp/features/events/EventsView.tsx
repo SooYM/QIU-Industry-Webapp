@@ -85,8 +85,11 @@ export function EventsView({
                 <p className="text-accent text-xs">{when(ev.startAt)} → {when(ev.endAt)}{ev.location ? ` · ${ev.location}` : ""}</p>
                 <div className="event-speaker">
                   <span className="detail-label">SPEAKER</span>
-                  {ev.speakerName || (ev.speakerLinks ?? []).length
-                    ? <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
+                  {ev.speakerName || (ev.speakerLinks ?? []).length || ev.speakerPhotoUrl
+                    ? <div className="event-speaker-row">
+                        {ev.speakerPhotoUrl && <img className="speaker-photo-sm" src={ev.speakerPhotoUrl} alt={ev.speakerName || "Speaker"} />}
+                        <p className="text-sm"><b>{ev.speakerName || "TBA"}</b>{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
+                      </div>
                     : <p className="text-accent text-sm">To be announced.</p>}
                 </div>
                 <p className="view-job mt-2">View details <span>→</span></p>

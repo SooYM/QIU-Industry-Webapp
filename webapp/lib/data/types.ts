@@ -212,6 +212,10 @@ export interface EmployerSignup {
   name: string;
   company: string;
   contact?: string;
+  website?: string;
+  logoUrl?: string;
+  videoUrl?: string;
+  summary?: string;
   status: "pending" | "approved";
   createdAt?: unknown;
   updatedAt?: unknown;

@@ -197,7 +197,7 @@ export default function Home() {
     if (!isStudent) {
       const toggleable: [Tab, string][] = ([["home", "Home"], ["events", "Events"], ["vacancies", "Vacancies"]] as [Tab, string][])
         .filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
-      return [["summary", "Summary"] as [Tab, string], ...toggleable, ["dashboard", role === "employer" ? "Dashboard" : "Admin tools"] as [Tab, string]];
+      return [["summary", "Summary"] as [Tab, string], ["dashboard", role === "employer" ? "Employer tools" : "Admin tools"] as [Tab, string], ...toggleable];
     }
     const studentTabs: [Tab, string][] = [["home", "Home"], ["events", "Events"], ["resume", "My Resume"], ["vacancies", "Vacancies"], ["history", "History"]];
     return studentTabs.filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);

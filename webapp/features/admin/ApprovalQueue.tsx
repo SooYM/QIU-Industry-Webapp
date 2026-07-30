@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { approveCompany, approveJob, deleteCompany, rejectJob, subscribeCompanies } from "../../lib/data/firestore";
-import { isApprovedCompany, type Company, type Job } from "../../lib/data/types";
+import { approveCompany, approveJob, approveSignup, deleteCompany, deleteSignup, rejectJob, subscribeCompanies, subscribeSignups } from "../../lib/data/firestore";
+import { isApprovedCompany, type Company, type EmployerSignup, type Job } from "../../lib/data/types";
+import { useAuth } from "../../app/auth-context";
+import { normalizeEmail } from "../../app/auth-policy";
 import { jobStatusMeta } from "../vacancies/vacancy-utils";
 
 /** Fields an employer changed in a staged edit, as (field, was, becomes) rows. */
@@ -13,11 +15,14 @@ function changedFields(job: Job): [string, unknown, unknown][] {
 }
 
 export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [query, setQuery] = useState("");
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [signups, setSignups] = useState<EmployerSignup[]>([]);
 
   useEffect(() => subscribeCompanies(setCompanies, () => {}), []);
+  useEffect(() => subscribeSignups(setSignups), []);
 
   const q = query.trim().toLowerCase();
   const match = (...fields: (string | undefined)[]) => !q || fields.some((f) => (f ?? "").toLowerCase().includes(q));
@@ -28,6 +33,15 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
   const pendingCompanies = companies
     .filter((c) => !isApprovedCompany(c))
     .filter((c) => match(c.name, c.createdBy));
+  const pendingSignups = signups
+    .filter((s) => s.status === "pending")
+    .filter((s) => match(s.company, s.name, s.email));
+
+  async function approveReg(s: EmployerSignup) {
+    setMessage("");
+    try { await approveSignup(s, normalizeEmail(user?.email)); setMessage(`Approved ${s.company} — added to exhibitors.`); }
+    catch { setMessage(`Could not approve ${s.company}.`); }
+  }
 
   async function approve(job: Job) {
     setMessage("");
@@ -52,9 +66,31 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
 
   return (
     <section aria-labelledby="approval-title">
-      <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Awaiting review</h3></div><strong aria-live="polite">{pendingJobs.length + pendingCompanies.length}</strong></div>
-      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pending vacancies and companies…" aria-label="Search approvals" />
+      <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Awaiting review</h3></div><strong aria-live="polite">{pendingJobs.length + pendingCompanies.length + pendingSignups.length}</strong></div>
+      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pending registrations, vacancies and companies…" aria-label="Search approvals" />
       {message && <p className="admin-message" role="status" aria-live="polite">{message}</p>}
+
+      {/* Section — new company registrations (self-service signups) */}
+      <div className="local-jobs" style={{ marginTop: ".5rem" }}>
+        <div className="local-jobs-head"><div><span className="detail-label">COMPANY REGISTRATIONS</span><h3>New companies</h3></div><strong>{pendingSignups.length}</strong></div>
+        {pendingSignups.length ? (
+          <div className="local-job-list">
+            {pendingSignups.map((s) => (
+              <div className="local-job" key={s.email} style={{ alignItems: "flex-start" }}>
+                <span>
+                  <b>{s.company}</b>
+                  <small>{s.name} · {s.email}{s.contact ? ` · ${s.contact}` : ""}{s.website ? ` · ${s.website}` : ""}</small>
+                  {(s.summary || s.videoUrl || s.logoUrl) && <span className="mt-1 block text-[11px] text-accent">{[s.summary, s.videoUrl && "🎬 video", s.logoUrl && "🖼 logo"].filter(Boolean).join(" · ")}</span>}
+                </span>
+                <div className="local-job-actions">
+                  <button className="edit-local" onClick={() => approveReg(s)}>Approve</button>
+                  <button className="delete-local" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email); }}>Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : <div className="admin-jobs-empty"><strong>No new registrations</strong><p>Self-registered companies appear here. Approving one whitelists them and publishes their exhibitor profile.</p></div>}
+      </div>
 
       {/* Section 1 — vacancies */}
       <div className="local-jobs" style={{ marginTop: ".5rem" }}>

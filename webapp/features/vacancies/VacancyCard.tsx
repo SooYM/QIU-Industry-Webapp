@@ -19,15 +19,13 @@ export function VacancyCard({
 }) {
   const status = showStatus ? jobStatusMeta(job) : null;
   return (
-    <article className={`job-card${recommended ? " is-recommended" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${recommended ? " — recommended for your course" : ""}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
+    <article className={`job-card${recommended ? " is-recommended" : ""}${applied ? " is-applied" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${applied ? " — you have applied" : ""}${recommended ? " — recommended for your profile" : ""}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
+      {applied && <span className="applied-ribbon" aria-hidden="true">APPLIED</span>}
       <div className="card-top">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`type ${job.type.toLowerCase().includes("intern") ? "intern" : ""}`}>{job.type}</span>
           {recommended && (
             <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Recommended for your profile</span>
-          )}
-          {applied && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">✓ Applied</span>
           )}
           {status && (
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${status.tone}`}>{status.label}</span>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { subscribeApplications, subscribeCompanyChats } from "../../lib/data/firestore";
 import type { Application, ChatLog } from "../../lib/data/types";
+import { BarChart } from "./AdminSummary";
 
 function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return <div className="stat-card"><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong>{hint && <small>{hint}</small>}</div>;
@@ -40,11 +41,7 @@ export function EmployerSummary({ companies }: { companies: string[] }) {
           </div>
 
           <div className="summary-ranks">
-            <div className="rank-card">
-              <span className="detail-label">Applications by vacancy</span>
-              {ranked.length ? <ol className="rank-list">{ranked.slice(0, 8).map((r, i) => <li key={r.label}><span className="rank-num">{i + 1}</span><span className="rank-label">{r.label}</span><span className="rank-count">{r.count} apps</span></li>)}</ol>
-                : <p className="text-accent text-sm mt-1">No applications yet.</p>}
-            </div>
+            <BarChart title="Applications by vacancy" rows={ranked} />
           </div>
           <p className="text-[11px] text-accent mt-2">Profile-view counts aren&apos;t available on the current plan — figures above reflect applications and assistant questions.</p>
         </>

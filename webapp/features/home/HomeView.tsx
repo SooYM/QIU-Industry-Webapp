@@ -147,13 +147,14 @@ function CompanyDetail({ company, jobs, isStudent, course, onOpenJob, onClose }:
 
 function ExhibitorCard({ company, onOpen }: { company: Company; onOpen: () => void }) {
   const backdrop = useLogoBackdrop(company.logoUrl, company.logoBackground ?? "auto");
+  const [logoOk, setLogoOk] = useState(true);
   return (
     <article className="exhibitor-card" role="button" tabIndex={0}
       aria-label={`View ${company.name}`}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}>
       <div className={`exhibitor-logo-wrap logo-${backdrop}`}>
-        {company.logoUrl ? <img src={company.logoUrl} alt={company.name} /> : <span className="exhibitor-logo-fallback">{company.name.slice(0, 2).toUpperCase()}</span>}
+        {company.logoUrl && logoOk ? <img src={company.logoUrl} alt={company.name} onError={() => setLogoOk(false)} /> : <span className="exhibitor-logo-fallback">{company.name.slice(0, 2).toUpperCase()}</span>}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <h3>{company.name}</h3>

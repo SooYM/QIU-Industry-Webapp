@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { isApprovedCompany, type Company } from "../../lib/data/types";
 import { useAuth } from "../../app/auth-context";
-import { normalizeEmail } from "../../app/auth-policy";
+import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
 import { clearCompanies, deleteCompany, saveCompany, subscribeCompanies } from "../../lib/data/firestore";
 
 type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
@@ -13,7 +13,7 @@ const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", su
  * employer's own single profile — the company name is fixed by their admin
  * assignment, and every save is submitted as `pending` for admin approval.
  */
-export function CompanyManager({ employer }: { employer?: { email: string; companyName: string } }) {
+export function CompanyManager({ employer, view = "both" }: { employer?: { email: string; companyName: string }; view?: "add" | "manage" | "both" }) {
   const { user } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -80,15 +80,20 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
   }
 
   // ---- Admin mode -----------------------------------------------------------
+  // The Manage tab shows the edit form inline only while editing an exhibitor.
+  const showForm = view !== "manage" || editingId !== null;
+  const showList = view !== "add";
   return (
     <section className="local-jobs" aria-labelledby="company-manager-title">
-      <div className="local-jobs-head"><div><span className="detail-label">EXHIBITORS</span><h3 id="company-manager-title">Add an exhibitor</h3></div><strong>{companies.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">EXHIBITORS</span><h3 id="company-manager-title">{showForm && !showList ? "Add an exhibitor" : showList && !showForm ? "Manage exhibitors" : "Exhibitors"}</h3></div><strong>{companies.length}</strong></div>
 
-      <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel={editingId ? "Save changes" : "Add exhibitor"}
-        onCancel={editingId ? () => { setEditingId(null); setDraft(emptyDraft); setMessage(""); } : undefined} />
-      {message && <p className="admin-message mt-2" role="status" aria-live="polite">{message}</p>}
+      {showForm && <>
+        <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel={editingId ? "Save changes" : "Add exhibitor"}
+          onCancel={editingId ? () => { setEditingId(null); setDraft(emptyDraft); setMessage(""); } : undefined} />
+        {message && <p className="admin-message mt-2" role="status" aria-live="polite">{message}</p>}
+      </>}
 
-      {companies.length > 0 && (
+      {showList && companies.length > 0 && (
         <>
           <div className="local-jobs-head mt-4">
             <div><span className="detail-label">MANAGE</span><h3>All exhibitors</h3></div>
@@ -99,7 +104,7 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
               <div className="local-job" key={c.id}>
                 <span><b>{c.name} {!isApprovedCompany(c) && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Pending</span>}{c.boothNumber && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">Booth {c.boothNumber}</span>}</b><small>{[c.createdBy, c.website].filter(Boolean).join(" · ") || "No links"}</small></span>
                 <div className="local-job-actions">
-                  <button className="edit-local" onClick={() => edit(c)}>Edit</button>
+                  <button className="edit-local" onClick={() => { edit(c); }}>Edit</button>
                   <button className="delete-local" onClick={() => { if (confirm(`Remove "${c.name}" from the Home page?`)) deleteCompany(c.id).catch(() => {}); }}>Delete</button>
                 </div>
               </div>
@@ -107,6 +112,7 @@ export function CompanyManager({ employer }: { employer?: { email: string; compa
           </div>
         </>
       )}
+      {showList && companies.length === 0 && !showForm && <div className="admin-jobs-empty"><strong>No exhibitors yet</strong><p>Add one from the “Add exhibitor” tab.</p></div>}
     </section>
   );
 }
@@ -128,7 +134,10 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
         ? <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>
         : <label>Display order<input type="number" value={draft.order} placeholder="e.g. 1" onChange={(e) => setDraft({ ...draft, order: e.target.value })} /></label>}
       {showBooth && <label>Display order<input type="number" value={draft.order} placeholder="e.g. 1" onChange={(e) => setDraft({ ...draft, order: e.target.value })} /></label>}
-      <label className="full">Logo image URL<input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /></label>
+      <label className="full">Logo image URL
+        <span className="register-logo-row"><input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /><button type="button" className="reset-admin-filters register-logo-btn" onClick={() => setDraft({ ...draft, logoUrl: logoFromWebsite(draft.website) })} disabled={!draft.website.trim()}>From website</button></span>
+        <small className="field-label">Auto-fetches the brand logo from the website — or paste your own link.</small>
+      </label>
       <label className="full">Logo tile background<select value={draft.logoBackground} onChange={(e) => setDraft({ ...draft, logoBackground: e.target.value as Draft["logoBackground"] })}><option value="auto">Auto (detect from logo)</option><option value="light">Light</option><option value="dark">Dark</option></select><small className="field-label">Use Dark for white / light-coloured transparent logos so they stay visible.</small></label>
       <label className="full">Corporate video (YouTube URL)<input type="url" value={draft.videoUrl} placeholder="https://www.youtube.com/watch?v=…" onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })} /></label>
       <label className="full"><span className="field-label">Company profile / blurb</span><textarea rows={3} value={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} /></label>

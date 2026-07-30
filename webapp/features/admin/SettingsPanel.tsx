@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { AppSettings } from "../../lib/data/types";
-import { DEFAULT_SETTINGS, saveSettings, subscribeSettings } from "../../lib/data/firestore";
-import { CompanyManager } from "./CompanyManager";
+import { DEFAULT_SETTINGS, resetAllData, saveSettings, subscribeSettings } from "../../lib/data/firestore";
+import { useAuth } from "../../app/auth-context";
+import { normalizeEmail } from "../../app/auth-policy";
 
 const TAB_LABELS: { key: keyof AppSettings["tabs"]; label: string }[] = [
   { key: "home", label: "Home" },
@@ -16,11 +17,23 @@ const TAB_LABELS: { key: keyof AppSettings["tabs"]; label: string }[] = [
  * attendance rules, which sections are visible, and the exhibitor line-up.
  */
 export function SettingsPanel() {
+  const { role, user } = useAuth();
   const [form, setForm] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => subscribeSettings(setForm), []);
+
+  async function resetAll() {
+    const answer = window.prompt("DANGER: this permanently erases ALL vacancies, applications, resumes, events, attendance, exhibitors, registrations and non-superadmin accounts. This cannot be undone.\n\nType CONFIRM-RESET to proceed:");
+    if (answer !== "CONFIRM-RESET") { setMessage(answer == null ? "" : "Reset cancelled — you must type CONFIRM-RESET exactly."); return; }
+    setResetting(true);
+    setMessage("Resetting all data…");
+    try { await resetAllData(normalizeEmail(user?.email)); setMessage("All data has been reset. The portal is now empty."); }
+    catch { setMessage("Reset failed — some records may remain. Try again."); }
+    finally { setResetting(false); }
+  }
 
   const set = (patch: Partial<AppSettings>) => setForm((f) => ({ ...f, ...patch }));
   const setTab = (key: keyof AppSettings["tabs"], on: boolean) => setForm((f) => ({ ...f, tabs: { ...f.tabs, [key]: on } }));
@@ -66,7 +79,13 @@ export function SettingsPanel() {
         </div>
       </form>
 
-      <CompanyManager />
+      {role === "superadmin" && (
+        <div className="danger-zone">
+          <div className="section-heading"><div><span>DANGER ZONE</span><h3>Reset all data</h3></div></div>
+          <p>Wipes every vacancy, application, resume, event, attendance record, exhibitor and registration back to empty. Portal settings and your superadmin account are kept. This cannot be undone.</p>
+          <button type="button" className="delete-local danger-reset" onClick={resetAll} disabled={resetting}>{resetting ? "Resetting…" : "Reset all data & start empty"}</button>
+        </div>
+      )}
     </div>
   );
 }

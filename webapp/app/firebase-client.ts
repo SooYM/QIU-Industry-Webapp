@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -17,5 +17,8 @@ export const firebaseApp = isFirebaseConfigured
   ? (getApps().length ? getApp() : initializeApp(firebaseConfig))
   : null;
 export const auth = firebaseApp ? getAuth(firebaseApp) : null;
+// Keep the session in local storage so the popup sign-in handshake survives
+// storage-partitioned browsers (avoids "missing initial state" errors).
+if (auth) setPersistence(auth, browserLocalPersistence).catch(() => {});
 export const db = firebaseApp ? getFirestore(firebaseApp) : null;
 export const storage = firebaseApp ? getStorage(firebaseApp) : null;

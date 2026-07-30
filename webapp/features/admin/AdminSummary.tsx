@@ -12,12 +12,22 @@ function Stat({ label, value, hint }: { label: string; value: string | number; h
   return <div className="stat-card"><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong>{hint && <small>{hint}</small>}</div>;
 }
 
-function Rank({ title, rows, unit }: { title: string; rows: { label: string; count: number }[]; unit: string }) {
+export function BarChart({ title, rows }: { title: string; rows: { label: string; count: number }[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <div className="rank-card">
       <span className="detail-label">{title}</span>
-      {rows.length ? <ol className="rank-list">{rows.slice(0, 5).map((r, i) => <li key={r.label}><span className="rank-num">{i + 1}</span><span className="rank-label">{r.label}</span><span className="rank-count">{r.count} {unit}</span></li>)}</ol>
-        : <p className="text-accent text-sm mt-1">No data yet.</p>}
+      {rows.length ? (
+        <div className="bar-list">
+          {rows.slice(0, 6).map((r) => (
+            <div className="bar-row" key={r.label}>
+              <span className="bar-label" title={r.label}>{r.label}</span>
+              <span className="bar-track"><span className="bar-fill" style={{ width: `${Math.max(6, (r.count / max) * 100)}%` }} /></span>
+              <span className="bar-count">{r.count}</span>
+            </div>
+          ))}
+        </div>
+      ) : <p className="text-accent text-sm mt-1">No data yet.</p>}
     </div>
   );
 }
@@ -60,9 +70,9 @@ export function AdminSummary() {
       </div>
 
       <div className="summary-ranks">
-        <Rank title="Most-applied companies" rows={topCompanies} unit="apps" />
-        <Rank title="Most-applied jobs" rows={topJobs} unit="apps" />
-        <Rank title="Best-attended events" rows={topEvents} unit="attended" />
+        <BarChart title="Most-applied companies" rows={topCompanies} />
+        <BarChart title="Most-applied jobs" rows={topJobs} />
+        <BarChart title="Best-attended events" rows={topEvents} />
       </div>
     </section>
   );

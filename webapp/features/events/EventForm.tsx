@@ -8,6 +8,21 @@ type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" 
 
 const emptyDraft: Draft = { title: "", description: "", location: "", speakerName: "", startAt: "", endAt: "", sessionMinutes: 60 };
 
+/** Minutes between two datetime-local strings (0 when invalid or non-positive). */
+function minutesBetween(start: string, end: string) {
+  const s = new Date(start).getTime(), e = new Date(end).getTime();
+  return Number.isFinite(s) && Number.isFinite(e) && e > s ? Math.round((e - s) / 60000) : 0;
+}
+
+/** Add minutes to a datetime-local start, returned as a datetime-local string. */
+function addMinutes(start: string, mins: number) {
+  const s = new Date(start).getTime();
+  if (!Number.isFinite(s)) return "";
+  const d = new Date(s + mins * 60000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }: { editing: EventItem | null; userEmail: string; defaultRotateSeconds: number; onClose: () => void }) {
   const [draft, setDraft] = useState<Draft>(editing
     ? { title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes }
@@ -34,7 +49,7 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       ...(speakerPhoto.trim() ? { speakerPhotoUrl: speakerPhoto.trim() } : {}),
       startAt: draft.startAt,
       endAt: draft.endAt,
-      sessionMinutes: Number(draft.sessionMinutes) || 0,
+      sessionMinutes: minutesBetween(draft.startAt, draft.endAt),
       presenters,
       qrRotateSeconds: Math.min(600, Math.max(5, Number(rotateSeconds) || defaultRotateSeconds)),
     };
@@ -54,7 +69,7 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
         <label>Starts (date &amp; time)<input type="datetime-local" required value={draft.startAt} onChange={(e) => setDraft({ ...draft, startAt: e.target.value })} /></label>
         <label>Ends (date &amp; time)<input type="datetime-local" required value={draft.endAt} onChange={(e) => setDraft({ ...draft, endAt: e.target.value })} /></label>
         <label>Location / hall<input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></label>
-        <label>Session length (minutes)<input type="number" min="0" value={draft.sessionMinutes} onChange={(e) => setDraft({ ...draft, sessionMinutes: Number(e.target.value) })} /></label>
+        <label>Session length (minutes) <small className="field-label">auto from start &amp; end — edit to move the end time</small><input type="number" min="0" value={minutesBetween(draft.startAt, draft.endAt)} disabled={!draft.startAt} onChange={(e) => setDraft({ ...draft, endAt: addMinutes(draft.startAt, Math.max(0, Number(e.target.value) || 0)) })} /></label>
         <label>Speaker name<input value={draft.speakerName} onChange={(e) => setDraft({ ...draft, speakerName: e.target.value })} /></label>
         <label>QR rotate (seconds)<input type="number" min="5" max="600" value={rotateSeconds} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">How often the attendance QR changes. Default {defaultRotateSeconds}s.</small></label>
         <label className="full">Speaker photo URL <small className="field-label">Optional — paste a headshot image link (e.g. from their LinkedIn photo)</small><input type="url" value={speakerPhoto} placeholder="https://…/speaker.jpg" onChange={(e) => setSpeakerPhoto(e.target.value)} /></label>

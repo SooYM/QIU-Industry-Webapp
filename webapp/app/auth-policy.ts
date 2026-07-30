@@ -40,6 +40,15 @@ export function canEditOrDeleteJob(job: { createdBy?: string }, currentUserEmail
   return false;
 }
 
+/** Best-effort brand logo from a website URL (Clearbit). Empty when unparseable. */
+export function logoFromWebsite(url?: string): string {
+  if (!url || !url.trim()) return "";
+  try {
+    const host = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname.replace(/^www\./, "");
+    return host ? `https://logo.clearbit.com/${host}` : "";
+  } catch { return ""; }
+}
+
 export function getYouTubeEmbedUrl(url?: string): string {
   if (!url || !url.trim()) {
     return "https://www.youtube.com/embed/5qap5aO4i9A";

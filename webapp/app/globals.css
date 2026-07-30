@@ -316,6 +316,32 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .register-field input { height:2.75rem; border:1px solid var(--line); border-radius:.6rem; background:var(--surface); color:var(--ink); padding:0 .75rem; font-size:.82rem; }
 .auth-secondary { width:100%; margin-top:.6rem; background:none; border:0; color:var(--muted); font-size:.72rem; font-weight:750; }
 .auth-secondary:hover { color:var(--ink); }
+.register-logo-row { display:flex; gap:.5rem; }
+.register-logo-row input { flex:1; min-width:0; }
+.register-logo-btn { width:auto; flex:none; margin-top:0; white-space:nowrap; padding:0 .7rem; min-height:2.75rem; }
+
+/* "Applied" corner sticker on vacancy cards. */
+.job-card.is-applied { border-color:color-mix(in srgb,var(--success) 45%,var(--line)); }
+.applied-ribbon { position:absolute; top:.85rem; right:-2.6rem; transform:rotate(45deg); background:var(--success); color:#fff; font-size:.6rem; font-weight:900; letter-spacing:.12em; padding:.28rem 2.8rem; box-shadow:0 .2rem .5rem rgba(0,0,0,.2); z-index:2; pointer-events:none; }
+
+/* Summary bar charts. */
+.bar-list { display:flex; flex-direction:column; gap:.55rem; margin-top:.7rem; }
+.bar-row { display:grid; grid-template-columns:8rem 1fr auto; align-items:center; gap:.6rem; font-size:.74rem; }
+.bar-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-weight:700; }
+.bar-track { height:.7rem; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+.bar-fill { display:block; height:100%; background:linear-gradient(90deg,var(--blue),color-mix(in srgb,var(--blue) 60%,var(--cyan,var(--blue)))); border-radius:999px; }
+.bar-count { color:var(--muted); font-weight:800; font-size:.72rem; min-width:1.5rem; text-align:right; }
+
+/* Event speaker headshots. */
+.event-speaker-row { display:flex; align-items:center; gap:.6rem; }
+.speaker-photo-sm { width:2.4rem; height:2.4rem; border-radius:50%; object-fit:cover; border:1px solid var(--line); flex:none; background:var(--surface-2); }
+
+/* Danger zone (superadmin reset). */
+.danger-zone { margin-top:2rem; padding:1.2rem; border:1px solid color-mix(in srgb,var(--danger) 40%,var(--line)); border-radius:.8rem; background:color-mix(in srgb,var(--danger) 6%,var(--surface)); }
+.danger-zone .section-heading span { color:var(--danger); }
+.danger-zone p { color:var(--muted); font-size:.74rem; line-height:1.55; margin:.5rem 0 .9rem; }
+.danger-reset { min-height:2.75rem; padding:0 1.1rem; font-weight:800; }
+@media (max-width:600px) { .bar-row { grid-template-columns:6rem 1fr auto; } }
 .exhibitor-blurb { margin:0; color:var(--muted); font-size:.74rem; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .exhibitor-tags { display:flex; flex-wrap:wrap; gap:.4rem; }
 .exhibitor-tag { font-size:.62rem; font-weight:750; color:var(--blue); background:var(--blue-soft); border-radius:.35rem; padding:.28rem .48rem; }

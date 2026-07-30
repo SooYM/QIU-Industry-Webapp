@@ -32,39 +32,50 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
 
   const searchBox = <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name, email or job…" aria-label="Search resumes" />;
 
-  // ---- Employer view --------------------------------------------------------
+  // ---- Employer view (grouped by job) ---------------------------------------
   if (employer) {
+    const byJob = new Map<string, typeof employerRows>();
+    for (const r of employerRows) {
+      const k = r.app.jobTitle || "Other";
+      if (!byJob.has(k)) byJob.set(k, []);
+      byJob.get(k)!.push(r);
+    }
+    const jobGroups = [...byJob.entries()].sort((a, b) => b[1].length - a[1].length);
+
+    const renderRow = ({ app, resume }: (typeof employerRows)[number]) => {
+      const choice = app.resumeChoice ?? (resume && hasGeneratedCV(resume.profile) ? "generated" : "link");
+      const generated = choice === "generated" && resume && hasGeneratedCV(resume.profile);
+      const link = choice === "link" && resume?.fileUrl;
+      const key = app.id;
+      const isOpen = expanded === key;
+      return (
+        <div className="local-job local-job-stack" key={key}>
+          <div className="local-job-row">
+            <span><b>{app.studentName || app.studentEmail}</b><small>{app.studentEmail} · {generated ? "Generated CV" : link ? "Shared link" : "No resume shared"}</small></span>
+            <div className="local-job-actions">
+              {generated && <><button type="button" className="edit-local" onClick={() => setExpanded(isOpen ? null : key)}>{isOpen ? "Hide CV" : "View CV"}</button><button type="button" className="edit-local" onClick={() => downloadCV(resume!)}>Download</button></>}
+              {link && <a className="edit-local" href={resume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a>}
+              {!generated && !link && <span className="text-xs text-accent italic">Nothing shared</span>}
+            </div>
+          </div>
+          {generated && isOpen && <div className="cv-print mt-2"><GeneratedCV name={app.studentName || app.studentEmail} email={app.studentEmail} course={resume!.course} profile={resume!.profile!} /></div>}
+        </div>
+      );
+    };
+
     return (
       <section className="local-jobs" aria-labelledby="resumes-title">
-        <div className="local-jobs-head"><div><span className="detail-label">CANDIDATE RESUMES</span><h3 id="resumes-title">Applicants to your company</h3></div><strong>{employerRows.length}</strong></div>
+        <div className="local-jobs-head"><div><span className="detail-label">CANDIDATE APPLICANTS</span><h3 id="resumes-title">Applicants by job</h3></div><strong>{employerRows.length}</strong></div>
         <p className="text-[11px] text-accent">You only see the resume each student chose to share when applying.</p>
         {searchBox}
         {loading ? <p className="role-manager-state" role="status">Loading…</p>
           : !employer.companies.length ? <div className="admin-jobs-empty"><strong>No company assigned</strong><p>Ask an admin to set your company.</p></div>
-          : employerRows.length ? (
-            <div className="local-job-list">
-              {employerRows.map(({ app, resume }) => {
-                const choice = app.resumeChoice ?? (resume && hasGeneratedCV(resume.profile) ? "generated" : "link");
-                const generated = choice === "generated" && resume && hasGeneratedCV(resume.profile);
-                const link = choice === "link" && resume?.fileUrl;
-                const key = app.id;
-                const isOpen = expanded === key;
-                return (
-                  <div className="local-job local-job-stack" key={key}>
-                    <div className="local-job-row">
-                      <span><b>{app.studentName || app.studentEmail}</b><small>applied to <b>{app.jobTitle}</b> · {generated ? "Generated CV" : link ? "Shared link" : "No resume shared"}</small></span>
-                      <div className="local-job-actions">
-                        {generated && <><button type="button" className="edit-local" onClick={() => setExpanded(isOpen ? null : key)}>{isOpen ? "Hide CV" : "View CV"}</button><button type="button" className="edit-local" onClick={() => downloadCV(resume!)}>Download</button></>}
-                        {link && <a className="edit-local" href={resume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a>}
-                        {!generated && !link && <span className="text-xs text-accent italic">Nothing shared</span>}
-                      </div>
-                    </div>
-                    {generated && isOpen && <div className="cv-print mt-2"><GeneratedCV name={app.studentName || app.studentEmail} email={app.studentEmail} course={resume!.course} profile={resume!.profile!} /></div>}
-                  </div>
-                );
-              })}
-            </div>
-          ) : <div className="admin-jobs-empty"><strong>No applicants yet</strong><p>Resumes appear here when students apply to your vacancies.</p></div>}
+          : jobGroups.length ? jobGroups.map(([job, rows]) => (
+            <details className="student-group" key={job} open>
+              <summary className="student-group-head"><b>{job}</b><small>{rows.length} applicant{rows.length === 1 ? "" : "s"}</small></summary>
+              {rows.map(renderRow)}
+            </details>
+          )) : <div className="admin-jobs-empty"><strong>No applicants yet</strong><p>Resumes appear here when students apply to your vacancies.</p></div>}
       </section>
     );
   }

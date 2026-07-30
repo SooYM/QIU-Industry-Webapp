@@ -2,7 +2,7 @@
 // database. Feature modules call these helpers; they never touch Firestore SDK
 // directly. Swapping backends later means reimplementing only this file.
 import {
-  collection, deleteDoc, doc, getDoc, increment, onSnapshot, query, serverTimestamp,
+  collection, deleteDoc, doc, getDoc, getDocs, increment, onSnapshot, query, serverTimestamp,
   setDoc, updateDoc, where, type Firestore,
 } from "firebase/firestore";
 import { db } from "../../app/firebase-client";
@@ -298,12 +298,18 @@ export async function saveSettings(settings: AppSettings) {
 
 // ---- Employer self-registration --------------------------------------------
 
+type SignupInput = { name: string; company: string; contact?: string; website?: string; logoUrl?: string; videoUrl?: string; summary?: string };
+
 /** A non-QIU visitor submits their own signup (doc id = lowercased email). */
-export async function submitSignup(email: string, data: { name: string; company: string; contact?: string }) {
+export async function submitSignup(email: string, data: SignupInput) {
   const id = email.trim().toLowerCase();
   await setDoc(doc(requireDb(), COLLECTIONS.signups, id), {
     email: id, name: data.name.trim(), company: data.company.trim(),
     ...(data.contact?.trim() ? { contact: data.contact.trim() } : {}),
+    ...(data.website?.trim() ? { website: data.website.trim() } : {}),
+    ...(data.logoUrl?.trim() ? { logoUrl: data.logoUrl.trim() } : {}),
+    ...(data.videoUrl?.trim() ? { videoUrl: data.videoUrl.trim() } : {}),
+    ...(data.summary?.trim() ? { summary: data.summary.trim() } : {}),
     status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   }, { merge: true });
 }
@@ -319,15 +325,50 @@ export function subscribeSignups(onData: (rows: EmployerSignup[]) => void) {
   return onSnapshot(collection(requireDb(), COLLECTIONS.signups), (snap) => onData(snap.docs.map((d) => d.data() as EmployerSignup)));
 }
 
-/** Admin approves a signup: whitelist the email as an employer with their company. */
+/**
+ * Admin approves a registration: (1) whitelist the email as an employer with
+ * their company, (2) publish their exhibitor profile straight into the Home
+ * showcase from the details they submitted, (3) clear the request. The employer
+ * can then edit that same profile later (createdBy = their email).
+ */
 export async function approveSignup(signup: EmployerSignup, approverEmail: string) {
   const database = requireDb();
   await setDoc(doc(database, COLLECTIONS.whitelist, signup.email), {
     email: signup.email, role: "employer", company: signup.company, active: true, addedBy: approverEmail, updatedAt: serverTimestamp(),
   }, { merge: true });
-  await updateDoc(doc(database, COLLECTIONS.signups, signup.email), { status: "approved", updatedAt: serverTimestamp() });
+  await saveCompany({
+    id: Date.now(),
+    name: signup.company,
+    website: signup.website || undefined,
+    logoUrl: signup.logoUrl || undefined,
+    videoUrl: signup.videoUrl || undefined,
+    summary: signup.summary || undefined,
+    status: "approved",
+  }, false, signup.email);
+  await deleteDoc(doc(database, COLLECTIONS.signups, signup.email));
 }
 
 export async function deleteSignup(email: string) {
   await deleteDoc(doc(requireDb(), COLLECTIONS.signups, email.trim().toLowerCase()));
+}
+
+/**
+ * Superadmin-only hard reset: wipes every data collection back to empty (keeps
+ * portal settings and the superadmin's own account). Best-effort per document.
+ */
+export async function resetAllData(superadminEmail: string) {
+  const database = requireDb();
+  const cols = [
+    COLLECTIONS.vacancies, COLLECTIONS.applications, COLLECTIONS.viewEvents, COLLECTIONS.resumes,
+    COLLECTIONS.chatLogs, COLLECTIONS.events, COLLECTIONS.eventCodes, COLLECTIONS.attendance,
+    COLLECTIONS.jobStats, COLLECTIONS.companies, COLLECTIONS.signups, COLLECTIONS.whitelist,
+  ];
+  for (const c of cols) {
+    const snap = await getDocs(collection(database, c));
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref).catch(() => {})));
+  }
+  const usersSnap = await getDocs(collection(database, COLLECTIONS.users));
+  await Promise.all(usersSnap.docs
+    .filter((d) => ((d.data().email as string) ?? "").toLowerCase() !== superadminEmail.toLowerCase())
+    .map((d) => deleteDoc(d.ref).catch(() => {})));
 }
