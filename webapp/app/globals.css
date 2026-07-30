@@ -221,8 +221,10 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 @media (max-width:600px) {
   .brand>span,.brand>small { display:none; }
   .brand-logo { height:3rem; }
-  .auth-brand .brand-logo { height:3.4rem; }
-  .auth-brand>span,.auth-brand>small { display:inline; }
+  .auth-brand { flex-wrap:wrap; white-space:normal; row-gap:.2rem; }
+  .auth-brand .brand-logo { height:2.8rem; }
+  .auth-brand>span { display:inline; }
+  .auth-brand>small { display:none; }
   /* Free header space for the bigger logo: avatar + Sign out are enough ID here. */
   .auth-account small,.auth-account strong { display:none; }
 }
