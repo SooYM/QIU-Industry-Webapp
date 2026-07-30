@@ -133,7 +133,7 @@ service cloud.firestore {
 
     function validCompany(data) {
       return data.keys().hasAll(['id', 'name', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'logoBackground', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.name is string && data.name.size() > 0 && data.name.size() <= 200
         && (!('website' in data) || (data.website is string && data.website.size() <= 2048))
@@ -141,6 +141,7 @@ service cloud.firestore {
         && (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.size() <= 2048))
         && (!('summary' in data) || (data.summary is string && data.summary.size() <= 5000))
         && (!('order' in data) || (data.order is number))
+        && (!('logoBackground' in data) || data.logoBackground in ['auto', 'light', 'dark'])
         && data.createdBy is string
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }

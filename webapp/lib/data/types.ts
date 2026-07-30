@@ -191,6 +191,7 @@ export interface Company {
   videoUrl?: string;       // YouTube URL
   summary?: string;
   order?: number;          // manual sort weight (lower first)
+  logoBackground?: "auto" | "light" | "dark"; // tile behind the logo; auto = detect
   createdBy?: string;
 }
 

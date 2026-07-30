@@ -2,14 +2,16 @@ import { useState } from "react";
 import type { Company } from "../../lib/data/types";
 import { getYouTubeEmbedUrl } from "../../app/auth-policy";
 import { Modal } from "../../components/Modal";
+import { useLogoBackdrop } from "./useLogoBackdrop";
 
 function CompanyDetail({ company, onClose }: { company: Company; onClose: () => void }) {
   const hasVideo = Boolean(company.videoUrl && company.videoUrl.trim());
+  const backdrop = useLogoBackdrop(company.logoUrl, company.logoBackground ?? "auto");
   return (
     <Modal className="job-detail" labelledBy="company-detail-title" closeLabel="Close company profile" onClose={onClose}>
       <div className="detail-header">
         <div className="flex items-center gap-3">
-          {company.logoUrl && <img className="exhibitor-logo-lg" src={company.logoUrl} alt={company.name} />}
+          {company.logoUrl && <img className={`exhibitor-logo-lg logo-${backdrop}`} src={company.logoUrl} alt={company.name} />}
           <div>
             <h2 id="company-detail-title">{company.name}</h2>
             {company.website && <p><a href={company.website} target="_blank" rel="noreferrer">{company.website.replace(/^https?:\/\//i, "")} ↗</a></p>}
@@ -28,6 +30,27 @@ function CompanyDetail({ company, onClose }: { company: Company; onClose: () => 
         )}
       </div>
     </Modal>
+  );
+}
+
+function ExhibitorCard({ company, onOpen }: { company: Company; onOpen: () => void }) {
+  const backdrop = useLogoBackdrop(company.logoUrl, company.logoBackground ?? "auto");
+  return (
+    <article className="exhibitor-card" role="button" tabIndex={0}
+      aria-label={`View ${company.name}`}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}>
+      <div className={`exhibitor-logo-wrap logo-${backdrop}`}>
+        {company.logoUrl ? <img src={company.logoUrl} alt={company.name} /> : <span className="exhibitor-logo-fallback">{company.name.slice(0, 2).toUpperCase()}</span>}
+      </div>
+      <h3>{company.name}</h3>
+      {company.summary && <p className="exhibitor-blurb">{company.summary}</p>}
+      <div className="exhibitor-tags">
+        {company.website && <span className="exhibitor-tag">🌐 Website</span>}
+        {company.videoUrl && <span className="exhibitor-tag">🎬 Video</span>}
+      </div>
+      <p className="view-job mt-2">View profile <span>→</span></p>
+    </article>
   );
 }
 
@@ -52,23 +75,7 @@ export function HomeView({
 
       {companies.length ? (
         <div className="exhibitor-grid">
-          {companies.map((c) => (
-            <article key={c.id} className="exhibitor-card" role="button" tabIndex={0}
-              aria-label={`View ${c.name}`}
-              onClick={() => setSelected(c)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelected(c); } }}>
-              <div className="exhibitor-logo-wrap">
-                {c.logoUrl ? <img src={c.logoUrl} alt={c.name} /> : <span className="exhibitor-logo-fallback">{c.name.slice(0, 2).toUpperCase()}</span>}
-              </div>
-              <h3>{c.name}</h3>
-              {c.summary && <p className="exhibitor-blurb">{c.summary}</p>}
-              <div className="exhibitor-tags">
-                {c.website && <span className="exhibitor-tag">🌐 Website</span>}
-                {c.videoUrl && <span className="exhibitor-tag">🎬 Video</span>}
-              </div>
-              <p className="view-job mt-2">View profile <span>→</span></p>
-            </article>
-          ))}
+          {companies.map((c) => <ExhibitorCard key={c.id} company={c} onOpen={() => setSelected(c)} />)}
         </div>
       ) : (
         <div className="empty"><strong>Exhibitor line-up coming soon</strong><p>Companies attending Industry Day will appear here.</p></div>

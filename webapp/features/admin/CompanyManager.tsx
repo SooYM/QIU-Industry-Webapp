@@ -4,8 +4,8 @@ import { useAuth } from "../../app/auth-context";
 import { normalizeEmail } from "../../app/auth-policy";
 import { deleteCompany, saveCompany, subscribeCompanies } from "../../lib/data/firestore";
 
-type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string };
-const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", order: "" };
+type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string; logoBackground: "auto" | "light" | "dark" };
+const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", order: "", logoBackground: "auto" };
 
 /** Admin CRUD for the exhibitors shown on the Home landing. */
 export function CompanyManager() {
@@ -28,6 +28,7 @@ export function CompanyManager() {
       videoUrl: draft.videoUrl.trim() || undefined,
       summary: draft.summary.trim() || undefined,
       order: draft.order.trim() ? Number(draft.order) : undefined,
+      logoBackground: draft.logoBackground,
     };
     try {
       await saveCompany(record, editingId !== null, normalizeEmail(user?.email));
@@ -39,7 +40,7 @@ export function CompanyManager() {
 
   function edit(c: Company) {
     setEditingId(c.id);
-    setDraft({ name: c.name, website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", order: c.order != null ? String(c.order) : "" });
+    setDraft({ name: c.name, website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", order: c.order != null ? String(c.order) : "", logoBackground: c.logoBackground ?? "auto" });
     setMessage("Editing exhibitor. Save to apply changes.");
   }
 
@@ -52,6 +53,7 @@ export function CompanyManager() {
         <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
         <label>Display order<input type="number" value={draft.order} placeholder="e.g. 1" onChange={(e) => setDraft({ ...draft, order: e.target.value })} /></label>
         <label className="full">Logo image URL<input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /></label>
+        <label className="full">Logo tile background<select value={draft.logoBackground} onChange={(e) => setDraft({ ...draft, logoBackground: e.target.value as Draft["logoBackground"] })}><option value="auto">Auto (detect from logo)</option><option value="light">Light</option><option value="dark">Dark</option></select><small className="field-label">Use Dark for white / light-coloured transparent logos so they stay visible.</small></label>
         <label className="full">Company video (YouTube URL)<input type="url" value={draft.videoUrl} placeholder="https://www.youtube.com/watch?v=…" onChange={(e) => setDraft({ ...draft, videoUrl: e.target.value })} /></label>
         <label className="full"><span className="field-label">Company profile / blurb</span><textarea rows={3} value={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.value })} /></label>
         <div className="admin-form-footer full">
