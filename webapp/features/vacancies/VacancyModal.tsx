@@ -188,10 +188,9 @@ export function VacancyModal({
             )}
           </>
         )}
+        <JobAssistant job={job} />
         </aside>
       </div>
-
-      <JobAssistant job={job} />
     </Modal>
   );
 }

@@ -186,7 +186,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const token = GoogleAuthProvider.credentialFromResult(scopedResult)?.accessToken;
             if (token) {
               const resolved = await fetchDirectoryCourse(token);
-              if (resolved) {
+              // Only a recognised QIU programme counts. Staff/lecturers (or any
+              // unmatched directory value) leave the course blank.
+              if (resolved && resolved.code) {
                 await setDoc(doc(db, "users", result.user.uid), { course: resolved.name, courseCode: resolved.code }, { merge: true });
                 setCourse(resolved.name);
               }
@@ -242,7 +244,7 @@ export function AuthAccount() {
   const subtitle = role === "superadmin" ? "Super admin"
     : role === "admin" ? "Admin"
     : role === "employer" ? "Employer"
-    : (course || "Student"); // students see their course under their name
+    : (course || ""); // students see their course; staff/unmatched stay blank
   return <div className="auth-account">
     <span className="auth-avatar" aria-hidden="true">{(user.displayName || user.email || "Q").charAt(0).toUpperCase()}</span>
     <span><strong>{user.displayName || user.email}</strong><small>{subtitle}</small></span>
