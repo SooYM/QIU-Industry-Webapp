@@ -130,6 +130,7 @@ export interface EventItem {
   location: string;
   speakerName: string;
   speakerLinks: string[]; // LinkedIn / portfolio URLs (replaced the old speaker email)
+  speakerPhotoUrl?: string; // optional speaker headshot URL (paste from LinkedIn etc.)
   startAt: string;        // datetime-local value, e.g. "2026-08-01T14:00"
   endAt: string;
   sessionMinutes: number; // scheduled length, drives the CCA eligibility threshold
@@ -200,6 +201,21 @@ export interface Company {
 
 /** A company with no explicit status is admin-created and counts as approved. */
 export const isApprovedCompany = (c: Company) => !c.status || c.status === "approved";
+
+/**
+ * A self-service employer registration request (doc id = lowercased email).
+ * A non-QIU visitor submits this; an admin approves it, which whitelists them as
+ * an employer with the given company — no more entering emails one by one.
+ */
+export interface EmployerSignup {
+  email: string;
+  name: string;
+  company: string;
+  contact?: string;
+  status: "pending" | "approved";
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
 
 /**
  * Portal-wide settings an admin can edit from the Settings panel — no code

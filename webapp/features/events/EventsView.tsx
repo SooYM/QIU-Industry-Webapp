@@ -106,22 +106,6 @@ export function EventsView({
         <div className="empty"><strong>No events yet</strong><p>{canManageEvents ? "Add the first event to get started." : "Events will appear here soon."}</p></div>
       )}
 
-      {!canManageEvents && myAttendance.length > 0 && (
-        <section className="local-jobs" aria-labelledby="my-attendance-title">
-          <div className="local-jobs-head"><div><span className="detail-label">MY ATTENDANCE</span><h3 id="my-attendance-title">Events you attended</h3></div><strong>{myAttendance.length}</strong></div>
-          <div className="local-job-list">
-            {myAttendance.map((a) => (
-              <div className="local-job" key={a.id}>
-                <span>
-                  <b>{a.eventTitle} {a.caEligible ? <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">CCA eligible</span> : a.checkOutMs ? <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-danger">Below threshold</span> : <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Checked in</span>}</b>
-                  <small>{a.durationMinutes != null ? `${a.durationMinutes} min attended` : "In progress — check out before you leave"}</small>
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {formOpen && <EventForm editing={editing} userEmail={userEmail} defaultRotateSeconds={settings.qrRotateSeconds} onClose={() => { setFormOpen(false); setEditing(null); }} />}
       {presenting && <EventPresenter event={presenting} rotateSeconds={presenting.qrRotateSeconds ?? settings.qrRotateSeconds} ccaSettings={{ ccaPercent: settings.ccaPercent, ccaFloorMinutes: settings.ccaFloorMinutes }} onClose={() => setPresenting(null)} />}
       {viewing && <EventAttendance event={viewing} onClose={() => setViewing(null)} />}

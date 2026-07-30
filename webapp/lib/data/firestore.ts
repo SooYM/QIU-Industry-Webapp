@@ -6,7 +6,7 @@ import {
   setDoc, updateDoc, where, type Firestore,
 } from "firebase/firestore";
 import { db } from "../../app/firebase-client";
-import type { AppSettings, Application, Attendance, ChatLog, Company, EventCode, EventItem, Job, Resume, ViewEvent } from "./types";
+import type { AppSettings, Application, Attendance, ChatLog, Company, EmployerSignup, EventCode, EventItem, Job, Resume, ViewEvent } from "./types";
 
 export const COLLECTIONS = {
   users: "users",
@@ -22,6 +22,7 @@ export const COLLECTIONS = {
   jobStats: "job_stats",
   companies: "companies",
   settings: "app_settings",
+  signups: "employer_signups",
 } as const;
 
 /** Fallback settings before the settings doc loads (or if an admin hasn't saved any). */
@@ -293,4 +294,40 @@ export function subscribeSettings(onData: (settings: AppSettings) => void) {
 export async function saveSettings(settings: AppSettings) {
   await setDoc(doc(requireDb(), COLLECTIONS.settings, SETTINGS_DOC),
     { ...clean(settings), updatedAt: serverTimestamp() }, { merge: true });
+}
+
+// ---- Employer self-registration --------------------------------------------
+
+/** A non-QIU visitor submits their own signup (doc id = lowercased email). */
+export async function submitSignup(email: string, data: { name: string; company: string; contact?: string }) {
+  const id = email.trim().toLowerCase();
+  await setDoc(doc(requireDb(), COLLECTIONS.signups, id), {
+    email: id, name: data.name.trim(), company: data.company.trim(),
+    ...(data.contact?.trim() ? { contact: data.contact.trim() } : {}),
+    status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+/** Watch a single visitor's own signup (so they can see approval status). */
+export function subscribeMySignup(email: string, onData: (s: EmployerSignup | null) => void) {
+  return onSnapshot(doc(requireDb(), COLLECTIONS.signups, email.trim().toLowerCase()),
+    (snap) => onData(snap.exists() ? (snap.data() as EmployerSignup) : null), () => onData(null));
+}
+
+/** Admin: every pending/approved signup request. */
+export function subscribeSignups(onData: (rows: EmployerSignup[]) => void) {
+  return onSnapshot(collection(requireDb(), COLLECTIONS.signups), (snap) => onData(snap.docs.map((d) => d.data() as EmployerSignup)));
+}
+
+/** Admin approves a signup: whitelist the email as an employer with their company. */
+export async function approveSignup(signup: EmployerSignup, approverEmail: string) {
+  const database = requireDb();
+  await setDoc(doc(database, COLLECTIONS.whitelist, signup.email), {
+    email: signup.email, role: "employer", company: signup.company, active: true, addedBy: approverEmail, updatedAt: serverTimestamp(),
+  }, { merge: true });
+  await updateDoc(doc(database, COLLECTIONS.signups, signup.email), { status: "approved", updatedAt: serverTimestamp() });
+}
+
+export async function deleteSignup(email: string) {
+  await deleteDoc(doc(requireDb(), COLLECTIONS.signups, email.trim().toLowerCase()));
 }

@@ -16,6 +16,8 @@ import { VacancyFilters } from "../features/vacancies/VacancyFilters";
 import { VacancyList } from "../features/vacancies/VacancyList";
 import { VacancyModal } from "../features/vacancies/VacancyModal";
 import { AdminPanel } from "../features/admin/AdminPanel";
+import { AdminSummary } from "../features/admin/AdminSummary";
+import { EmployerSummary } from "../features/admin/EmployerSummary";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
 import { HomeView } from "../features/home/HomeView";
@@ -24,10 +26,10 @@ import { EventDetail } from "../features/events/EventDetail";
 import { Guide } from "../features/Guide";
 import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
 
-type Tab = "home" | "vacancies" | "history" | "resume" | "events";
+type Tab = "summary" | "home" | "vacancies" | "history" | "resume" | "events" | "dashboard";
 
 export default function Home() {
-  const { user, role, course } = useAuth();
+  const { user, role, course, company: employerCompany } = useAuth();
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
   const [tab, setTab] = useState<Tab>("home");
   const [myApplications, setMyApplications] = useState<Application[]>([]);
@@ -47,7 +49,6 @@ export default function Home() {
   const [theme, setTheme] = useState<Theme>("light");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [adminOpen, setAdminOpen] = useState(false);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
   const [sort, setSort] = useState<"default" | "newest" | "oldest" | "salary_high" | "salary_low">("default");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
@@ -143,7 +144,7 @@ export default function Home() {
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setSelectedJob(null); setAdminOpen(false); setSelectedEvent(null); }
+      if (event.key === "Escape") { setSelectedJob(null); setSelectedEvent(null); }
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
@@ -165,7 +166,7 @@ export default function Home() {
     try { if (!localStorage.getItem(k)) { setGuideOpen(true); localStorage.setItem(k, "1"); } } catch { /* ignore */ }
   }, [user, role]);
 
-  const isAnyModalOpen = Boolean(selectedJob || adminOpen || selectedEvent || guideOpen);
+  const isAnyModalOpen = Boolean(selectedJob || selectedEvent || guideOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -189,13 +190,27 @@ export default function Home() {
   const canManageJobs = canManageVacancies(role);
   const isStudent = !canManageJobs;
 
-  // Tab order (Home · Events · My Resume · Vacancies · History for students),
-  // filtered by the admin feature toggles. Managers get a focused subset.
+  // Students: Home · Events · My Resume · Vacancies · History (toggle-gated).
+  // Managers: a Summary landing + Dashboard tab (no modal button), plus the shared
+  // browse tabs. Summary/Dashboard are always on for managers.
   const visibleTabs = useMemo(() => {
+    if (!isStudent) {
+      const toggleable: [Tab, string][] = ([["home", "Home"], ["events", "Events"], ["vacancies", "Vacancies"]] as [Tab, string][])
+        .filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
+      return [["summary", "Summary"] as [Tab, string], ...toggleable, ["dashboard", role === "employer" ? "Dashboard" : "Admin tools"] as [Tab, string]];
+    }
     const studentTabs: [Tab, string][] = [["home", "Home"], ["events", "Events"], ["resume", "My Resume"], ["vacancies", "Vacancies"], ["history", "History"]];
-    const managerTabs: [Tab, string][] = [["home", "Home"], ["vacancies", "Vacancies"], ["events", "Events"]];
-    return (isStudent ? studentTabs : managerTabs).filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
-  }, [isStudent, settings.tabs]);
+    return studentTabs.filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
+  }, [isStudent, role, settings.tabs]);
+
+  // Managers land on the Summary page first (before Home); students keep Home.
+  const didInitTab = useRef(false);
+  useEffect(() => {
+    if (didInitTab.current || !role) return;
+    didInitTab.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (canManageVacancies(role)) setTab("summary");
+  }, [role]);
 
   // If the active tab gets toggled off (or isn't available for this role), fall back.
   useEffect(() => {
@@ -279,7 +294,6 @@ export default function Home() {
         <div className="header-actions">
           <button className="icon-button" onClick={() => setGuideOpen(true)} aria-label="How to use this portal" title="Guide">?</button>
           <button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}>{theme === "light" ? "☾" : "☀"}</button>
-          {canManageJobs && <button className="admin-button" onClick={() => setAdminOpen(true)}>{role === "employer" ? "Employer dashboard" : "Admin dashboard"}</button>}
           <AuthAccount />
         </div>
       </header>
@@ -302,6 +316,18 @@ export default function Home() {
             onClick={() => setTab(key)}>{label}</button>
         ))}
       </nav>
+
+      {tab === "summary" && !isStudent && (
+        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
+          {role === "employer" ? <EmployerSummary companies={employerCompany ? [employerCompany] : []} /> : <AdminSummary />}
+        </section>
+      )}
+
+      {tab === "dashboard" && !isStudent && (
+        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
+          <AdminPanel onCreated={() => { resetFilters(); setTab("vacancies"); }} customJobs={customJobs} companies={companies} specializations={specializations} types={types} />
+        </section>
+      )}
 
       {tab === "home" && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
@@ -349,6 +375,7 @@ export default function Home() {
             jobs={visibleJobs}
             isStudent={isStudent}
             course={course}
+            appliedIds={appliedJobIds}
             columns={columns}
             currentPage={currentPage}
             pageCount={pageCount}
@@ -364,7 +391,7 @@ export default function Home() {
 
       {tab === "history" && isStudent && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <StudentHistory jobs={jobs} applications={myApplications} views={myViews} onOpen={setSelectedJob} />
+          <StudentHistory jobs={jobs} applications={myApplications} views={myViews} attendance={myAttendance} onOpen={setSelectedJob} />
         </section>
       )}
 
@@ -380,7 +407,7 @@ export default function Home() {
         </section>
       )}
 
-      <footer>{brand}<p>{settings.portalTagline}</p>{canManageJobs && <button onClick={() => setAdminOpen(true)}>Admin tools</button>}</footer>
+      <footer>{brand}<p>{settings.portalTagline}</p></footer>
 
       {selectedJob && (
         <VacancyModal
@@ -395,18 +422,6 @@ export default function Home() {
           onWithdraw={() => withdrawFromJob(selectedJob)}
           onGoToResume={() => { setSelectedJob(null); setTab("resume"); }}
           onClose={() => setSelectedJob(null)}
-        />
-      )}
-
-      {canManageJobs && (
-        <AdminPanel
-          open={adminOpen}
-          onClose={() => setAdminOpen(false)}
-          onCreated={() => { resetFilters(); setAdminOpen(false); }}
-          customJobs={customJobs}
-          companies={companies}
-          specializations={specializations}
-          types={types}
         />
       )}
 

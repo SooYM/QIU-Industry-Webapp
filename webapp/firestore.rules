@@ -169,13 +169,14 @@ service cloud.firestore {
 
     function validEvent(data) {
       return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'qrRotateSeconds', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'speakerPhotoUrl', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'qrRotateSeconds', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.description is string && data.description.size() <= 5000
         && data.location is string && data.location.size() <= 200
         && data.speakerName is string && data.speakerName.size() <= 200
         && data.speakerLinks is list && data.speakerLinks.size() <= 10
+        && (!('speakerPhotoUrl' in data) || (data.speakerPhotoUrl is string && data.speakerPhotoUrl.size() <= 2048))
         && data.startAt is string && data.startAt.size() <= 40
         && data.endAt is string && data.endAt.size() <= 40
         && data.sessionMinutes is int && data.sessionMinutes >= 0 && data.sessionMinutes <= 1440
@@ -373,6 +374,31 @@ service cloud.firestore {
     match /app_settings/{docId} {
       allow read: if isAllowedUser();
       allow write: if isAdmin() && validSettings(request.resource.data);
+    }
+
+    // Self-service employer registration. Any verified Google user may submit /
+    // read / edit ONLY their own request (doc id = their email); admins review.
+    // Approving it whitelists the email as an employer, so admins no longer add
+    // external emails one by one.
+    match /employer_signups/{emailId} {
+      allow read: if isAuthenticated() && (emailId == request.auth.token.email.lower() || isAdmin());
+      // The visitor creates/edits their own pending request…
+      allow create: if isAuthenticated()
+        && emailId == request.auth.token.email.lower()
+        && request.resource.data.email == request.auth.token.email.lower()
+        && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 160
+        && request.resource.data.company is string && request.resource.data.company.size() > 0 && request.resource.data.company.size() <= 200
+        && (!('contact' in request.resource.data) || (request.resource.data.contact is string && request.resource.data.contact.size() <= 200))
+        && request.resource.data.status == 'pending';
+      // …the owner may resubmit (stays pending); an admin may mark it approved.
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && emailId == request.auth.token.email.lower()
+          && request.resource.data.email == request.auth.token.email.lower()
+          && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'status', 'createdAt', 'updatedAt'])
+          && request.resource.data.status == 'pending');
+      allow delete: if isAdmin();
     }
 
     match /{document=**} {

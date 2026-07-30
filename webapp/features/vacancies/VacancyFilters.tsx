@@ -53,17 +53,17 @@ export function VacancyFilters({
       {isStudent && (
         <>
           <div className="mt-4 rounded-xl p-3.5 panel-accent transition-colors">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-accent">🎓 Your course</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-accent">🎓 Your profile</span>
             {programmeLabel
               ? <div className="mt-1 text-xs font-bold text-success">{programmeLabel}</div>
-              : <div className="mt-1 text-[11px] font-medium text-accent">Course not detected from your directory profile — showing all vacancies.</div>}
+              : <div className="mt-1 text-[11px] font-medium text-accent">Programme not detected from your directory profile — showing all vacancies.</div>}
           </div>
 
           <label className="field">
-            <span>Course recommendation</span>
+            <span>Profile recommendation</span>
             <select value={recommendationMode} onChange={(e) => onRecommendationMode(e.target.value as RecommendationMode)}>
               <option value="all">All vacancies (matches first)</option>
-              <option value="recommended">🌟 Recommended for my course only</option>
+              <option value="recommended">🌟 Recommended for my profile only</option>
             </select>
           </label>
         </>

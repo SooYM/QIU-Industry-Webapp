@@ -7,6 +7,7 @@ export function VacancyList({
   jobs,
   isStudent,
   course,
+  appliedIds,
   columns,
   currentPage,
   pageCount,
@@ -19,6 +20,7 @@ export function VacancyList({
   jobs: Job[];
   isStudent: boolean;
   course: string | null;
+  appliedIds?: Set<number>;
   columns: number;
   currentPage: number;
   pageCount: number;
@@ -37,6 +39,7 @@ export function VacancyList({
               key={job.id}
               job={job}
               recommended={isStudent && jobMatchesCourse(job, course)}
+              applied={isStudent && Boolean(appliedIds?.has(job.id))}
               showStatus={!isStudent}
               onGlow={onGlow}
               onOpen={onSelect}

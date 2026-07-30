@@ -121,7 +121,7 @@ function CompanyDetail({ company, jobs, isStudent, course, onOpenJob, onClose }:
                 return (
                   <button type="button" key={j.id} className={`company-vacancy${matched ? " is-recommended" : ""}`} onClick={() => onOpenJob(j)}>
                     <span><b>{j.title}</b><small>{j.type} · {j.location} · {j.specialization}</small></span>
-                    {matched && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Matches your course</span>}
+                    {matched && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Matches your profile</span>}
                     <span className="view-job">View →</span>
                   </button>
                 );

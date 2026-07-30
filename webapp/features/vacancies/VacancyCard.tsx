@@ -5,12 +5,14 @@ import { formatSalary, jobStatusMeta } from "./vacancy-utils";
 export function VacancyCard({
   job,
   recommended = false,
+  applied = false,
   showStatus = false,
   onGlow,
   onOpen,
 }: {
   job: Job;
   recommended?: boolean;
+  applied?: boolean;
   showStatus?: boolean;
   onGlow: (event: PointerEvent<HTMLElement>) => void;
   onOpen: (job: Job) => void;
@@ -22,7 +24,10 @@ export function VacancyCard({
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`type ${job.type.toLowerCase().includes("intern") ? "intern" : ""}`}>{job.type}</span>
           {recommended && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Recommended for your course</span>
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Recommended for your profile</span>
+          )}
+          {applied && (
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">✓ Applied</span>
           )}
           {status && (
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${status.tone}`}>{status.label}</span>

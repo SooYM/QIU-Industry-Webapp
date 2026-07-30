@@ -140,7 +140,7 @@ export function VacancyModal({
           <div className="flex items-center gap-2 mb-1">
             <span className={`type ${job.type.toLowerCase().includes("intern") ? "intern" : ""}`}>{job.type}</span>
             {recommended && (
-              <span className="rounded-lg px-2 py-0.5 text-xs font-bold tone-success">🌟 Recommended for your course</span>
+              <span className="rounded-lg px-2 py-0.5 text-xs font-bold tone-success">🌟 Recommended for your profile</span>
             )}
           </div>
           <h2 id="job-detail-title">{job.title}</h2>
@@ -197,9 +197,9 @@ export function VacancyModal({
                 )}
                 <button type="button" className="enquire-main" onClick={() => {
                   const label = resumeChoice === "generated" ? "generated CV" : "resume link";
-                  if (window.confirm(`Your ${label} will be shared with ${job.company} and QIU (Quest International University) for this application. Continue?`)) onApply?.(resumeChoice);
+                  if (window.confirm(`Consent to apply\n\nBy applying, you agree to share your ${label}, name and email address with ${job.company} (the employer) and Quest International University, to be used for recruitment and QIU Industry Day purposes.\n\nDo you want to continue?`)) onApply?.(resumeChoice);
                 }}>Apply to this vacancy →</button>
-                <small className="text-accent">By applying, your {hasGeneratedResume && hasResumeLink ? "chosen resume" : hasGeneratedResume ? "generated CV" : "resume link"} is shared with <b>{job.company}</b> and <b>QIU</b>.</small>
+                <small className="text-accent">By applying, you consent to sharing your {hasGeneratedResume && hasResumeLink ? "chosen resume" : hasGeneratedResume ? "generated CV" : "resume link"}, name and email with <b>{job.company}</b> and <b>QIU</b> for recruitment purposes.</small>
               </>
             ) : (
               <>

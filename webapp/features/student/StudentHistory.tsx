@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Application, Job, ViewEvent } from "../../lib/data/types";
+import type { Application, Attendance, Job, ViewEvent } from "../../lib/data/types";
 import { deleteApplication } from "../../lib/data/firestore";
 
 /** Firestore Timestamp → readable date, tolerant of the pending serverTimestamp. */
@@ -19,16 +19,21 @@ export function StudentHistory({
   jobs,
   applications,
   views,
+  attendance = [],
   onOpen,
 }: {
   jobs: Job[];
   applications: Application[];
   views: ViewEvent[];
+  attendance?: Attendance[];
   onOpen: (job: Job) => void;
 }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const matchJob = (title: string, company: string) => !q || title.toLowerCase().includes(q) || company.toLowerCase().includes(q);
+  const attended = [...attendance]
+    .filter((a) => !q || (a.eventTitle ?? "").toLowerCase().includes(q))
+    .sort((a, b) => (b.checkInMs ?? 0) - (a.checkInMs ?? 0));
   const byId = new Map(jobs.map((job) => [job.id, job]));
   const sortedApps = [...applications].filter((a) => matchJob(a.jobTitle, a.company)).sort((a, b) => whenValue(b.appliedAt) - whenValue(a.appliedAt));
   const sortedViews = [...views].filter((v) => matchJob(v.jobTitle, v.company)).sort((a, b) => whenValue(b.viewedAt) - whenValue(a.viewedAt));
@@ -76,6 +81,17 @@ export function StudentHistory({
         {sortedViews.length
           ? <div className="local-job-list">{sortedViews.map((v) => row(`view-${v.id}`, v.jobId, v.jobTitle, v.company, v.viewedAt))}</div>
           : <div className="admin-jobs-empty"><strong>Nothing viewed yet</strong><p>Vacancies you open will appear here.</p></div>}
+      </section>
+
+      <section className="local-jobs" aria-labelledby="history-events-title">
+        <div className="local-jobs-head"><div><span className="detail-label">EVENTS ATTENDED</span><h3 id="history-events-title">Events you attended</h3></div><strong>{attended.length}</strong></div>
+        {attended.length
+          ? <div className="local-job-list">{attended.map((a) => (
+              <div className="local-job" key={`att-${a.id}`}>
+                <span><b>{a.eventTitle} {a.caEligible ? <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">CCA eligible</span> : a.checkOutMs ? <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-danger">Below threshold</span> : <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Checked in</span>}</b><small>{a.durationMinutes != null ? `${a.durationMinutes} min attended` : "In progress — check out before you leave"}</small></span>
+              </div>
+            ))}</div>
+          : <div className="admin-jobs-empty"><strong>No events attended yet</strong><p>Scan the QR at an event to check in — your attendance shows here.</p></div>}
       </section>
     </section>
   );

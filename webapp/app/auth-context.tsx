@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, FormEvent, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -12,6 +12,8 @@ import {
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryCourse, PEOPLE_SCOPE } from "../lib/auth/course-directory";
+import { approveSignup, deleteSignup, submitSignup, subscribeMySignup, subscribeSignups } from "../lib/data/firestore";
+import type { EmployerSignup } from "../lib/data/types";
 import {
   isAllowedAccessEmail,
   isAllowedQiuEmail,
@@ -28,6 +30,7 @@ type AuthContextValue = {
   company: string | null;
   loading: boolean;
   error: string;
+  needsRegistration: boolean; // signed-in non-QIU visitor who isn't whitelisted yet
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -68,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [course, setCourse] = useState<string | null>(null);
   const [company, setCompany] = useState<string | null>(null);
+  const [needsRegistration, setNeedsRegistration] = useState(false);
   const [loading, setLoading] = useState(isFirebaseConfigured);
   const [error, setError] = useState(isFirebaseConfigured ? "" : "Firebase has not been configured for this deployment.");
 
@@ -95,14 +99,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fallback to empty whitelist if network fails
       }
 
-      if (!nextUser.emailVerified || !isAllowedAccessEmail(nextUser.email, whitelisted)) {
+      if (!nextUser.emailVerified) {
         await firebaseSignOut(activeAuth);
         setUser(null);
         setRole(null);
-        setError("Access is limited to verified @qiu.edu.my accounts or accounts approved by the Super Admin.");
+        setError("Please verify your Google account email, then sign in again.");
         setLoading(false);
         return;
       }
+
+      // Non-QIU, not-yet-approved visitors are kept signed in so they can submit a
+      // registration request (handled by AuthGate → RegisterGate) instead of being
+      // turned away. Everything else in Firestore stays denied to them by the rules.
+      if (!isAllowedAccessEmail(nextUser.email, whitelisted)) {
+        setUser(nextUser);
+        setRole(null);
+        setCourse(null);
+        setCompany(null);
+        setNeedsRegistration(true);
+        setLoading(false);
+        return;
+      }
+      setNeedsRegistration(false);
 
       try {
         const userRef = doc(activeDb, "users", nextUser.uid);
@@ -166,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     company,
     loading,
     error,
+    needsRegistration,
     signIn: async () => {
       if (!auth || !isFirebaseConfigured) {
         setError("Firebase has not been configured for this deployment.");
@@ -202,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       if (auth) await firebaseSignOut(auth);
     },
-  }), [company, course, error, loading, role, user]);
+  }), [company, course, error, loading, needsRegistration, role, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
@@ -214,21 +233,76 @@ export function useAuth() {
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { user, loading, error, signIn } = useAuth();
+  const { user, loading, error, needsRegistration, signIn } = useAuth();
 
   if (loading) return <AuthStatus title="Checking access" detail="Confirming your account permissions…" loading />;
   if (!user) {
     return <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
         <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><img className="brand-logo" src="/qiu-logo.png" alt="QIU" /><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
-        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Use your @qiu.edu.my Google account or a Superadmin approved external account.</p></div>
+        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Students &amp; staff: use your @qiu.edu.my Google account. Companies: sign in with any Google account and register to attend.</p></div>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with Google account</button>
-        <small className="auth-boundary">Allowed: @qiu.edu.my or Superadmin Whitelisted Accounts</small>
+        <small className="auth-boundary">QIU accounts get in instantly · external companies register for admin approval</small>
       </section>
     </main>;
   }
+  if (needsRegistration) return <RegisterGate />;
   return <>{children}</>;
+}
+
+/** Non-QIU visitor: submit an employer registration, then wait for admin approval. */
+function RegisterGate() {
+  const { user, signOut } = useAuth();
+  const email = user?.email ?? "";
+  const [signup, setSignup] = useState<EmployerSignup | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [name, setName] = useState(user?.displayName ?? "");
+  const [companyName, setCompanyName] = useState("");
+  const [contact, setContact] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!email) return;
+    return subscribeMySignup(email, (s) => { setSignup(s); setLoaded(true); });
+  }, [email]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
+    setBusy(true);
+    try { await submitSignup(email, { name, company: companyName, contact }); setMessage(""); }
+    catch { setMessage("Could not submit your registration. Please try again."); }
+    finally { setBusy(false); }
+  }
+
+  const pending = signup && signup.status === "pending";
+
+  return <main className="auth-screen"><section className="auth-card" aria-labelledby="register-title">
+    <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><img className="brand-logo" src="/qiu-logo.png" alt="QIU" /><span>Industry <span>Day 2026</span></span></a>
+    {!loaded ? <p className="auth-status" role="status">Loading…</p>
+      : pending ? (
+        <div className="auth-copy">
+          <span className="detail-label">REGISTRATION RECEIVED</span>
+          <h1 id="register-title">Thanks, {signup!.name.split(" ")[0]} — you&apos;re in the queue</h1>
+          <p>We&apos;ve received your registration for <b>{signup!.company}</b>. An admin will review and approve it shortly. You&apos;ll get employer access on your next sign-in after approval.</p>
+          <button className="google-sign-in" type="button" onClick={signOut} style={{ marginTop: "1rem" }}>Sign out</button>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="auth-copy">
+          <span className="detail-label">COMPANY REGISTRATION</span>
+          <h1 id="register-title">Register your company</h1>
+          <p>Signed in as <b>{email}</b>. Tell us about your company — an admin approves it, then you can add your profile and vacancies.</p>
+          <label className="register-field">Your name<input value={name} onChange={(e) => setName(e.target.value)} required maxLength={160} /></label>
+          <label className="register-field">Company name<input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={200} placeholder="e.g. Acme Sdn Bhd" /></label>
+          <label className="register-field">Contact (phone / website) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
+          {message && <p className="auth-error" role="alert">{message}</p>}
+          <button className="google-sign-in" type="submit" disabled={busy}>{busy ? "Submitting…" : "Submit registration"}</button>
+          <button className="auth-secondary" type="button" onClick={signOut}>Cancel &amp; sign out</button>
+        </form>
+      )}
+  </section></main>;
 }
 
 function AuthStatus({ title, detail, loading = false }: { title: string; detail: string; loading?: boolean }) {
@@ -262,8 +336,15 @@ export function RoleManager() {
   const [newRole, setNewRole] = useState<UserRole>("employer");
   const [newCompany, setNewCompany] = useState("");
   const [userQuery, setUserQuery] = useState("");
+  const [signups, setSignups] = useState<EmployerSignup[]>([]);
 
   const canManageRoles = role === "superadmin" || role === "admin";
+  useEffect(() => { if (canManageRoles && db) return subscribeSignups(setSignups); }, [canManageRoles]);
+  const pendingSignups = signups.filter((s) => s.status === "pending");
+  async function approveRegistration(s: EmployerSignup) {
+    try { await approveSignup(s, normalizeEmail(user?.email)); setMessage(`Approved ${s.company}.`); }
+    catch { setMessage(`Could not approve ${s.company}.`); }
+  }
   useEffect(() => {
     if (!canManageRoles || !db) return;
     const activeDb = db;
@@ -383,6 +464,28 @@ export function RoleManager() {
                 ))}
               </div>
             )}
+          </div>
+        </details>
+      )}
+
+      {canManageRoles && (
+        <details className="access-approve panel-accent" open={pendingSignups.length > 0}>
+          <summary><span>🏢 Company registration requests</span><small>{pendingSignups.length} pending</small></summary>
+          <div className="access-approve-body">
+            <p>Companies that registered themselves. Approving one whitelists them as an employer with their company — no need to add emails one by one.</p>
+            {pendingSignups.length ? (
+              <div className="access-approved-list">
+                {pendingSignups.map((s) => (
+                  <div key={s.email} className="access-approved-row">
+                    <span><b>{s.company}</b> <span className="role-pill">employer</span><small> · {s.name} · {s.email}{s.contact ? ` · ${s.contact}` : ""}</small></span>
+                    <span className="flex gap-2">
+                      <button type="button" className="save-job" style={{ minHeight: "2.1rem", padding: "0 .7rem" }} onClick={() => approveRegistration(s)}>Approve</button>
+                      <button type="button" className="access-revoke" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email); }}>Reject</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-accent text-xs">No pending registrations.</p>}
           </div>
         </details>
       )}
