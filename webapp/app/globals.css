@@ -234,11 +234,12 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .exhibitor-card { display:flex; flex-direction:column; gap:.55rem; padding:1.2rem; background:var(--surface); border:1px solid var(--line); border-radius:.9rem; box-shadow:var(--shadow); cursor:pointer; transition:border-color .15s,transform .15s; }
 .exhibitor-card:hover { border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); transform:translateY(-2px); }
 .exhibitor-card h3 { margin:.1rem 0 0; font-size:1.02rem; letter-spacing:-.02em; color:var(--navy); }
-/* Whole logo, never distorted or cropped (object-fit:contain). The tile flips
-   light/dark per logo (auto-detected or admin-set) so both dark-ink and
-   white-ink transparent logos stay visible; full-width keeps wide wordmarks
-   legible instead of shrinking into a square. */
-.exhibitor-logo-wrap { width:100%; height:6rem; display:grid; place-items:center; border:1px solid var(--line); border-radius:.7rem; overflow:hidden; padding:.7rem 1rem; }
+/* Uniform 1:1 frame for every exhibitor. The logo sits INSIDE at its true
+   aspect ratio (object-fit:contain) — centred, never cropped or stretched — so
+   mismatched source logos all present consistently. The tile flips light/dark
+   per logo (auto-detected or admin-set) so dark-ink and white-ink transparent
+   logos both stay visible. */
+.exhibitor-logo-wrap { width:8.5rem; height:8.5rem; margin:0 auto; display:grid; place-items:center; border:1px solid var(--line); border-radius:.8rem; overflow:hidden; padding:.9rem; }
 .exhibitor-logo-wrap img { max-width:100%; max-height:100%; object-fit:contain; }
 .exhibitor-logo-fallback { font-family:var(--font-geist-mono),monospace; font-weight:800; font-size:1.6rem; color:var(--blue); }
 .exhibitor-logo-lg { width:3.4rem; height:3.4rem; flex:none; object-fit:contain; border:1px solid var(--line); border-radius:.6rem; padding:.35rem; }
