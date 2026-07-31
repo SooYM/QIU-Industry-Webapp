@@ -58,6 +58,7 @@ export interface Application {
 export interface ViewEvent {
   id: string;              // `${studentUid}_${jobId}`
   studentUid: string;
+  studentEmployeeId?: string; // Workspace employee/student ID, stamped at view
   jobId: number;
   jobTitle: string;
   company: string;
@@ -116,6 +117,7 @@ export interface Resume {
 export interface ChatLog {
   id: string;
   studentUid: string;
+  studentEmployeeId?: string; // Workspace employee/student ID, stamped at chat
   studentEmail: string;
   studentName: string;
   company: string | null;  // detected company the question is about, if any

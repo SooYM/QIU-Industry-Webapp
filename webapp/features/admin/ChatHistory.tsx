@@ -24,11 +24,13 @@ function AllChats() {
 
   const q = query.trim().toLowerCase();
   const shown = q ? logs.filter((l) => [l.studentName, l.studentEmail, l.company, l.question, l.answer].some((f) => (f ?? "").toLowerCase().includes(q))) : logs;
-  const groups = new Map<string, { name: string; email: string; items: ChatLog[] }>();
+  const groups = new Map<string, { name: string; email: string; employeeId?: string; items: ChatLog[] }>();
   for (const l of shown) {
     const key = l.studentUid || l.studentEmail || "unknown";
-    if (!groups.has(key)) groups.set(key, { name: l.studentName, email: l.studentEmail, items: [] });
-    groups.get(key)!.items.push(l);
+    if (!groups.has(key)) groups.set(key, { name: l.studentName, email: l.studentEmail, employeeId: l.studentEmployeeId, items: [] });
+    const g = groups.get(key)!;
+    if (!g.employeeId && l.studentEmployeeId) g.employeeId = l.studentEmployeeId;
+    g.items.push(l);
   }
   const grouped = [...groups.values()]
     .map((g) => ({ ...g, items: g.items.sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt)) }))
@@ -36,8 +38,8 @@ function AllChats() {
 
   function exportCsv() {
     if (!shown.length) { notify("Nothing to export.", "error"); return; }
-    const rows = shown.map((l) => [l.studentName, l.studentEmail, l.company ?? "", l.question, l.answer, csvWhen(l.createdAt)]);
-    downloadCsv(`chat-history-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "About company", "Question", "Answer", "When"], rows));
+    const rows = shown.map((l) => [l.studentName, l.studentEmail, l.studentEmployeeId ?? "", l.company ?? "", l.question, l.answer, csvWhen(l.createdAt)]);
+    downloadCsv(`chat-history-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "Employee ID", "About company", "Question", "Answer", "When"], rows));
     notify(`Exported ${shown.length} chat${shown.length === 1 ? "" : "s"}.`);
   }
 
@@ -48,7 +50,7 @@ function AllChats() {
       {loading ? <p className="role-manager-state" role="status">Loading chats…</p>
         : grouped.length ? grouped.map((g) => (
           <details className="student-group" key={g.email || g.name}>
-            <summary className="student-group-head"><b>{g.name || g.email || "Unknown"}</b><small>{g.email} · {g.items.length} question{g.items.length === 1 ? "" : "s"}</small></summary>
+            <summary className="student-group-head"><b>{g.name || g.email || "Unknown"}</b><small>{g.email}{g.employeeId ? ` · ID ${g.employeeId}` : ""} · {g.items.length} question{g.items.length === 1 ? "" : "s"}</small></summary>
             {g.items.map((log) => (
               <div className="local-job" key={log.id} style={{ alignItems: "flex-start" }}>
                 <span>

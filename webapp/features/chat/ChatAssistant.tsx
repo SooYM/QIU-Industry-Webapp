@@ -17,7 +17,7 @@ export function ChatAssistant({
   onClose: () => void;
   onSelectSource: (job: Job) => void;
 }) {
-  const { user } = useAuth();
+  const { user, employeeId } = useAuth();
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Ask me to compare jobs, find internships, or explain a listed company profile. I only use the supplied vacancy records." },
@@ -47,6 +47,7 @@ export function ChatAssistant({
       logChat({
         id: `${user.uid}_${Date.now()}`,
         studentUid: user.uid,
+        ...(employeeId ? { studentEmployeeId: employeeId } : {}),
         studentEmail: user.email ?? "",
         studentName: user.displayName || user.email || "Anonymous",
         company,

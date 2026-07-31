@@ -40,7 +40,7 @@ function answerAboutJob(question: string, job: Job): string {
 
 /** Grounded assistant scoped to a SINGLE job. Streams the answer and auto-scrolls. */
 function JobAssistant({ job }: { job: Job }) {
-  const { user } = useAuth();
+  const { user, employeeId } = useAuth();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -78,6 +78,7 @@ function JobAssistant({ job }: { job: Job }) {
     if (user) {
       logChat({
         id: `${user.uid}_${Date.now()}`, studentUid: user.uid,
+        ...(employeeId ? { studentEmployeeId: employeeId } : {}),
         studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Anonymous",
         company: job.company, question, answer,
       }).catch(() => { /* best-effort */ });

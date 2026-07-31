@@ -156,9 +156,10 @@ export default function Home() {
     if (!selectedJob || !user || canManageVacancies(role)) return;
     recordView({
       id: `${user.uid}_${selectedJob.id}`, studentUid: user.uid,
+      ...(employeeId ? { studentEmployeeId: employeeId } : {}),
       jobId: selectedJob.id, jobTitle: selectedJob.title, company: selectedJob.company,
     }).catch(() => { /* View logging is best-effort. */ });
-  }, [selectedJob, user, role]);
+  }, [selectedJob, user, role, employeeId]);
 
   // Show the role-specific guide once per account on first sign-in.
   useEffect(() => {

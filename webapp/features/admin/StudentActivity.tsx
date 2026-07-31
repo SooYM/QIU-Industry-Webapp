@@ -71,7 +71,7 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
 
   // View events carry only a uid — label them with the name/email seen in
   // applications where possible so admins can tell who viewed what.
-  const nameByUid = new Map(apps.map((a) => [a.studentUid, { name: a.studentName, email: a.studentEmail }]));
+  const nameByUid = new Map(apps.map((a) => [a.studentUid, { name: a.studentName, email: a.studentEmail, employeeId: a.studentEmployeeId }]));
   const viewsScoped = q
     ? views.filter((v) => [v.jobTitle, v.company, nameByUid.get(v.studentUid)?.name, nameByUid.get(v.studentUid)?.email].some((f) => (f ?? "").toLowerCase().includes(q)))
     : views;
@@ -93,8 +93,8 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
   }
   function exportViews() {
     if (!viewsScoped.length) { notify("Nothing to export.", "error"); return; }
-    const rows = viewsScoped.map((v) => [nameByUid.get(v.studentUid)?.name ?? "", nameByUid.get(v.studentUid)?.email ?? "", v.studentUid, v.jobTitle, v.company, csvWhen(v.viewedAt)]);
-    downloadCsv(`job-views-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "UID", "Job viewed", "Company", "Viewed at"], rows));
+    const rows = viewsScoped.map((v) => [nameByUid.get(v.studentUid)?.name ?? "", nameByUid.get(v.studentUid)?.email ?? "", v.studentEmployeeId ?? nameByUid.get(v.studentUid)?.employeeId ?? "", v.studentUid, v.jobTitle, v.company, csvWhen(v.viewedAt)]);
+    downloadCsv(`job-views-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "Employee ID", "UID", "Job viewed", "Company", "Viewed at"], rows));
     notify(`Exported ${viewsScoped.length} view${viewsScoped.length === 1 ? "" : "s"}.`);
   }
 

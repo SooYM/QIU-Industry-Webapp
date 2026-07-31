@@ -32,7 +32,7 @@ function answerAboutCompany(question: string, company: Company, jobs: Job[]): st
 
 /** Grounded assistant scoped to a SINGLE company. Streams the answer and auto-scrolls. */
 function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) {
-  const { user } = useAuth();
+  const { user, employeeId } = useAuth();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -59,7 +59,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
     };
     window.setTimeout(stream, 60);
     if (user) {
-      logChat({ id: `${user.uid}_${Date.now()}`, studentUid: user.uid, studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Anonymous", company: company.name, question, answer }).catch(() => {});
+      logChat({ id: `${user.uid}_${Date.now()}`, studentUid: user.uid, ...(employeeId ? { studentEmployeeId: employeeId } : {}), studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Anonymous", company: company.name, question, answer }).catch(() => {});
     }
   }
 
