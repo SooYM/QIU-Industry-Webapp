@@ -153,6 +153,10 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .job-assistant-toggle:hover { background:var(--blue-hover); }
 .job-assistant-toggle>span { color:var(--color-on-primary); }
 .job-assistant-messages { margin-top:.85rem; max-height:24rem; overflow-y:auto; display:flex; flex-direction:column; gap:.6rem; padding-right:.25rem; }
+.chat-disclaimer { margin-top:.5rem; text-align:center; color:var(--muted); font-size:.66rem; }
+.data-export { margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--line); }
+.export-buttons { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.6rem; }
+.export-buttons .admin-button small { color:var(--muted); font-weight:600; }
 
 /* Grouped-by-student headers in the admin chat/activity viewers. */
 .student-group { margin-top:1rem; }
@@ -308,6 +312,9 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 
 /* Chat/assistant typed text must stay legible in any surface. */
 .chat-form input { color:var(--ink); }
+/* User bubbles sit on a solid blue fill — force white so RichText children
+   (links, bold, code) can never render dark-on-blue and vanish. */
+.message.user, .message.user * { color:#fff; }
 
 /* Dashboard rendered inline as a tab (no modal chrome). */
 .admin-inline { width:100%; max-width:none; max-height:none; box-shadow:none; border-radius:0; overflow:visible; padding:2rem clamp(1.25rem,3.5vw,3.5rem); }

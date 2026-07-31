@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import type { EventItem } from "../../lib/data/types";
+import { eventSpecializations } from "../../lib/data/types";
 import { saveEvent } from "../../lib/data/firestore";
 import { normalizeEmail } from "../../app/auth-policy";
 import { Modal } from "../../components/Modal";
@@ -27,9 +28,9 @@ const PREDEFINED_SPECS = [
   "Telecommunications",
 ];
 
-type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds"> & { customSpecialization?: string };
+type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds" | "specialization" | "specializations"> & { specializations: string[]; customSpecialization?: string };
 
-const emptyDraft: Draft = { title: "", description: "", location: "", speakerName: "", startAt: "", endAt: "", sessionMinutes: 60 };
+const emptyDraft: Draft = { title: "", description: "", location: "", speakerName: "", startAt: "", endAt: "", sessionMinutes: 60, specializations: [] };
 
 /** Minutes between two datetime-local strings (0 when invalid or non-positive). */
 function minutesBetween(start: string, end: string) {
@@ -47,13 +48,17 @@ function addMinutes(start: string, mins: number) {
 }
 
 export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }: { editing: EventItem | null; userEmail: string; defaultRotateSeconds: number; onClose: () => void }) {
-  const [draft, setDraft] = useState<Draft>(editing
-    ? {
-        title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes,
-        specialization: editing.specialization && PREDEFINED_SPECS.includes(editing.specialization) ? editing.specialization : (editing.specialization ? "Other" : undefined),
-        customSpecialization: editing.specialization && !PREDEFINED_SPECS.includes(editing.specialization) ? editing.specialization : undefined
-      }
-    : emptyDraft);
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (!editing) return emptyDraft;
+    const all = eventSpecializations(editing);
+    const known = all.filter((s) => PREDEFINED_SPECS.includes(s));
+    const custom = all.filter((s) => !PREDEFINED_SPECS.includes(s));
+    return {
+      title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes,
+      specializations: custom.length ? [...known, "Other"] : known,
+      customSpecialization: custom.join(", ") || undefined,
+    };
+  });
   const [presentersText, setPresentersText] = useState((editing?.presenters ?? []).join(", "));
   const [speakerLinksText, setSpeakerLinksText] = useState((editing?.speakerLinks ?? []).join("\n"));
   const [speakerPhoto, setSpeakerPhoto] = useState(editing?.speakerPhotoUrl ?? "");
@@ -66,6 +71,10 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
     if (editing && !window.confirm("Save changes to this event? Students who already checked in will see the updated details.")) return;
     const presenters = Array.from(new Set(presentersText.split(/[\s,;]+/).map((e) => normalizeEmail(e)).filter(Boolean)));
     const speakerLinks = Array.from(new Set(speakerLinksText.split(/[\s,]+/).map((l) => l.trim()).filter(Boolean))).slice(0, 10);
+    // Resolve the checked specializations, expanding "Other" to the custom values.
+    const specializations = Array.from(new Set(draft.specializations.flatMap((s) =>
+      s === "Other" ? (draft.customSpecialization ?? "").split(",").map((v) => v.trim()).filter(Boolean) : [s],
+    )));
     const record: EventItem = {
       id: editing?.id ?? Date.now(),
       title: draft.title.trim(),
@@ -74,7 +83,7 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       speakerName: draft.speakerName.trim(),
       speakerLinks,
       ...(speakerPhoto.trim() ? { speakerPhotoUrl: speakerPhoto.trim() } : {}),
-      ...(draft.specialization ? { specialization: draft.specialization === "Other" ? (draft.customSpecialization?.trim() ?? "Other") : draft.specialization } : {}),
+      ...(specializations.length ? { specializations } : {}),
       startAt: draft.startAt,
       endAt: draft.endAt,
       sessionMinutes: minutesBetween(draft.startAt, draft.endAt),
@@ -95,25 +104,30 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       <form onSubmit={submit} className="admin-form">
         <label className="full">Event title<input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
         <label className="full"><span className="field-label">Description</span><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
-        <label>Specialization
-          <select value={draft.specialization ?? ""} onChange={(e) => setDraft({ ...draft, specialization: e.target.value })}>
-            <option value="">None / Not specific</option>
-            {PREDEFINED_SPECS.map(item => <option key={item} value={item}>{item}</option>)}
-            <option value="Other">Other (Specify below)</option>
-          </select>
-        </label>
-        {draft.specialization === "Other" && (
+        <fieldset className="full"><legend className="field-label">Target specializations <small>Tick all that apply — the event is recommended to students in these fields</small></legend>
+          <div className="toggle-grid">
+            {[...PREDEFINED_SPECS, "Other"].map((item) => {
+              const on = draft.specializations.includes(item);
+              return (
+                <label key={item} className="toggle-row">
+                  <input type="checkbox" checked={on} onChange={(e) => setDraft({ ...draft, specializations: e.target.checked ? [...draft.specializations, item] : draft.specializations.filter((s) => s !== item) })} /> {item}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+        {draft.specializations.includes("Other") && (
           <label className="full">
-            <span className="field-label">Custom Specialization <small>Required for &apos;Other&apos;</small></span>
-            <input required value={draft.customSpecialization ?? ""} placeholder="e.g. Graphic Design" onChange={(e) => setDraft({ ...draft, customSpecialization: e.target.value })} />
+            <span className="field-label">Custom specialization(s) <small>Comma-separated, e.g. Graphic Design, Robotics</small></span>
+            <input required value={draft.customSpecialization ?? ""} placeholder="e.g. Graphic Design, Robotics" onChange={(e) => setDraft({ ...draft, customSpecialization: e.target.value })} />
           </label>
         )}
         <label>Starts (date &amp; time)<input type="datetime-local" required value={draft.startAt} onChange={(e) => setDraft({ ...draft, startAt: e.target.value })} /></label>
         <label>Ends (date &amp; time)<input type="datetime-local" required value={draft.endAt} onChange={(e) => setDraft({ ...draft, endAt: e.target.value })} /></label>
         <label>Location / hall<input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></label>
         <label>Session length (minutes) <small className="field-label">auto from start &amp; end — edit to move the end time</small><input type="number" min="0" value={minutesBetween(draft.startAt, draft.endAt)} disabled={!draft.startAt} onChange={(e) => setDraft({ ...draft, endAt: addMinutes(draft.startAt, Math.max(0, Number(e.target.value) || 0)) })} /></label>
-        <label>Speaker name<input value={draft.speakerName} onChange={(e) => setDraft({ ...draft, speakerName: e.target.value })} /></label>
-        <label>QR rotate (seconds)<input type="number" min="5" max="600" value={rotateSeconds} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">How often the attendance QR changes. Default {defaultRotateSeconds}s.</small></label>
+        <label>Speaker(s) / Host(s)<input value={draft.speakerName} placeholder="e.g. Jane Doe, John Smith" onChange={(e) => setDraft({ ...draft, speakerName: e.target.value })} /><small className="field-label">Separate multiple names with commas.</small></label>
+        <label>QR rotate (seconds)<input type="number" min="5" max="600" value={rotateSeconds || ""} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">How often the attendance QR changes. Default {defaultRotateSeconds}s.</small></label>
         <label className="full">Speaker photo URL <small className="field-label">Optional — paste a headshot image link (e.g. from their LinkedIn photo)</small><input type="url" value={speakerPhoto} placeholder="https://…/speaker.jpg" onChange={(e) => setSpeakerPhoto(e.target.value)} /></label>
         <div className="full"><ImagePreview url={speakerPhoto} label="Speaker photo preview" /></div>
         <label className="full"><span className="field-label">Speaker links <small>Optional — LinkedIn / portfolio URLs, one per line</small></span><textarea rows={2} value={speakerLinksText} placeholder={"https://linkedin.com/in/speaker\nhttps://speaker.dev"} onChange={(e) => setSpeakerLinksText(e.target.value)} /></label>

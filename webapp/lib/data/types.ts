@@ -128,7 +128,7 @@ export interface EventItem {
   title: string;
   description: string;
   location: string;
-  speakerName: string;
+  speakerName: string;    // one or more speakers/hosts (comma-separated when many)
   speakerLinks: string[]; // LinkedIn / portfolio URLs (replaced the old speaker email)
   speakerPhotoUrl?: string; // optional speaker headshot URL (paste from LinkedIn etc.)
   startAt: string;        // datetime-local value, e.g. "2026-08-01T14:00"
@@ -136,8 +136,15 @@ export interface EventItem {
   sessionMinutes: number; // scheduled length, drives the CCA eligibility threshold
   presenters: string[];   // extra emails allowed to present this event's QR only
   qrRotateSeconds?: number; // per-event QR rotation; falls back to the global default
-  specialization?: string; // target field: "AI & Machine Learning", etc.
+  specialization?: string;    // legacy single field (kept for older events)
+  specializations?: string[]; // target fields, e.g. ["AI & Machine Learning", "Data Analytics"]
   createdBy?: string;
+}
+
+/** An event's target fields as an array, tolerating the legacy single field. */
+export function eventSpecializations(e: Pick<EventItem, "specialization" | "specializations">): string[] {
+  if (e.specializations && e.specializations.length) return e.specializations;
+  return e.specialization ? [e.specialization] : [];
 }
 
 /**
@@ -178,6 +185,7 @@ export interface UserRecord {
   role: UserRole;
   course?: string;         // resolved course name (e.g. "Computer Science")
   courseCode?: string;     // raw directory code (e.g. "BCS")
+  employeeId?: string;     // Google Workspace employee/student ID, if present
   company?: string;        // employer's company, assigned by an admin
 }
 

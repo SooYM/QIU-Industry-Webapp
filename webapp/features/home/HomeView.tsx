@@ -66,7 +66,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
   return (
     <section className="job-assistant mt-4">
       <button type="button" className="job-assistant-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span aria-hidden="true">✦</span> Ask about {company.name} <span aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span aria-hidden="true">✦</span> Chat with AI about {company.name} <span aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <>
@@ -77,6 +77,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
             <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Ask about ${company.name}…`} aria-label="Ask about this company" />
             <button disabled={!input.trim() || streaming} aria-label="Send question">↑</button>
           </form>
+          <p className="chat-disclaimer">⚠️ AI can make mistakes — verify important details.</p>
         </>
       )}
     </section>

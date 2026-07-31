@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
+import { eventSpecializations } from "../../lib/data/types";
 import { deleteEvent } from "../../lib/data/firestore";
 import { EventForm } from "./EventForm";
 import { EventPresenter } from "./EventPresenter";
@@ -29,10 +30,12 @@ function when(iso: string) {
 }
 
 function eventMatchesCourse(event: EventItem, course: string | null): boolean {
-  if (!course || !event.specialization) return false;
+  if (!course) return false;
+  const specs = eventSpecializations(event);
+  if (!specs.length) return false;
   const pattern = courseToSpecializationPattern(course);
   if (!pattern) return false;
-  return pattern.test(event.specialization);
+  return specs.some((s) => pattern.test(s));
 }
 
 export function EventsView({
@@ -103,15 +106,15 @@ export function EventsView({
                 <h2>{ev.title}</h2>
                 <p className="text-accent text-xs">{when(ev.startAt)} → {when(ev.endAt)}{ev.location ? ` · ${ev.location}` : ""}</p>
                 <div className="event-speaker">
-                  <span className="detail-label">SPEAKER</span>
+                  <span className="detail-label">SPEAKER(S)</span>
                   <div className="event-speaker-row">
                     <SpeakerAvatar photo={ev.speakerPhotoUrl} name={ev.speakerName} />
                     <p className="text-sm">{ev.speakerName ? <b>{ev.speakerName}</b> : <span className="text-accent">To be announced</span>}{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
                   </div>
                 </div>
-                {ev.specialization && (
+                {eventSpecializations(ev).length > 0 && (
                   <div className="event-specs">
-                    <span className="exhibitor-tag">{ev.specialization}</span>
+                    {eventSpecializations(ev).map((s) => <span key={s} className="exhibitor-tag">{s}</span>)}
                     {isStudent && eventMatchesCourse(ev, course) && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Relevant to you</span>}
                   </div>
                 )}

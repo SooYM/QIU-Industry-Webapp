@@ -11,7 +11,7 @@ import {
 } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
-import { fetchDirectoryCourse, PEOPLE_SCOPE } from "../lib/auth/course-directory";
+import { fetchDirectoryProfile, PEOPLE_SCOPE } from "../lib/auth/course-directory";
 import { submitSignup, subscribeMySignup } from "../lib/data/firestore";
 import type { EmployerSignup } from "../lib/data/types";
 import { ImagePreview } from "../components/ImagePreview";
@@ -212,13 +212,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const scopedResult = await reauthenticateWithPopup(result.user, scoped);
             const token = GoogleAuthProvider.credentialFromResult(scopedResult)?.accessToken;
             if (token) {
-              const resolved = await fetchDirectoryCourse(token);
+              const { course: resolved, employeeId } = await fetchDirectoryProfile(token);
+              const patch: Record<string, unknown> = {};
               // Only a recognised QIU programme counts. Staff/lecturers (or any
               // unmatched directory value) leave the course blank.
-              if (resolved && resolved.code) {
-                await setDoc(doc(db, "users", result.user.uid), { course: resolved.name, courseCode: resolved.code }, { merge: true });
-                setCourse(resolved.name);
-              }
+              if (resolved && resolved.code) { patch.course = resolved.name; patch.courseCode = resolved.code; }
+              if (employeeId) patch.employeeId = employeeId;
+              if (Object.keys(patch).length) await setDoc(doc(db, "users", result.user.uid), patch, { merge: true });
+              if (resolved && resolved.code) setCourse(resolved.name);
             }
           } catch { /* Directory lookup is best-effort; keep the stored course. */ }
         }

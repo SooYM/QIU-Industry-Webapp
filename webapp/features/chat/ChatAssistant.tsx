@@ -59,11 +59,11 @@ export function ChatAssistant({
   if (!open) return null;
 
   return (
-    <div className="chat-shell" role="dialog" aria-label="Grounded job assistant">
-      <div className="chat-head"><div><span className="chat-icon" aria-hidden="true">✦</span><div><strong>Job Assistant <span className="ml-1 rounded px-1.5 py-0.5 text-[9px] font-extrabold tone-neutral">⚡ SLM-Lite v1.0</span></strong><small><i></i> On-Device Small Language Model RAG</small></div></div><button onClick={onClose} aria-label="Close assistant">×</button></div>
+    <div className="chat-shell" role="dialog" aria-label="Chat with AI">
+      <div className="chat-head"><div><span className="chat-icon" aria-hidden="true">✦</span><div><strong>Chat with AI <span className="ml-1 rounded px-1.5 py-0.5 text-[9px] font-extrabold tone-neutral">⚡ SLM-Lite v1.0</span></strong><small><i></i> On-Device Small Language Model RAG</small></div></div><button onClick={onClose} aria-label="Close assistant">×</button></div>
       <div className="chat-messages" ref={chatMessagesRef} aria-live="polite">{messages.map((message, index) => <div key={index} className={`message ${message.role}`}><RichText content={message.content} />{message.sources && message.sources.length > 0 && <div className="sources"><span>Sources</span>{message.sources.slice(0, 3).map(source => <button key={source.id} onClick={() => onSelectSource(source)}>{source.title} · {source.company}</button>)}</div>}</div>)}</div>
       <form className="chat-form" onSubmit={askAssistant}><input value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder="Ask about jobs, salaries, internships…" aria-label="Your question"/><button disabled={!chatInput.trim()} aria-label="Send question">↑</button></form>
-      <div className="chat-boundary">Powered by SLM-Lite v1.0 (On-Device RAG Transformer)</div>
+      <div className="chat-boundary">⚠️ AI can make mistakes — verify important details. Powered by SLM-Lite v1.0 (On-Device RAG).</div>
     </div>
   );
 }

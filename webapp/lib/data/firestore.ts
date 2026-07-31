@@ -2,7 +2,7 @@
 // database. Feature modules call these helpers; they never touch Firestore SDK
 // directly. Swapping backends later means reimplementing only this file.
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, increment, onSnapshot, query, serverTimestamp,
+  collection, deleteDoc, deleteField, doc, getDoc, getDocs, increment, onSnapshot, query, serverTimestamp,
   setDoc, updateDoc, where, type Firestore,
 } from "firebase/firestore";
 import { db } from "../../app/firebase-client";
@@ -251,12 +251,21 @@ export function subscribeCompanies(onData: (rows: Company[]) => void, onError?: 
   }, onError);
 }
 
+// Optional company fields that an editor can blank out. On edit, a cleared value
+// must be removed from the doc — clean() drops undefined keys, so updateDoc would
+// otherwise leave the old value (e.g. a "deleted" logo would linger).
+const COMPANY_OPTIONAL: (keyof Company)[] = ["logoUrl", "website", "videoUrl", "summary", "boothNumber"];
+
 export async function saveCompany(company: Company, isEditing: boolean, creatorEmail: string) {
   const database = requireDb();
-  const payload = { ...clean(company), updatedAt: serverTimestamp() };
   const ref = doc(database, COLLECTIONS.companies, String(company.id));
-  if (isEditing) await updateDoc(ref, payload);
-  else await setDoc(ref, { ...payload, createdBy: creatorEmail, createdAt: serverTimestamp() });
+  if (isEditing) {
+    const payload: Record<string, unknown> = { ...clean(company), updatedAt: serverTimestamp() };
+    for (const key of COMPANY_OPTIONAL) if (company[key] == null || company[key] === "") payload[key] = deleteField();
+    await updateDoc(ref, payload);
+  } else {
+    await setDoc(ref, { ...clean(company), createdBy: creatorEmail, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  }
 }
 
 export async function deleteCompany(id: number) {

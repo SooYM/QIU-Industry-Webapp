@@ -87,7 +87,7 @@ function JobAssistant({ job }: { job: Job }) {
   return (
     <section className="job-assistant">
       <button type="button" className="job-assistant-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span aria-hidden="true">✦</span> Ask about this job <span aria-hidden="true">{open ? "▲" : "▼"}</span>
+        <span aria-hidden="true">✦</span> Chat with AI about this job <span aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>
       {open && (
         <>
@@ -98,6 +98,7 @@ function JobAssistant({ job }: { job: Job }) {
             <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Ask about ${job.title}…`} aria-label="Ask about this job" />
             <button disabled={!input.trim() || streaming} aria-label="Send question">↑</button>
           </form>
+          <p className="chat-disclaimer">⚠️ AI can make mistakes — verify important details.</p>
         </>
       )}
     </section>
@@ -163,7 +164,7 @@ export function VacancyModal({
           <section><span className="detail-label">LISTING DETAILS</span><dl><div><dt>Specialization</dt><dd>{job.specialization}</dd></div><div><dt>Minimum requirement</dt><dd>{job.minimumRequirement}</dd></div><div><dt>Available places</dt><dd>{job.vacancies}</dd></div><div><dt>Pay frequency</dt><dd>{job.payFrequency}</dd></div></dl></section>
           {hasVideo && (
             <section className="mt-4">
-              <span className="detail-label flex items-center gap-1.5">🎬 CORPORATE INTRO VIDEO</span>
+              <span className="detail-label flex items-center gap-1.5">🎬 JOB VIDEO</span>
               <div className="overflow-hidden rounded-xl border border-token mt-1.5">
                 <iframe
                   src={embedUrl}
@@ -173,7 +174,7 @@ export function VacancyModal({
                   className="w-full aspect-video rounded-xl border-0"
                 />
               </div>
-              <small className="text-[11px] text-accent mt-1 block">Corporate video supplied by {job.company}.</small>
+              <small className="text-[11px] text-accent mt-1 block">Job video supplied by {job.company}.</small>
             </section>
           )}
         </div>

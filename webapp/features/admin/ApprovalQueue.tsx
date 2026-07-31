@@ -114,9 +114,10 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
               <div className="local-job" key={`sig-${s.email}`} style={{ alignItems: "flex-start" }}>
                 <span>
                   <b>{s.company} <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">New registration</span></b>
-                  <small>{s.name} · {s.email}{s.contact ? ` · ${s.contact}` : ""}{s.website ? ` · ${s.website}` : ""}</small>
+                  <small>{s.name} · <a href={`mailto:${s.email}`}>{s.email}</a>{s.contact ? ` · ${s.contact}` : ""}{s.website ? ` · ${s.website}` : ""}</small>
                 </span>
                 <div className="local-job-actions">
+                  <a className="edit-local" href={`mailto:${s.email}?subject=${encodeURIComponent(`QIU Industry Day 2026 — ${s.company} registration`)}&body=${encodeURIComponent(`Hi ${s.name},\n\nThank you for registering ${s.company} for QIU Industry Day 2026.\n\n`)}`}>✉ Contact</a>
                   <button className="edit-local" onClick={() => setPreview({ name: s.company, website: s.website, logoUrl: s.logoUrl, videoUrl: s.videoUrl, summary: s.summary })}>View</button>
                   <button className="edit-local" onClick={() => run(() => approveSignup(s, normalizeEmail(user?.email)), `Approved ${s.company} — added to exhibitors.`, "Could not approve.")}>Approve</button>
                   <button className="delete-local" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email).then(() => notify(`Rejected ${s.company}.`)); }}>Reject</button>

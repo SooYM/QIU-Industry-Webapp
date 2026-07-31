@@ -14,32 +14,48 @@ export const PEOPLE_SCOPE = "https://www.googleapis.com/auth/directory.readonly"
 type PeopleResponse = {
   organizations?: { title?: string; department?: string; name?: string }[];
   occupations?: { value?: string }[];
+  externalIds?: { value?: string; type?: string; formattedType?: string }[];
 };
 
+export interface DirectoryProfile {
+  course: { code: string; name: string } | null;
+  /** Google Workspace "Employee ID" — surfaced to admins for roster matching. */
+  employeeId: string | null;
+}
+
+/** Pull the Workspace employee ID from People API externalIds / organizations. */
+function extractEmployeeId(data: PeopleResponse): string | null {
+  const ids = data.externalIds ?? [];
+  // Prefer an entry explicitly typed as an organisation/employee id, else the first.
+  const preferred = ids.find((e) => /organ|employee|account/i.test(`${e.type ?? ""} ${e.formattedType ?? ""}`));
+  return (preferred?.value || ids[0]?.value || "").trim() || null;
+}
+
 /**
- * Fetch the raw course string from People API, or null if unavailable.
- * Never throws — directory access is best-effort.
+ * Fetch the student's directory course + employee ID from People API. Never
+ * throws — directory access is best-effort and returns nulls on any failure.
  */
-export async function fetchDirectoryCourse(accessToken: string): Promise<{ code: string; name: string } | null> {
-  if (!accessToken) return null;
+export async function fetchDirectoryProfile(accessToken: string): Promise<DirectoryProfile> {
+  const empty: DirectoryProfile = { course: null, employeeId: null };
+  if (!accessToken) return empty;
   try {
     const res = await fetch(
-      "https://people.googleapis.com/v1/people/me?personFields=organizations,occupations",
+      "https://people.googleapis.com/v1/people/me?personFields=organizations,occupations,externalIds",
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
-    if (!res.ok) return null;
+    if (!res.ok) return empty;
     const data = (await res.json()) as PeopleResponse;
+    const employeeId = extractEmployeeId(data);
     const candidates = [
       ...(data.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
       ...(data.occupations ?? []).map((o) => o.value),
     ].filter(Boolean) as string[];
     for (const candidate of candidates) {
       const resolved = resolveCourse(candidate);
-      if (resolved && resolved.code) return resolved; // a recognised code wins
+      if (resolved && resolved.code) return { course: resolved, employeeId }; // a recognised code wins
     }
-    // No recognised code — return the first free-text candidate if any.
-    return candidates.length ? resolveCourse(candidates[0]) : null;
+    return { course: candidates.length ? resolveCourse(candidates[0]) : null, employeeId };
   } catch {
-    return null;
+    return empty;
   }
 }

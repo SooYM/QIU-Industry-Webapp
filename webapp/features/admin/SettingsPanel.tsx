@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, resetAllData, saveSettings, subscribeSettings } from 
 import { useAuth } from "../../app/auth-context";
 import { normalizeEmail } from "../../app/auth-policy";
 import { notify } from "../../components/toast";
+import { DataExport } from "./DataExport";
 
 const TAB_LABELS: { key: keyof AppSettings["tabs"]; label: string }[] = [
   { key: "home", label: "Home" },
@@ -64,9 +65,9 @@ export function SettingsPanel() {
         <label className="full">Tagline<input value={form.portalTagline} maxLength={200} onChange={(e) => set({ portalTagline: e.target.value })} /><small className="field-label">Shown on the Home page and in the footer.</small></label>
 
         <div className="section-heading full"><div><span>ATTENDANCE</span><h3>QR &amp; CCA rules</h3></div></div>
-        <label>Default QR rotate (seconds)<input type="number" min="5" max="600" value={form.qrRotateSeconds} onChange={(e) => set({ qrRotateSeconds: Number(e.target.value) })} /><small className="field-label">Per-event value overrides this.</small></label>
-        <label>CCA threshold (% of session)<input type="number" min="0" max="100" value={form.ccaPercent} onChange={(e) => set({ ccaPercent: Number(e.target.value) })} /></label>
-        <label>CCA minimum minutes floor<input type="number" min="0" max="1440" value={form.ccaFloorMinutes} onChange={(e) => set({ ccaFloorMinutes: Number(e.target.value) })} /><small className="field-label">Used when an event has no set length.</small></label>
+        <label>Default QR rotate (seconds)<input type="number" min="5" max="600" value={form.qrRotateSeconds || ""} onChange={(e) => set({ qrRotateSeconds: Number(e.target.value) })} /><small className="field-label">Per-event value overrides this. Saved value is clamped to 5–600s.</small></label>
+        <label>CCA threshold (% of session)<input type="number" min="0" max="100" value={form.ccaPercent || ""} onChange={(e) => set({ ccaPercent: Number(e.target.value) })} /></label>
+        <label>CCA minimum minutes floor<input type="number" min="0" max="1440" value={form.ccaFloorMinutes || ""} onChange={(e) => set({ ccaFloorMinutes: Number(e.target.value) })} /><small className="field-label">Used when an event has no set length.</small></label>
 
         <div className="section-heading full"><div><span>SECTIONS</span><h3>Show / hide tabs</h3></div></div>
         <fieldset className="toggle-grid full">
@@ -80,6 +81,8 @@ export function SettingsPanel() {
           <div className="admin-submit"><button type="submit" className="save-job" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button></div>
         </div>
       </form>
+
+      <DataExport />
 
       {role === "superadmin" && (
         <div className="danger-zone">

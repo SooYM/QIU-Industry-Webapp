@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { subscribeAllChats, subscribeCompanyChats } from "../../lib/data/firestore";
 import type { ChatLog } from "../../lib/data/types";
+import { csvWhen, downloadCsv, toCsv } from "../../lib/data/csv";
+import { notify } from "../../components/toast";
 
 function formatWhen(ts: unknown): string {
   if (ts && typeof ts === "object" && "toDate" in ts) {
@@ -32,9 +34,16 @@ function AllChats() {
     .map((g) => ({ ...g, items: g.items.sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt)) }))
     .sort((a, b) => whenValue(b.items[0]?.createdAt) - whenValue(a.items[0]?.createdAt));
 
+  function exportCsv() {
+    if (!shown.length) { notify("Nothing to export.", "error"); return; }
+    const rows = shown.map((l) => [l.studentName, l.studentEmail, l.company ?? "", l.question, l.answer, csvWhen(l.createdAt)]);
+    downloadCsv(`chat-history-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "About company", "Question", "Answer", "When"], rows));
+    notify(`Exported ${shown.length} chat${shown.length === 1 ? "" : "s"}.`);
+  }
+
   return (
     <section className="local-jobs" aria-labelledby="chats-title">
-      <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><strong>{shown.length} from {grouped.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><div className="flex items-center gap-2"><strong>{shown.length} from {grouped.length}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!shown.length}>⬇ Export CSV</button></div></div>
       <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, company or text…" aria-label="Search chats" />
       {loading ? <p className="role-manager-state" role="status">Loading chats…</p>
         : grouped.length ? grouped.map((g) => (

@@ -1,4 +1,5 @@
 import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
+import { eventSpecializations } from "../../lib/data/types";
 import { ccaThresholdMinutes } from "../../lib/data/firestore";
 import { Modal } from "../../components/Modal";
 import { SpeakerAvatar } from "./SpeakerAvatar";
@@ -53,7 +54,7 @@ export function EventDetail({
       <div className="detail-main">
         {event.description && <section><span className="detail-label">ABOUT</span><p style={{ whiteSpace: "pre-wrap" }}>{event.description}</p></section>}
 
-        <section><span className="detail-label">SPEAKER</span>
+        <section><span className="detail-label">SPEAKER(S)</span>
           <div className="speaker-block">
             <SpeakerAvatar photo={event.speakerPhotoUrl} name={event.speakerName} className="speaker-photo" />
             <div>
@@ -77,6 +78,12 @@ export function EventDetail({
             <div><dt>CCA eligible at</dt><dd>≥ {threshold} min attended</dd></div>
           </dl>
         </section>
+
+        {eventSpecializations(event).length > 0 && (
+          <section><span className="detail-label">TARGET FIELDS</span>
+            <div className="event-specs mt-1">{eventSpecializations(event).map((s) => <span key={s} className="exhibitor-tag">{s}</span>)}</div>
+          </section>
+        )}
 
         {!canManageEvents && (
           <section>
