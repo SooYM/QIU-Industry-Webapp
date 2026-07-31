@@ -274,31 +274,40 @@ function RegisterGate() {
   const [summary, setSummary] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // Latch: once a submit is accepted by the server, stay on the pending screen
+  // even if a later snapshot momentarily returns null (transient listen error /
+  // optimistic-write race) — otherwise the form would wrongly reappear.
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!email) return;
-    return subscribeMySignup(email, (s) => { setSignup(s); setLoaded(true); });
+    // A null snapshot never clears a locally-latched submission.
+    return subscribeMySignup(email, (s) => { if (s) setSignup(s); setLoaded(true); });
   }, [email]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
     setBusy(true);
-    try { await submitSignup(email, { name, company: companyName, contact, website, logoUrl, videoUrl, summary }); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
+    // await resolves only after the server accepts the write, so it has persisted.
+    try { await submitSignup(email, { name, company: companyName, contact, website, logoUrl, videoUrl, summary }); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
     catch { setMessage("Could not submit your registration. Please try again."); notify("Could not submit registration.", "error"); }
     finally { setBusy(false); }
   }
 
-  const pending = signup && signup.status === "pending";
+  const pending = submitted || (signup !== null && signup.status === "pending");
+  const pendingName = (signup?.name || name || email).split(" ")[0];
+  const pendingCompany = signup?.company || companyName;
 
   return <main className="auth-screen"><section className="auth-card" aria-labelledby="register-title">
     <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><img className="brand-logo" src="/qiu-logo.png" alt="QIU" /><span>Industry <span>Day 2026</span></span></a>
-    {!loaded ? <p className="auth-status" role="status">Loading…</p>
+    {!loaded && !pending ? <p className="auth-status" role="status">Loading…</p>
       : pending ? (
         <div className="auth-copy">
-          <span className="detail-label">REGISTRATION RECEIVED</span>
-          <h1 id="register-title">Thanks, {signup!.name.split(" ")[0]} — you&apos;re in the queue</h1>
-          <p>We&apos;ve received your registration for <b>{signup!.company}</b>. An admin will review and approve it shortly. You&apos;ll get employer access on your next sign-in after approval.</p>
+          <span className="detail-label">⏳ WAITING FOR APPROVAL</span>
+          <h1 id="register-title">Thanks, {pendingName} — you&apos;re in the queue</h1>
+          <p>We&apos;ve received your registration{pendingCompany ? <> for <b>{pendingCompany}</b></> : ""}. Its status is <b>Pending</b> — an admin will review and approve it shortly. You&apos;ll get employer access on your next sign-in after approval.</p>
+          <p style={{ marginTop: ".5rem" }}><span className="rounded px-1.5 py-0.5 text-[11px] font-bold tone-neutral">Pending approval</span></p>
           <button className="google-sign-in" type="button" onClick={signOut} style={{ marginTop: "1rem" }}>Sign out</button>
         </div>
       ) : (
