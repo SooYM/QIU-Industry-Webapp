@@ -342,9 +342,18 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .img-preview img { max-width:14rem; max-height:8rem; object-fit:contain; border-radius:.3rem; display:block; }
 .img-preview-fail { font-size:.72rem; color:var(--danger); max-width:16rem; line-height:1.4; }
 
-/* "Applied" corner sticker on vacancy cards. */
-.job-card.is-applied { border-color:color-mix(in srgb,var(--success) 45%,var(--line)); }
-.applied-ribbon { position:absolute; top:.85rem; right:-2.6rem; transform:rotate(45deg); background:var(--success); color:#fff; font-size:.6rem; font-weight:900; letter-spacing:.12em; padding:.28rem 2.8rem; box-shadow:0 .2rem .5rem rgba(0,0,0,.2); z-index:2; pointer-events:none; }
+/* "Applied" rubber stamp on vacancy cards — obvious, inked-on look. */
+.job-card.is-applied { border-color:color-mix(in srgb,var(--success) 55%,var(--line)); }
+.applied-stamp { position:absolute; top:.55rem; right:.5rem; width:6rem; z-index:3; transform:rotate(-13deg); pointer-events:none; opacity:.9; }
+.applied-stamp svg { width:100%; height:auto; display:block; overflow:visible; }
+.applied-stamp ellipse { fill:none; stroke:#2f9e41; stroke-width:4; }
+.applied-stamp ellipse.inner { stroke-width:1.6; }
+.applied-stamp text { fill:#2f9e41; font-weight:900; font-family:var(--font-geist-sans),system-ui,sans-serif; text-anchor:middle; }
+.applied-stamp text.star { font-size:15px; }
+.applied-stamp text.dots { font-size:12px; letter-spacing:1px; }
+.applied-stamp text:not(.star):not(.dots) { font-size:20px; letter-spacing:1.5px; }
+:root[data-theme="dark"] .applied-stamp ellipse,:root[data-theme="dark"] .applied-stamp text { stroke:#4ec765; fill:#4ec765; }
+:root[data-theme="dark"] .applied-stamp ellipse { fill:none; }
 
 /* Summary bar charts. */
 .bar-list { display:flex; flex-direction:column; gap:.55rem; margin-top:.7rem; }

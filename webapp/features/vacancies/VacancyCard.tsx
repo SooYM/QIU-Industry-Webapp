@@ -20,7 +20,19 @@ export function VacancyCard({
   const status = showStatus ? jobStatusMeta(job) : null;
   return (
     <article className={`job-card${recommended ? " is-recommended" : ""}${applied ? " is-applied" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${applied ? " — you have applied" : ""}${recommended ? " — recommended for your profile" : ""}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
-      {applied && <span className="applied-ribbon" aria-hidden="true">APPLIED</span>}
+      {applied && (
+        <span className="applied-stamp" aria-hidden="true">
+          <svg viewBox="0 0 140 84">
+            <ellipse cx="70" cy="42" rx="66" ry="38" />
+            <ellipse cx="70" cy="42" rx="58" ry="31" className="inner" />
+            <text x="70" y="50">APPLIED</text>
+            <text x="19" y="49" className="star">★</text>
+            <text x="121" y="49" className="star">★</text>
+            <text x="70" y="22" className="dots">· · · · ·</text>
+            <text x="70" y="76" className="dots">· · · · ·</text>
+          </svg>
+        </span>
+      )}
       <div className="card-top">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`type ${job.type.toLowerCase().includes("intern") ? "intern" : ""}`}>{job.type}</span>
