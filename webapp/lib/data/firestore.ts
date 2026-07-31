@@ -247,9 +247,7 @@ export function subscribeAttendance(onData: (rows: Attendance[]) => void, studen
 
 export function subscribeCompanies(onData: (rows: Company[]) => void, onError?: () => void) {
   return onSnapshot(collection(requireDb(), COLLECTIONS.companies), (snap) => {
-    onData(snap.docs.map((d) => d.data() as Company).sort(
-      (a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name),
-    ));
+    onData(snap.docs.map((d) => d.data() as Company).sort((a, b) => a.name.localeCompare(b.name)));
   }, onError);
 }
 

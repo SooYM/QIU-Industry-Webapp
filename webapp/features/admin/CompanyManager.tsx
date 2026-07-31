@@ -6,8 +6,8 @@ import { ImagePreview } from "../../components/ImagePreview";
 import { notify } from "../../components/toast";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
-type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; order: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
-const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", order: "", boothNumber: "", logoBackground: "auto" };
+type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
+const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", logoBackground: "auto" };
 
 /**
  * Exhibitor editor. Admins manage every company (edit / delete / clear all;
@@ -34,7 +34,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
 
   function fill(c: Company) {
     setEditingId(c.id);
-    setDraft({ name: c.name, website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", order: c.order != null ? String(c.order) : "", boothNumber: c.boothNumber ?? "", logoBackground: c.logoBackground ?? "auto" });
+    setDraft({ name: c.name, website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", logoBackground: c.logoBackground ?? "auto" });
   }
 
   async function submit(event: FormEvent) {
@@ -49,7 +49,6 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
       logoUrl: draft.logoUrl.trim() || undefined,
       videoUrl: draft.videoUrl.trim() || undefined,
       summary: draft.summary.trim() || undefined,
-      order: draft.order.trim() ? Number(draft.order) : undefined,
       // Booth is a venue/organiser concern — admins set it; employers keep any existing value.
       boothNumber: employer ? existing?.boothNumber : (draft.boothNumber.trim() || undefined),
       logoBackground: draft.logoBackground,
@@ -146,10 +145,7 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
     <form onSubmit={onSubmit} className="admin-form">
       {showName && <label className="full">Company name<input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>}
       <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
-      {showBooth
-        ? <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>
-        : <label>Display order<input type="number" value={draft.order} placeholder="e.g. 1" onChange={(e) => setDraft({ ...draft, order: e.target.value })} /></label>}
-      {showBooth && <label>Display order<input type="number" value={draft.order} placeholder="e.g. 1" onChange={(e) => setDraft({ ...draft, order: e.target.value })} /></label>}
+      {showBooth && <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>}
       <label className="full">Logo image URL
         <span className="register-logo-row"><input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /><button type="button" className="reset-admin-filters register-logo-btn" onClick={() => setDraft({ ...draft, logoUrl: logoFromWebsite(draft.website) })} disabled={!draft.website.trim()}>From website</button></span>
         <small className="field-label">Auto-fetches the brand logo from the website — or paste your own link.</small>

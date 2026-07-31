@@ -191,7 +191,6 @@ export interface Company {
   logoUrl?: string;
   videoUrl?: string;       // YouTube corporate video URL
   summary?: string;
-  order?: number;          // manual sort weight (lower first)
   boothNumber?: string;    // booth/stand number at the venue
   logoBackground?: "auto" | "light" | "dark"; // tile behind the logo; auto = detect
   /** Employer submissions are gated; admin listings publish immediately. Absent = approved. */

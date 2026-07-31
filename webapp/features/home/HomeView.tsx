@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Company, Job } from "../../lib/data/types";
 import { isApprovedCompany } from "../../lib/data/types";
 import { getYouTubeEmbedUrl } from "../../app/auth-policy";
@@ -187,7 +187,19 @@ export function HomeView({
   onOpenJob: (job: Job) => void;
 }) {
   const [selected, setSelected] = useState<Company | null>(null);
-  const visible = companies.filter(isApprovedCompany);
+  const [sort, setSort] = useState<"az" | "za" | "booth">("az");
+  const visible = useMemo(() => {
+    const rows = companies.filter(isApprovedCompany);
+    const byName = (a: Company, b: Company) => a.name.localeCompare(b.name, undefined, { numeric: true });
+    if (sort === "za") return rows.slice().sort((a, b) => byName(b, a));
+    if (sort === "booth") return rows.slice().sort((a, b) => {
+      // Booth-less companies sink to the bottom; the rest sort naturally (A12 before A100).
+      if (!a.boothNumber) return b.boothNumber ? 1 : byName(a, b);
+      if (!b.boothNumber) return -1;
+      return a.boothNumber.localeCompare(b.boothNumber, undefined, { numeric: true }) || byName(a, b);
+    });
+    return rows.slice().sort(byName);
+  }, [companies, sort]);
 
   return (
     <section className="results" aria-labelledby="home-title">
@@ -196,7 +208,18 @@ export function HomeView({
         <p>{settings.portalTagline}</p>
       </div>
 
-      <div className="section-heading"><div><span>EXHIBITORS</span><h2>Companies attending</h2></div></div>
+      <div className="section-heading">
+        <div><span>EXHIBITORS</span><h2>Companies attending</h2></div>
+        {visible.length > 1 && (
+          <label className="event-sort">Sort
+            <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort companies">
+              <option value="az">Name A → Z</option>
+              <option value="za">Name Z → A</option>
+              <option value="booth">Booth number</option>
+            </select>
+          </label>
+        )}
+      </div>
 
       {visible.length ? (
         <div className="exhibitor-grid">
