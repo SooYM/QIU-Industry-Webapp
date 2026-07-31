@@ -313,6 +313,7 @@ For specific operational domain guides, consult the dedicated specifications:
 - **[SECURITY_AND_RULES.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SECURITY_AND_RULES.md)**: Security Model, Firestore Security Rules & 30s Dynamic QR Math
 - **[DATA_MODELS_AND_SCHEMAS.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md)**: Data Dictionary, TypeScript Interfaces & Firestore Collections
 - **[FEATURE_MODULES_GUIDE.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/FEATURE_MODULES_GUIDE.md)**: Feature Modules Technical Specification
+- **[CODEBASE_FILE_MAP.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/CODEBASE_FILE_MAP.md)**: Exhaustive File-by-File Technical Code Map & Section-by-Section Code Block Breakdown
 
 ---
 

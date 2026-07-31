@@ -29,6 +29,9 @@ This repository maintains comprehensive, multi-page technical documentation for 
 5. **[FEATURE_MODULES_GUIDE.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/FEATURE_MODULES_GUIDE.md)** *(Feature Modules Technical Specification)*  
    Detailed technical guide covering Home Directory RAG, logo luminance analysis (`useLogoBackdrop.ts`), employer self-registration queue, admin sub-tabs, generated CV engine (`cv-download.ts`), global toast system, image preview component, and events anti-cheat module.
 
+6. **[CODEBASE_FILE_MAP.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/CODEBASE_FILE_MAP.md)** *(Exhaustive File-by-File Technical Code Map)*  
+   Comprehensive file-by-file code map documenting every source, component, domain model, security rule, configuration, script, and test suite file with detailed section-by-section code block breakdowns.
+
 ---
 
 ## Brand & Visual Identity: Signature QIU-Red Design System
