@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import type { User } from "firebase/auth";
 import { deleteResume, saveResume } from "../../lib/data/firestore";
-import { hasGeneratedCV, type Resume, type ResumeProfile } from "../../lib/data/types";
+import { hasGeneratedCV, type Application, type Resume, type ResumeProfile } from "../../lib/data/types";
 import { GeneratedCV } from "./GeneratedCV";
 import { notify } from "../../components/toast";
 
@@ -14,10 +14,14 @@ export function StudentResume({
   user,
   course,
   myResume,
+  applications = [],
+  onWithdrawApplications,
 }: {
   user: User;
   course: string | null;
   myResume: Resume | null;
+  applications?: Application[];
+  onWithdrawApplications?: (ids: string[]) => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -63,8 +67,15 @@ export function StudentResume({
     }
   }
 
+  // Applications that shared a given resume — withdrawn when that resume is removed,
+  // since the employer can no longer see what the student applied with. Older
+  // applications predate resumeChoice and are treated as the generated CV.
+  const appsUsing = (choice: "generated" | "link") => applications.filter((a) => (a.resumeChoice ?? "generated") === choice);
+  const withdrawNote = (n: number) => (n ? ` ${n} application${n === 1 ? "" : "s"} that shared it withdrawn.` : "");
+
   async function clearGeneratedCV() {
-    if (!confirm("Remove your generated CV? Your entered details will be cleared.")) return;
+    const affected = appsUsing("generated");
+    if (!confirm(`Remove your generated CV? Your entered details will be cleared.${affected.length ? ` This also withdraws ${affected.length} application${affected.length === 1 ? "" : "s"} that shared it.` : ""}`)) return;
     setBusy(true);
     report("Clearing your generated CV…");
     try {
@@ -73,14 +84,25 @@ export function StudentResume({
         course: course ?? undefined, fileUrl: myResume?.fileUrl, fileName: myResume?.fileName,
         source: myResume?.fileUrl ? "link" : "generated", profile: {},
       });
+      if (affected.length) await onWithdrawApplications?.(affected.map((a) => a.id));
       setProfile({ ...emptyProfile });
       setLinksText("");
-      done("Generated CV cleared.");
+      done(`Generated CV cleared.${withdrawNote(affected.length)}`);
     } catch {
       done("Could not clear your generated CV. Please try again.", true);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function removeLink() {
+    const affected = appsUsing("link");
+    if (!confirm(`Remove your submitted resume link?${affected.length ? ` This also withdraws ${affected.length} application${affected.length === 1 ? "" : "s"} that shared it.` : ""}`)) return;
+    try {
+      await deleteResume(user.uid);
+      if (affected.length) await onWithdrawApplications?.(affected.map((a) => a.id));
+      notify(`Resume link removed.${withdrawNote(affected.length)}`);
+    } catch { notify("Could not remove.", "error"); }
   }
 
   async function submitLink(event: FormEvent) {
@@ -123,7 +145,7 @@ export function StudentResume({
           <div className={`resume-status ${linkOnFile ? "ready" : ""}`}>
             <strong>{linkOnFile ? "✓ Resume link on file" : "No resume link yet"}</strong>
             {linkOnFile
-              ? <div className="local-job-actions"><a className="admin-button" href={myResume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a><button type="button" className="delete-local" onClick={() => { if (confirm("Remove your submitted resume link?")) deleteResume(user.uid).then(() => notify("Resume link removed.")).catch(() => notify("Could not remove.", "error")); }}>Remove</button></div>
+              ? <div className="local-job-actions"><a className="admin-button" href={myResume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a><button type="button" className="delete-local" onClick={removeLink}>Remove</button></div>
               : <small>Optional — paste one below.</small>}
           </div>
         </div>

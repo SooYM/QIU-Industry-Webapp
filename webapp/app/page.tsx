@@ -266,6 +266,12 @@ export default function Home() {
       .catch(() => notify("Could not withdraw. Please try again.", "error"));
   }
 
+  // Withdraw a set of applications at once — used when removing a resume that was
+  // shared with those employers (see StudentResume).
+  async function withdrawApplications(ids: string[]) {
+    await Promise.all(ids.map((id) => deleteApplication(id)));
+  }
+
   function applyToJob(job: Job, choice: "generated" | "link") {
     if (!user || !myResume) return; // must have a resume on file before applying
     recordApplication({
@@ -402,7 +408,7 @@ export default function Home() {
 
       {tab === "resume" && isStudent && user && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <StudentResume user={user} course={course} myResume={myResume} />
+          <StudentResume user={user} course={course} myResume={myResume} applications={myApplications} onWithdrawApplications={withdrawApplications} />
         </section>
       )}
 
