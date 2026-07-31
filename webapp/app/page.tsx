@@ -408,7 +408,7 @@ export default function Home() {
 
       {tab === "events" && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} settings={settings} onOpenEvent={setSelectedEvent} />
+          <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} settings={settings} course={course} isStudent={isStudent} onOpenEvent={setSelectedEvent} />
         </section>
       )}
 

@@ -6,7 +6,28 @@ import { Modal } from "../../components/Modal";
 import { ImagePreview } from "../../components/ImagePreview";
 import { notify } from "../../components/toast";
 
-type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds">;
+const PREDEFINED_SPECS = [
+  "AI & Machine Learning",
+  "Cybersecurity",
+  "Web Development",
+  "Data Analytics",
+  "Software Engineering",
+  "Networking & Cloud",
+  "Accounting",
+  "Finance",
+  "Business & Management",
+  "Hospitality & Tourism",
+  "Marketing",
+  "Engineering",
+  "Food Technology",
+  "Education",
+  "Psychology & HR",
+  "Pharmacy & Healthcare",
+  "Design & Multimedia",
+  "Telecommunications",
+];
+
+type Draft = Omit<EventItem, "id" | "createdBy" | "presenters" | "speakerLinks" | "qrRotateSeconds"> & { customSpecialization?: string };
 
 const emptyDraft: Draft = { title: "", description: "", location: "", speakerName: "", startAt: "", endAt: "", sessionMinutes: 60 };
 
@@ -27,7 +48,11 @@ function addMinutes(start: string, mins: number) {
 
 export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }: { editing: EventItem | null; userEmail: string; defaultRotateSeconds: number; onClose: () => void }) {
   const [draft, setDraft] = useState<Draft>(editing
-    ? { title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes }
+    ? {
+        title: editing.title, description: editing.description, location: editing.location, speakerName: editing.speakerName, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes,
+        specialization: editing.specialization && PREDEFINED_SPECS.includes(editing.specialization) ? editing.specialization : (editing.specialization ? "Other" : undefined),
+        customSpecialization: editing.specialization && !PREDEFINED_SPECS.includes(editing.specialization) ? editing.specialization : undefined
+      }
     : emptyDraft);
   const [presentersText, setPresentersText] = useState((editing?.presenters ?? []).join(", "));
   const [speakerLinksText, setSpeakerLinksText] = useState((editing?.speakerLinks ?? []).join("\n"));
@@ -49,6 +74,7 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       speakerName: draft.speakerName.trim(),
       speakerLinks,
       ...(speakerPhoto.trim() ? { speakerPhotoUrl: speakerPhoto.trim() } : {}),
+      ...(draft.specialization ? { specialization: draft.specialization === "Other" ? (draft.customSpecialization?.trim() ?? "Other") : draft.specialization } : {}),
       startAt: draft.startAt,
       endAt: draft.endAt,
       sessionMinutes: minutesBetween(draft.startAt, draft.endAt),
@@ -69,6 +95,19 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       <form onSubmit={submit} className="admin-form">
         <label className="full">Event title<input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
         <label className="full"><span className="field-label">Description</span><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
+        <label>Specialization
+          <select value={draft.specialization ?? ""} onChange={(e) => setDraft({ ...draft, specialization: e.target.value })}>
+            <option value="">None / Not specific</option>
+            {PREDEFINED_SPECS.map(item => <option key={item} value={item}>{item}</option>)}
+            <option value="Other">Other (Specify below)</option>
+          </select>
+        </label>
+        {draft.specialization === "Other" && (
+          <label className="full">
+            <span className="field-label">Custom Specialization <small>Required for &apos;Other&apos;</small></span>
+            <input required value={draft.customSpecialization ?? ""} placeholder="e.g. Graphic Design" onChange={(e) => setDraft({ ...draft, customSpecialization: e.target.value })} />
+          </label>
+        )}
         <label>Starts (date &amp; time)<input type="datetime-local" required value={draft.startAt} onChange={(e) => setDraft({ ...draft, startAt: e.target.value })} /></label>
         <label>Ends (date &amp; time)<input type="datetime-local" required value={draft.endAt} onChange={(e) => setDraft({ ...draft, endAt: e.target.value })} /></label>
         <label>Location / hall<input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></label>

@@ -136,6 +136,7 @@ export interface EventItem {
   sessionMinutes: number; // scheduled length, drives the CCA eligibility threshold
   presenters: string[];   // extra emails allowed to present this event's QR only
   qrRotateSeconds?: number; // per-event QR rotation; falls back to the global default
+  specialization?: string; // target field: "AI & Machine Learning", etc.
   createdBy?: string;
 }
 

@@ -129,7 +129,8 @@ export function VacancyModal({
   onGoToResume?: () => void;
   onClose: () => void;
 }) {
-  const hasVideo = Boolean(job.youtubeUrl && job.youtubeUrl.trim());
+  const embedUrl = getYouTubeEmbedUrl(job.youtubeUrl);
+  const hasVideo = Boolean(embedUrl);
   const hasResume = hasGeneratedResume || hasResumeLink;
   // Default the choice to whichever the student has (generated preferred when both).
   const [resumeChoice, setResumeChoice] = useState<"generated" | "link">(hasGeneratedResume ? "generated" : "link");
@@ -165,7 +166,7 @@ export function VacancyModal({
               <span className="detail-label flex items-center gap-1.5">🎬 CORPORATE INTRO VIDEO</span>
               <div className="overflow-hidden rounded-xl border border-token mt-1.5">
                 <iframe
-                  src={getYouTubeEmbedUrl(job.youtubeUrl)}
+                  src={embedUrl}
                   title={`${job.company} Corporate Video`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen

@@ -91,7 +91,7 @@ function CompanyDetail({ company, jobs, isStudent, course, onOpenJob, onClose }:
   onOpenJob: (job: Job) => void;
   onClose: () => void;
 }) {
-  const hasVideo = Boolean(company.videoUrl && company.videoUrl.trim());
+  const embedUrl = getYouTubeEmbedUrl(company.videoUrl);
   const backdrop = useLogoBackdrop(company.logoUrl, company.logoBackground ?? "auto");
   const companyJobs = jobs.filter((j) => j.company === company.name && isApproved(j));
 
@@ -130,11 +130,11 @@ function CompanyDetail({ company, jobs, isStudent, course, onOpenJob, onClose }:
           ) : <p className="text-accent text-sm">No vacancies listed from this company yet.</p>}
         </section>
 
-        {hasVideo && (
+        {embedUrl && (
           <section className="mt-4">
             <span className="detail-label">🎬 CORPORATE VIDEO</span>
             <div className="overflow-hidden rounded-xl border border-token mt-1.5">
-              <iframe src={getYouTubeEmbedUrl(company.videoUrl)} title={`${company.name} corporate video`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full aspect-video rounded-xl border-0" />
+              <iframe src={embedUrl} title={`${company.name} corporate video`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full aspect-video rounded-xl border-0" />
             </div>
           </section>
         )}
@@ -145,11 +145,11 @@ function CompanyDetail({ company, jobs, isStudent, course, onOpenJob, onClose }:
   );
 }
 
-function ExhibitorCard({ company, onOpen }: { company: Company; onOpen: () => void }) {
+function ExhibitorCard({ company, onOpen, recommended }: { company: Company; onOpen: () => void; recommended?: boolean }) {
   const backdrop = useLogoBackdrop(company.logoUrl, company.logoBackground ?? "auto");
   const [logoOk, setLogoOk] = useState(true);
   return (
-    <article className="exhibitor-card" role="button" tabIndex={0}
+    <article className={`exhibitor-card ${recommended ? "recommended" : ""}`} role="button" tabIndex={0}
       aria-label={`View ${company.name}`}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}>
@@ -165,6 +165,7 @@ function ExhibitorCard({ company, onOpen }: { company: Company; onOpen: () => vo
         {company.website && <span className="exhibitor-tag">🌐 Website</span>}
         {company.videoUrl && <span className="exhibitor-tag">🎬 Video</span>}
       </div>
+      {recommended && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success mt-1">🌟 Has vacancies matching your profile</span>}
       <p className="view-job mt-2">View profile <span>→</span></p>
     </article>
   );
@@ -187,19 +188,35 @@ export function HomeView({
   onOpenJob: (job: Job) => void;
 }) {
   const [selected, setSelected] = useState<Company | null>(null);
-  const [sort, setSort] = useState<"az" | "za" | "booth">("booth");
+  const [sort, setSort] = useState<"recommended" | "booth" | "az" | "za">("booth");
+
+  // Companies worth recommending: any of their approved vacancies fits the student's
+  // course — even when the company's own industry differs (an F1 team hiring an AI
+  // engineer still fits a Computer Science student).
+  const recommendedIds = useMemo(() => {
+    if (!isStudent || !course) return new Set<number>();
+    const ids = new Set<number>();
+    for (const c of companies) {
+      if (jobs.some((j) => j.company === c.name && isApproved(j) && jobMatchesCourse(j, course))) ids.add(c.id);
+    }
+    return ids;
+  }, [companies, jobs, isStudent, course]);
+
   const visible = useMemo(() => {
     const rows = companies.filter(isApprovedCompany);
     const byName = (a: Company, b: Company) => a.name.localeCompare(b.name, undefined, { numeric: true });
-    if (sort === "za") return rows.slice().sort((a, b) => byName(b, a));
-    if (sort === "booth") return rows.slice().sort((a, b) => {
+    const byBooth = (a: Company, b: Company) => {
       // Booth-less companies sink to the bottom; the rest sort naturally (A12 before A100).
       if (!a.boothNumber) return b.boothNumber ? 1 : byName(a, b);
       if (!b.boothNumber) return -1;
       return a.boothNumber.localeCompare(b.boothNumber, undefined, { numeric: true }) || byName(a, b);
-    });
+    };
+    if (sort === "za") return rows.slice().sort((a, b) => byName(b, a));
+    if (sort === "booth") return rows.slice().sort(byBooth);
+    if (sort === "recommended") return rows.slice().sort((a, b) =>
+      (recommendedIds.has(b.id) ? 1 : 0) - (recommendedIds.has(a.id) ? 1 : 0) || byBooth(a, b));
     return rows.slice().sort(byName);
-  }, [companies, sort]);
+  }, [companies, sort, recommendedIds]);
 
   return (
     <section className="results" aria-labelledby="home-title">
@@ -213,9 +230,10 @@ export function HomeView({
         {visible.length > 1 && (
           <label className="event-sort">Sort
             <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort companies">
+              {recommendedIds.size > 0 && <option value="recommended">Recommended for you</option>}
+              <option value="booth">Booth number</option>
               <option value="az">Name A → Z</option>
               <option value="za">Name Z → A</option>
-              <option value="booth">Booth number</option>
             </select>
           </label>
         )}
@@ -223,7 +241,14 @@ export function HomeView({
 
       {visible.length ? (
         <div className="exhibitor-grid">
-          {visible.map((c) => <ExhibitorCard key={c.id} company={c} onOpen={() => setSelected(c)} />)}
+          {visible.map((c) => (
+            <ExhibitorCard
+              key={c.id}
+              company={c}
+              onOpen={() => setSelected(c)}
+              recommended={recommendedIds.has(c.id)}
+            />
+          ))}
         </div>
       ) : (
         <div className="empty"><strong>Exhibitor line-up coming soon</strong><p>Companies attending Industry Day will appear here.</p></div>

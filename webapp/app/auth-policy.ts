@@ -1,7 +1,6 @@
 export type UserRole = "user" | "admin" | "superadmin" | "employer";
 
 export const SUPERADMIN_EMAIL = "ai@qiu.edu.my";
-export const DEFAULT_YOUTUBE_PLACEHOLDER = "https://www.youtube.com/watch?v=5qap5aO4i9A";
 
 export function normalizeEmail(email: string | null | undefined) {
   return email?.trim().toLowerCase() ?? "";
@@ -49,23 +48,18 @@ export function logoFromWebsite(url?: string): string {
   } catch { return ""; }
 }
 
+/**
+ * Extract a YouTube embed URL from any common link form — watch?v=, youtu.be/,
+ * /live/ (past live streams & premieres), /embed/, /shorts/, or a bare 11-char
+ * ID. Returns "" when no valid ID is present so callers can hide the player
+ * instead of falling back to an unrelated video.
+ */
 export function getYouTubeEmbedUrl(url?: string): string {
-  if (!url || !url.trim()) {
-    return "https://www.youtube.com/embed/5qap5aO4i9A";
-  }
+  if (!url || !url.trim()) return "";
   const clean = url.trim();
-  let videoId = "";
-
-  if (clean.includes("youtube.com/watch")) {
-    const match = clean.match(/[?&]v=([^&]+)/);
-    if (match) videoId = match[1];
-  } else if (clean.includes("youtu.be/")) {
-    const parts = clean.split("youtu.be/");
-    if (parts[1]) videoId = parts[1].split("?")[0];
-  } else if (clean.includes("youtube.com/embed/")) {
-    const parts = clean.split("youtube.com/embed/");
-    if (parts[1]) videoId = parts[1].split("?")[0];
-  }
-
-  return videoId ? `https://www.youtube.com/embed/${videoId}` : "https://www.youtube.com/embed/5qap5aO4i9A";
+  const id =
+    clean.match(/[?&]v=([A-Za-z0-9_-]{11})/)?.[1] ||
+    clean.match(/(?:youtu\.be\/|youtube\.com\/(?:live|embed|shorts|v)\/)([A-Za-z0-9_-]{11})/)?.[1] ||
+    (/^[A-Za-z0-9_-]{11}$/.test(clean) ? clean : "");
+  return id ? `https://www.youtube.com/embed/${id}` : "";
 }

@@ -170,7 +170,7 @@ service cloud.firestore {
 
     function validEvent(data) {
       return data.keys().hasAll(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'speakerPhotoUrl', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'qrRotateSeconds', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'title', 'description', 'location', 'speakerName', 'speakerLinks', 'speakerPhotoUrl', 'startAt', 'endAt', 'sessionMinutes', 'presenters', 'qrRotateSeconds', 'specialization', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.title is string && data.title.size() > 0 && data.title.size() <= 200
         && data.description is string && data.description.size() <= 5000
@@ -183,6 +183,7 @@ service cloud.firestore {
         && data.sessionMinutes is int && data.sessionMinutes >= 0 && data.sessionMinutes <= 1440
         && data.presenters is list && data.presenters.size() <= 50
         && (!('qrRotateSeconds' in data) || (data.qrRotateSeconds is number && data.qrRotateSeconds >= 5 && data.qrRotateSeconds <= 600))
+        && (!('specialization' in data) || (data.specialization is string && data.specialization.size() <= 160))
         && data.createdBy is string
         && data.createdAt is timestamp && data.updatedAt is timestamp;
     }

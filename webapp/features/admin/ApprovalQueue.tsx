@@ -26,7 +26,8 @@ function companyChanges(c: Company): [string, unknown, unknown][] {
 
 /** Enlarged preview of a company/registration profile before approving. */
 function CompanyPreview({ company, onClose }: { company: Partial<Company>; onClose: () => void }) {
-  const hasVideo = Boolean(company.videoUrl && company.videoUrl.trim());
+  const embedUrl = getYouTubeEmbedUrl(company.videoUrl);
+  const hasVideo = Boolean(embedUrl);
   return (
     <Modal className="job-detail" labelledBy="preview-title" closeLabel="Close preview" onClose={onClose}>
       <div className="detail-header">
@@ -42,7 +43,7 @@ function CompanyPreview({ company, onClose }: { company: Partial<Company>; onClo
         {company.summary && <section><span className="detail-label">ABOUT</span><p style={{ whiteSpace: "pre-wrap" }}>{company.summary}</p></section>}
         {hasVideo && (
           <section className="mt-4"><span className="detail-label">🎬 CORPORATE VIDEO</span>
-            <div className="overflow-hidden rounded-xl border border-token mt-1.5"><iframe src={getYouTubeEmbedUrl(company.videoUrl)} title={`${company.name} video`} allowFullScreen className="w-full aspect-video rounded-xl border-0" /></div>
+            <div className="overflow-hidden rounded-xl border border-token mt-1.5"><iframe src={embedUrl} title={`${company.name} video`} allowFullScreen className="w-full aspect-video rounded-xl border-0" /></div>
           </section>
         )}
         {!company.summary && !hasVideo && !company.logoUrl && <p className="text-accent text-sm">No extra profile details were provided.</p>}

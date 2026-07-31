@@ -6,6 +6,7 @@ import { EventPresenter } from "./EventPresenter";
 import { EventAttendance } from "./EventAttendance";
 import { SpeakerAvatar } from "./SpeakerAvatar";
 import { notify } from "../../components/toast";
+import { courseToSpecializationPattern } from "../../lib/data/course-map";
 
 function eventStatus(ev: EventItem): "upcoming" | "live" | "ended" {
   const now = Date.now();
@@ -27,12 +28,21 @@ function when(iso: string) {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+function eventMatchesCourse(event: EventItem, course: string | null): boolean {
+  if (!course || !event.specialization) return false;
+  const pattern = courseToSpecializationPattern(course);
+  if (!pattern) return false;
+  return pattern.test(event.specialization);
+}
+
 export function EventsView({
   events,
   canManageEvents,
   userEmail,
   myAttendance,
   settings,
+  course,
+  isStudent,
   onOpenEvent,
 }: {
   events: EventItem[];
@@ -40,6 +50,8 @@ export function EventsView({
   userEmail: string;
   myAttendance: Attendance[];
   settings: AppSettings;
+  course: string | null;
+  isStudent: boolean;
   onOpenEvent: (event: EventItem) => void;
 }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -97,6 +109,12 @@ export function EventsView({
                     <p className="text-sm">{ev.speakerName ? <b>{ev.speakerName}</b> : <span className="text-accent">To be announced</span>}{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
                   </div>
                 </div>
+                {ev.specialization && (
+                  <div className="event-specs">
+                    <span className="exhibitor-tag">{ev.specialization}</span>
+                    {isStudent && eventMatchesCourse(ev, course) && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Relevant to you</span>}
+                  </div>
+                )}
                 <p className="view-job mt-2">View details <span>→</span></p>
                 {(canPresent || canManageEvents) && (
                   <div className="event-actions" onClick={(e) => e.stopPropagation()}>
