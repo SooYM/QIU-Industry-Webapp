@@ -41,7 +41,7 @@ export function AdminPanel({
   const canManageJobs = canManageVacancies(role);
   const isApprover = role === "admin" || role === "superadmin";
   const isEmployer = role === "employer";
-  const [adminView, setAdminView] = useState<"manage" | "manageVac" | "addVac" | "manageExhibitor" | "addExhibitor" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings" | "company">(role === "employer" ? "company" : "manageVac");
+  const [adminView, setAdminView] = useState<"manage" | "manageVac" | "addVac" | "manageExhibitor" | "addExhibitor" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings" | "company">(role === "employer" ? "company" : "access");
   const [draft, setDraft] = useState<AdminDraft>(emptyDraft);
   const [titleCommitted, setTitleCommitted] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);

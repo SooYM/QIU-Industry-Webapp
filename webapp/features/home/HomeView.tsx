@@ -187,7 +187,7 @@ export function HomeView({
   onOpenJob: (job: Job) => void;
 }) {
   const [selected, setSelected] = useState<Company | null>(null);
-  const [sort, setSort] = useState<"az" | "za" | "booth">("az");
+  const [sort, setSort] = useState<"az" | "za" | "booth">("booth");
   const visible = useMemo(() => {
     const rows = companies.filter(isApprovedCompany);
     const byName = (a: Company, b: Company) => a.name.localeCompare(b.name, undefined, { numeric: true });
