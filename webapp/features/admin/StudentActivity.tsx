@@ -47,7 +47,7 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
             <div className="local-job-list">
               {sorted.map((app) => (
                 <div className="local-job" key={app.id}>
-                  <span><b>{app.studentName || app.studentEmail}</b><small>{app.studentEmail} · applied to <b>{app.jobTitle}</b> · {formatWhen(app.appliedAt)}</small></span>
+                  <span><b>{app.studentName || app.studentEmail}</b><small>{app.studentEmail}{app.studentEmployeeId ? ` · ID ${app.studentEmployeeId}` : ""} · applied to <b>{app.jobTitle}</b> · {formatWhen(app.appliedAt)}</small></span>
                 </div>
               ))}
             </div>
@@ -57,11 +57,13 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
   }
 
   // Admin: group by student.
-  const groups = new Map<string, { name: string; email: string; items: Application[] }>();
+  const groups = new Map<string, { name: string; email: string; employeeId?: string; items: Application[] }>();
   for (const a of scoped) {
     const key = a.studentUid || a.studentEmail || "unknown";
-    if (!groups.has(key)) groups.set(key, { name: a.studentName, email: a.studentEmail, items: [] });
-    groups.get(key)!.items.push(a);
+    if (!groups.has(key)) groups.set(key, { name: a.studentName, email: a.studentEmail, employeeId: a.studentEmployeeId, items: [] });
+    const g = groups.get(key)!;
+    if (!g.employeeId && a.studentEmployeeId) g.employeeId = a.studentEmployeeId;
+    g.items.push(a);
   }
   const grouped = [...groups.values()]
     .map((g) => ({ ...g, items: g.items.sort((x, y) => whenValue(y.appliedAt) - whenValue(x.appliedAt)) }))
@@ -85,8 +87,8 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
 
   function exportApps() {
     if (!scoped.length) { notify("Nothing to export.", "error"); return; }
-    const rows = scoped.map((a) => [a.studentName, a.studentEmail, a.jobTitle, a.company, a.resumeChoice ?? "", csvWhen(a.appliedAt)]);
-    downloadCsv(`applications-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "Job", "Company", "Resume shared", "Applied at"], rows));
+    const rows = scoped.map((a) => [a.studentName, a.studentEmail, a.studentEmployeeId ?? "", a.jobTitle, a.company, a.resumeChoice ?? "", csvWhen(a.appliedAt)]);
+    downloadCsv(`applications-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "Employee ID", "Job", "Company", "Resume shared", "Applied at"], rows));
     notify(`Exported ${scoped.length} application${scoped.length === 1 ? "" : "s"}.`);
   }
   function exportViews() {
@@ -103,7 +105,7 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
       {loading ? <p className="role-manager-state" role="status">Loading…</p>
         : grouped.length ? grouped.map((g) => (
           <details className="student-group" key={g.email || g.name}>
-            <summary className="student-group-head"><b>{g.name || g.email || "Student"}</b><small>{g.email} · {g.items.length} application{g.items.length === 1 ? "" : "s"}</small></summary>
+            <summary className="student-group-head"><b>{g.name || g.email || "Student"}</b><small>{g.email}{g.employeeId ? ` · ID ${g.employeeId}` : ""} · {g.items.length} application{g.items.length === 1 ? "" : "s"}</small></summary>
             {g.items.map((app) => (
               <div className="local-job" key={app.id}>
                 <span><b>{app.jobTitle}</b><small>{app.company} · {formatWhen(app.appliedAt)}</small></span>

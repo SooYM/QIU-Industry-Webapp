@@ -51,7 +51,7 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
       return (
         <div className="local-job local-job-stack" key={key}>
           <div className="local-job-row">
-            <span><b>{app.studentName || app.studentEmail}</b><small>{app.studentEmail} · {generated ? "Generated CV" : link ? "Shared link" : "No resume shared"}</small></span>
+            <span><b>{app.studentName || app.studentEmail}</b><small>{app.studentEmail}{app.studentEmployeeId ? ` · ID ${app.studentEmployeeId}` : ""} · {generated ? "Generated CV" : link ? "Shared link" : "No resume shared"}</small></span>
             <div className="local-job-actions">
               {generated && <><button type="button" className="edit-local" onClick={() => setExpanded(isOpen ? null : key)}>{isOpen ? "Hide CV" : "View CV"}</button><button type="button" className="edit-local" onClick={() => downloadCV(resume!)}>Download</button></>}
               {link && <a className="edit-local" href={resume!.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a>}
@@ -95,7 +95,7 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
               return (
                 <div className="local-job local-job-stack" key={resume.id}>
                   <div className="local-job-row">
-                    <span><b>{resume.studentName || resume.studentEmail}</b><small>{resume.studentEmail}{resume.course ? ` · ${resume.course}` : ""} · {kinds}</small></span>
+                    <span><b>{resume.studentName || resume.studentEmail}</b><small>{resume.studentEmail}{resume.employeeId ? ` · ID ${resume.employeeId}` : ""}{resume.course ? ` · ${resume.course}` : ""} · {kinds}</small></span>
                     <div className="local-job-actions">
                       {generated && <><button type="button" className="edit-local" onClick={() => setExpanded(isOpen ? null : resume.id)}>{isOpen ? "Hide CV" : "View CV"}</button><button type="button" className="edit-local" onClick={() => downloadCV(resume)}>Download</button></>}
                       {resume.fileUrl && <a className="edit-local" href={resume.fileUrl} target="_blank" rel="noreferrer">Open link ↗</a>}

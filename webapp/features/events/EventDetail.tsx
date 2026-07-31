@@ -1,5 +1,5 @@
 import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
-import { eventSpecializations } from "../../lib/data/types";
+import { eventSpecializations, eventSpeakers } from "../../lib/data/types";
 import { ccaThresholdMinutes } from "../../lib/data/firestore";
 import { Modal } from "../../components/Modal";
 import { SpeakerAvatar } from "./SpeakerAvatar";
@@ -37,7 +37,7 @@ export function EventDetail({
   const meta = statusMeta[st];
   const isPresenter = canManageEvents || (event.presenters ?? []).includes(userEmail.trim().toLowerCase());
   const threshold = ccaThresholdMinutes(event.sessionMinutes, settings);
-  const speakerLinks = (event.speakerLinks ?? []).filter(Boolean);
+  const speakers = eventSpeakers(event);
 
   return (
     <Modal className="job-detail" labelledBy="event-detail-title" closeLabel="Close event details" onClose={onClose}>
@@ -55,19 +55,23 @@ export function EventDetail({
         {event.description && <section><span className="detail-label">ABOUT</span><p style={{ whiteSpace: "pre-wrap" }}>{event.description}</p></section>}
 
         <section><span className="detail-label">SPEAKER(S)</span>
-          <div className="speaker-block">
-            <SpeakerAvatar photo={event.speakerPhotoUrl} name={event.speakerName} className="speaker-photo" />
-            <div>
-              <p>{event.speakerName ? <b>{event.speakerName}</b> : <span className="text-accent">To be announced</span>}</p>
-              {speakerLinks.length > 0 && (
-                <p className="speaker-links">
-                  {speakerLinks.map((href) => (
-                    <a key={href} href={/^https?:\/\//i.test(href) ? href : `https://${href}`} target="_blank" rel="noreferrer">{href.replace(/^https?:\/\//i, "")} ↗</a>
-                  ))}
-                </p>
-              )}
+          {speakers.length ? speakers.map((sp, i) => (
+            <div className="speaker-block" key={i}>
+              <SpeakerAvatar photo={sp.photoUrl} name={sp.name} className="speaker-photo" />
+              <div>
+                <p><b>{sp.name || "Speaker"}</b></p>
+                {(sp.links ?? []).filter(Boolean).length > 0 && (
+                  <p className="speaker-links">
+                    {(sp.links ?? []).filter(Boolean).map((href) => (
+                      <a key={href} href={/^https?:\/\//i.test(href) ? href : `https://${href}`} target="_blank" rel="noreferrer">{href.replace(/^https?:\/\//i, "")} ↗</a>
+                    ))}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          )) : (
+            <div className="speaker-block"><SpeakerAvatar name="" className="speaker-photo" /><div><p className="text-accent">To be announced</p></div></div>
+          )}
         </section>
 
         <section><span className="detail-label">DETAILS</span>

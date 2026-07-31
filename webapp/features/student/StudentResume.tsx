@@ -13,16 +13,19 @@ const emptyProfile: ResumeProfile = {
 export function StudentResume({
   user,
   course,
+  employeeId,
   myResume,
   applications = [],
   onWithdrawApplications,
 }: {
   user: User;
   course: string | null;
+  employeeId?: string | null;
   myResume: Resume | null;
   applications?: Application[];
   onWithdrawApplications?: (ids: string[]) => Promise<void>;
 }) {
+  const emp = employeeId ?? myResume?.employeeId;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -52,7 +55,7 @@ export function StudentResume({
     try {
       await saveResume({
         id: user.uid, studentUid: user.uid, studentEmail, studentName,
-        course: course ?? undefined,
+        course: course ?? undefined, ...(emp ? { employeeId: emp } : {}),
         // Keep any existing shared link; primary source is the generated CV unless only a link exists.
         fileUrl: myResume?.fileUrl,
         fileName: myResume?.fileName,
@@ -81,7 +84,7 @@ export function StudentResume({
     try {
       await saveResume({
         id: user.uid, studentUid: user.uid, studentEmail, studentName,
-        course: course ?? undefined, fileUrl: myResume?.fileUrl, fileName: myResume?.fileName,
+        course: course ?? undefined, ...(emp ? { employeeId: emp } : {}), fileUrl: myResume?.fileUrl, fileName: myResume?.fileName,
         source: myResume?.fileUrl ? "link" : "generated", profile: {},
       });
       if (affected.length) await onWithdrawApplications?.(affected.map((a) => a.id));
@@ -114,7 +117,7 @@ export function StudentResume({
     try {
       await saveResume({
         id: user.uid, studentUid: user.uid, studentEmail, studentName,
-        course: course ?? undefined, fileUrl: url, fileName: "Resume link", source: "link",
+        course: course ?? undefined, ...(emp ? { employeeId: emp } : {}), fileUrl: url, fileName: "Resume link", source: "link",
         profile: myResume?.profile,
       });
       done("Resume link saved. Employers and admins can now open it.");
@@ -134,7 +137,7 @@ export function StudentResume({
       <div className="results-head"><div><span>MY RESUME</span><h1 id="resume-title">Build your CV</h1></div><p>Fill in your details to generate a clean CV, and/or paste a link to your own resume. When you apply, you choose which one to send.</p></div>
 
       <section className="local-jobs" aria-labelledby="resume-current-title">
-        <div className="local-jobs-head"><div><span className="detail-label">ON FILE</span><h3 id="resume-current-title">What employers can see</h3></div></div>
+        <div className="local-jobs-head"><div><span className="detail-label">ON FILE</span><h3 id="resume-current-title">What employers can see</h3></div>{emp && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">ID {emp}</span>}</div>
         <div className="resume-status-grid">
           <div className={`resume-status ${generatedOnFile ? "ready" : ""}`}>
             <strong>{generatedOnFile ? "✓ Generated CV ready" : "Generated CV not built yet"}</strong>

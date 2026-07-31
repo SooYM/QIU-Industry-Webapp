@@ -48,6 +48,7 @@ export interface Application {
   jobId: number;
   jobTitle: string;
   company: string;
+  studentEmployeeId?: string; // Workspace employee/student ID, stamped at apply
   resumeId?: string;
   resumeChoice?: "generated" | "link"; // which resume the student attached at apply
   appliedAt?: unknown;     // Firestore serverTimestamp
@@ -99,6 +100,7 @@ export interface Resume {
   studentEmail: string;
   studentName: string;
   course?: string;
+  employeeId?: string;     // Workspace employee/student ID, for hiring reference
   fileUrl?: string;        // external shareable link (no Storage on the free plan)
   fileName?: string;
   source: "upload" | "generated" | "link";
@@ -123,14 +125,21 @@ export interface ChatLog {
 }
 
 /** A live/upcoming Industry Day event. Only admins/superadmin manage these. */
+export interface Speaker {
+  name: string;
+  photoUrl?: string;
+  links?: string[];
+}
+
 export interface EventItem {
   id: number;
   title: string;
   description: string;
   location: string;
-  speakerName: string;    // one or more speakers/hosts (comma-separated when many)
-  speakerLinks: string[]; // LinkedIn / portfolio URLs (replaced the old speaker email)
-  speakerPhotoUrl?: string; // optional speaker headshot URL (paste from LinkedIn etc.)
+  speakerName: string;    // legacy/summary: names joined, kept for search + old events
+  speakerLinks: string[]; // legacy: flattened links, kept for old events
+  speakerPhotoUrl?: string; // legacy: first speaker's headshot, kept for old events
+  speakers?: Speaker[];   // distinct speakers/hosts, each with their own photo & links
   startAt: string;        // datetime-local value, e.g. "2026-08-01T14:00"
   endAt: string;
   sessionMinutes: number; // scheduled length, drives the CCA eligibility threshold
@@ -145,6 +154,15 @@ export interface EventItem {
 export function eventSpecializations(e: Pick<EventItem, "specialization" | "specializations">): string[] {
   if (e.specializations && e.specializations.length) return e.specializations;
   return e.specialization ? [e.specialization] : [];
+}
+
+/** An event's speakers as an array, tolerating the legacy flat speaker fields. */
+export function eventSpeakers(e: Pick<EventItem, "speakers" | "speakerName" | "speakerPhotoUrl" | "speakerLinks">): Speaker[] {
+  if (e.speakers && e.speakers.length) return e.speakers;
+  if (e.speakerName || e.speakerPhotoUrl || (e.speakerLinks && e.speakerLinks.length)) {
+    return [{ name: e.speakerName || "", photoUrl: e.speakerPhotoUrl, links: e.speakerLinks }];
+  }
+  return [];
 }
 
 /**

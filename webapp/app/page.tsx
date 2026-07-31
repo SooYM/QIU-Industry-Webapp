@@ -30,7 +30,7 @@ import { notify } from "../components/toast";
 type Tab = "summary" | "home" | "vacancies" | "history" | "resume" | "events" | "dashboard";
 
 export default function Home() {
-  const { user, role, course, company: employerCompany } = useAuth();
+  const { user, role, course, employeeId, company: employerCompany } = useAuth();
   const [customJobs, setCustomJobs] = useState<Job[]>([]);
   const [tab, setTab] = useState<Tab>("home");
   const [myApplications, setMyApplications] = useState<Application[]>([]);
@@ -278,6 +278,7 @@ export default function Home() {
       id: `${user.uid}_${job.id}`, studentUid: user.uid,
       studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Student",
       jobId: job.id, jobTitle: job.title, company: job.company,
+      ...(employeeId ? { studentEmployeeId: employeeId } : {}),
       resumeId: user.uid, resumeChoice: choice,
     })
       .then(() => notify(`Applied to ${job.title} — saved to your History.`))
@@ -408,7 +409,7 @@ export default function Home() {
 
       {tab === "resume" && isStudent && user && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <StudentResume user={user} course={course} myResume={myResume} applications={myApplications} onWithdrawApplications={withdrawApplications} />
+          <StudentResume user={user} course={course} employeeId={employeeId} myResume={myResume} applications={myApplications} onWithdrawApplications={withdrawApplications} />
         </section>
       )}
 

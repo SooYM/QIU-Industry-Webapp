@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { AppSettings, Attendance, EventItem } from "../../lib/data/types";
-import { eventSpecializations } from "../../lib/data/types";
+import { eventSpecializations, eventSpeakers } from "../../lib/data/types";
 import { deleteEvent } from "../../lib/data/firestore";
 import { EventForm } from "./EventForm";
 import { EventPresenter } from "./EventPresenter";
@@ -92,6 +92,7 @@ export function EventsView({
             const meta = statusMeta[st];
             const att = attendanceByEvent.get(ev.id);
             const canPresent = canManageEvents || (ev.presenters ?? []).includes(myLower);
+            const speakers = eventSpeakers(ev);
             return (
               <article className="event-card" key={ev.id} role="button" tabIndex={0}
                 aria-label={`View ${ev.title}`}
@@ -107,10 +108,19 @@ export function EventsView({
                 <p className="text-accent text-xs">{when(ev.startAt)} → {when(ev.endAt)}{ev.location ? ` · ${ev.location}` : ""}</p>
                 <div className="event-speaker">
                   <span className="detail-label">SPEAKER(S)</span>
-                  <div className="event-speaker-row">
-                    <SpeakerAvatar photo={ev.speakerPhotoUrl} name={ev.speakerName} />
-                    <p className="text-sm">{ev.speakerName ? <b>{ev.speakerName}</b> : <span className="text-accent">To be announced</span>}{(ev.speakerLinks ?? []).length ? ` · ${(ev.speakerLinks ?? []).length} link${ev.speakerLinks!.length === 1 ? "" : "s"}` : ""}</p>
-                  </div>
+                  {speakers.length ? (
+                    <div className="event-speaker-list">
+                      {speakers.slice(0, 4).map((s, i) => (
+                        <div className="event-speaker-row" key={i}>
+                          <SpeakerAvatar photo={s.photoUrl} name={s.name} />
+                          <p className="text-sm"><b>{s.name || "Speaker"}</b></p>
+                        </div>
+                      ))}
+                      {speakers.length > 4 && <p className="text-[11px] text-accent">+{speakers.length - 4} more</p>}
+                    </div>
+                  ) : (
+                    <div className="event-speaker-row"><SpeakerAvatar name="" /><p className="text-sm text-accent">To be announced</p></div>
+                  )}
                 </div>
                 {eventSpecializations(ev).length > 0 && (
                   <div className="event-specs">

@@ -30,6 +30,7 @@ type AuthContextValue = {
   user: User | null;
   role: UserRole | null;
   course: string | null;
+  employeeId: string | null;
   company: string | null;
   loading: boolean;
   error: string;
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [course, setCourse] = useState<string | null>(null);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [company, setCompany] = useState<string | null>(null);
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [loading, setLoading] = useState(isFirebaseConfigured);
@@ -94,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setRole(null);
         setCourse(null);
+        setEmployeeId(null);
         setLoading(false);
         return;
       }
@@ -172,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // onAuthStateChanged carries no OAuth token (e.g. page reload), so read the
         // course resolved during the last interactive sign-in from the stored doc.
         setCourse((snapshot.data()?.course as string) ?? null);
+        setEmployeeId((snapshot.data()?.employeeId as string) ?? null);
       } catch {
         await firebaseSignOut(activeAuth);
         setError("Your account could not be checked. Contact the QIU Industry Day portal administrator.");
@@ -189,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     role,
     course,
+    employeeId,
     company,
     loading,
     error,
@@ -220,6 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (employeeId) patch.employeeId = employeeId;
               if (Object.keys(patch).length) await setDoc(doc(db, "users", result.user.uid), patch, { merge: true });
               if (resolved && resolved.code) setCourse(resolved.name);
+              if (employeeId) setEmployeeId(employeeId);
             }
           } catch { /* Directory lookup is best-effort; keep the stored course. */ }
         }
@@ -230,7 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut: async () => {
       if (auth) await firebaseSignOut(auth);
     },
-  }), [company, course, error, loading, needsRegistration, role, user]);
+  }), [company, course, employeeId, error, loading, needsRegistration, role, user]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -154,6 +154,13 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .job-assistant-toggle>span { color:var(--color-on-primary); }
 .job-assistant-messages { margin-top:.85rem; max-height:24rem; overflow-y:auto; display:flex; flex-direction:column; gap:.6rem; padding-right:.25rem; }
 .chat-disclaimer { margin-top:.5rem; text-align:center; color:var(--muted); font-size:.66rem; }
+/* Multi-speaker editor (event form) */
+.speaker-editor { display:flex; flex-direction:column; gap:.85rem; border:0; padding:0; margin:0; }
+.speaker-editor > legend { margin-bottom:.2rem; }
+.speaker-row { display:flex; flex-direction:column; gap:.55rem; padding:.9rem; border:1px solid var(--line); border-radius:.7rem; background:var(--surface-2); }
+.speaker-row-head { display:flex; align-items:center; justify-content:space-between; }
+.speaker-row label { display:flex; flex-direction:column; gap:.3rem; font-size:.75rem; font-weight:650; }
+.event-speaker-list { display:flex; flex-direction:column; gap:.45rem; margin-top:.3rem; }
 .data-export { margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--line); }
 .export-buttons { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.6rem; }
 .export-buttons .admin-button small { color:var(--muted); font-weight:600; }
