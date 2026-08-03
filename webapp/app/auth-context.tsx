@@ -210,15 +210,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // People API directory scope INCREMENTALLY here, so non-QIU accounts never
         // see the sensitive-scope "unverified app" consent. Best-effort — a failed
         // or dismissed lookup never blocks sign-in.
-        console.error("[DIRECTORY-DEBUG] signed in as", result.user.email, "isQIU=", isAllowedQiuEmail(result.user.email));
+        const dbg = (v: unknown) => { try { (globalThis as unknown as { __DIR_DEBUG__?: unknown }).__DIR_DEBUG__ = v; } catch { /* noop */ } };
+        dbg({ stage: "signed-in", email: result.user.email, isQIU: isAllowedQiuEmail(result.user.email) });
         if (isAllowedQiuEmail(result.user.email) && db) {
           try {
             const scoped = new GoogleAuthProvider();
             scoped.addScope(PEOPLE_SCOPE);
-            console.error("[DIRECTORY-DEBUG] requesting directory scope popup…");
+            dbg({ stage: "requesting-scope-popup" });
             const scopedResult = await reauthenticateWithPopup(result.user, scoped);
             const token = GoogleAuthProvider.credentialFromResult(scopedResult)?.accessToken;
-            console.error("[DIRECTORY-DEBUG] got token?", Boolean(token));
+            dbg({ stage: "reauth-done", hasToken: Boolean(token) });
             if (token) {
               const { course: resolved, employeeId } = await fetchDirectoryProfile(token, result.user.email ?? undefined);
               const patch: Record<string, unknown> = {};
@@ -230,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (resolved && resolved.code) setCourse(resolved.name);
               if (employeeId) setEmployeeId(employeeId);
             }
-          } catch (dirErr) { console.error("[DIRECTORY-DEBUG] directory lookup failed:", dirErr); /* best-effort */ }
+          } catch (dirErr) { dbg({ stage: "error", error: String(dirErr) }); /* best-effort */ }
         }
       } catch (nextError) {
         setError(readableAuthError(nextError));

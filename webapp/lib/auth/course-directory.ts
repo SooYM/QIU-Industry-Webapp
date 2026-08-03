@@ -22,6 +22,8 @@ export interface DirectoryProfile {
   course: { code: string; name: string } | null;
   /** Google Workspace "Employee ID" — surfaced to admins for roster matching. */
   employeeId: string | null;
+  /** TEMP: raw People API payloads, for locating the employee-ID field. */
+  raw?: unknown;
 }
 
 /**
@@ -59,7 +61,7 @@ async function fetchDirectoryPerson(accessToken: string, email: string): Promise
       + "&readMask=emailAddresses,externalIds,organizations,occupations,relations,userDefined"
       + "&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT";
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) { console.warn("[directory] search failed", res.status, await res.text().catch(() => "")); return null; }
+    if (!res.ok) return null;
     const data = (await res.json()) as { people?: (PeopleResponse & { emailAddresses?: { value?: string }[] })[] };
     const people = data.people ?? [];
     const lower = email.toLowerCase();
@@ -87,24 +89,22 @@ export async function fetchDirectoryProfile(accessToken: string, email?: string)
     // Employee ID: prefer the directory-search profile, fall back to people/me.
     const dirPerson = await fetchDirectoryPerson(accessToken, email ?? "");
     const employeeId = (dirPerson && extractEmployeeId(dirPerson)) || extractEmployeeId(data);
-    // TEMP diagnostic (error level so it's always visible) — a flat string of every
-    // directory field returned, so we can locate the employee-ID field. Only the
-    // signed-in user's own data; removed once the correct field is confirmed.
-    console.error("[DIRECTORY-DEBUG] employeeId=" + (employeeId ?? "NONE") + " :: " + JSON.stringify({
-      me: { externalIds: data.externalIds, organizations: data.organizations, userDefined: data.userDefined },
-      dir: dirPerson ?? "no-directory-result",
-    }));
+    const raw = { employeeId: employeeId ?? "NONE", me: data, dir: dirPerson ?? "no-directory-result" };
+    // TEMP: expose on a global so it can be read with a single console command.
+    try { (globalThis as unknown as { __DIR_DEBUG__?: unknown }).__DIR_DEBUG__ = raw; } catch { /* noop */ }
 
     const candidates = [
       ...(data.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
       ...(data.occupations ?? []).map((o) => o.value),
       ...(dirPerson?.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
     ].filter(Boolean) as string[];
+    let course: { code: string; name: string } | null = null;
     for (const candidate of candidates) {
       const resolved = resolveCourse(candidate);
-      if (resolved && resolved.code) return { course: resolved, employeeId }; // a recognised code wins
+      if (resolved && resolved.code) { course = resolved; break; } // a recognised code wins
     }
-    return { course: candidates.length ? resolveCourse(candidates[0]) : null, employeeId };
+    if (!course && candidates.length) course = resolveCourse(candidates[0]);
+    return { course, employeeId, raw };
   } catch {
     return empty;
   }
