@@ -51,6 +51,7 @@ QIU Industry Webapp features a visual identity built around QIU's signature bran
 - **Exhibitor Directory & YouTube Embeds**: Interactive directory of approved Industry Day exhibitors featuring corporate summaries, booth numbers, and embedded YouTube promotional videos.
 - **Automated Logo Luminance Sampling**: The `useLogoBackdrop.ts` hook samples logo image pixels via an HTML5 2D Canvas to calculate relative luminance ($Y = 0.2126R + 0.7152G + 0.0722B$). Bright logos ($Y > 170$) automatically receive dark backdrop tiles for high contrast.
 - **In-Modal Grounded Company Assistant**: Grounded typewriter streaming assistant (`CompanyAssistant`) that answers student queries strictly using the selected company's profile and vacancy data.
+- **Company Recommendations**: Suggests relevant companies based on available vacancies and matching criteria to enhance student discovery.
 
 ### 2. Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx))
 - **Self-Service Employer Onboarding**: Non-QIU external partner employers can self-register via `employer_signups`.
@@ -65,6 +66,8 @@ Modular sub-tab navigation dividing administrative tasks into specialized compon
 - [StudentActivity.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/StudentActivity.tsx): Candidate application feeds with expandable student accordions.
 - [ResumeViewer.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ResumeViewer.tsx): Candidate resume reviewer supporting PDF, link, and generated CV views.
 - [SettingsPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/SettingsPanel.tsx): System-wide configuration (portal title, tagline, QR rotation speed, CCA thresholds).
+- **Data Export & CSV Integration**: 1-click CSV exports available across all admin and employer list views (applications, chat logs, event attendance).
+- **Workspace Employee ID Telemetry**: Extracts directory IDs upon sign-in and stamps them on view events and chat logs for administrative accountability.
 
 ### 4. Single-Company Employer Scope ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx))
 - **Employer Analytics**: Scoped overview displaying total application tallies, unique applicants, vacancies applied to, and assistant question feeds.
@@ -73,6 +76,7 @@ Modular sub-tab navigation dividing administrative tasks into specialized compon
 ### 5. Generated CV Engine & Printable HTML Engine ([GeneratedCV.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/GeneratedCV.tsx) & [cv-download.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/cv-download.ts))
 - **Built-in HTML/PDF CV Generator**: Candidates fill structured profile fields (headline, CGPA, FYP title, education, experience, skills, links) rendered by `GeneratedCV.tsx`.
 - **Zero-Cost Storage Download**: 1-click download generator (`cv-download.ts`) exports a standalone, beautifully styled HTML document that prints directly to PDF without requiring cloud storage subscriptions.
+- **Automated Application Withdrawal**: Modifying or removing a shared source CV automatically cascades withdrawal for any active applications tied to that resume version.
 
 ### 6. Reactive Global Toast System ([toast.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/toast.tsx))
 - **Real-Time Feedback Engine**: Global event-driven notification engine delivering non-blocking feedback (`success`, `error`, `info`) on save, edit, delete, apply, check-in, check-out, and withdrawal operations.
@@ -84,6 +88,7 @@ Modular sub-tab navigation dividing administrative tasks into specialized compon
 - **Live Projector Screen**: Presenters launch a live display screen generating a dynamic 30-second rotating QR code (`REFRESH_MS = 30000`).
 - **Server-Enforced Anti-Cheat**: `event_codes` collection is strictly unreadable by client queries (`allow read: if isAdmin()`). Server-side Firestore rules evaluate `eventCode(eventId)` assertions, invalidating screenshots shared over WhatsApp.
 - **Two-Step Duration Math for CCA Points**: Requires both Check-In and Check-Out. System computes elapsed time vs `sessionMinutes` (threshold: $\ge 80\%$ of session length or 45-minute floor) to assign `caEligible` status.
+- **Multi-Speaker Profiling**: Events natively support rendering profiles for multiple distinct speakers and delegated presenter access rights per event.
 
 ### 9. Multi-Criteria Vacancy Sorting ([VacancyFilters.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/vacancies/VacancyFilters.tsx))
 - **5-Mode Sorting Engine**: 5-mode dropdown supporting sorting by `default` (course recommendation fit), `newest`, `oldest`, `salary_high` (descending), and `salary_low` (ascending).

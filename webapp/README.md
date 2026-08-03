@@ -53,15 +53,15 @@ webapp/
 │   ├── SECURITY_AND_RULES.md
 │   └── SOFTWARE_DOCUMENTATION.md
 ├── features/                     # Feature modules
-│   ├── admin/                    # Admin sub-tabs (AdminSummary, ApprovalQueue, CompanyManager, etc.)
+│   ├── admin/                    # Admin sub-tabs (AdminSummary, ApprovalQueue, CompanyManager, DataExport, etc.)
 │   ├── chat/                     # Grounded in-modal streaming assistant
 │   ├── events/                   # Events module (EventsView, EventPresenter 30s QR, SpeakerAvatar)
 │   ├── home/                     # Home landing directory (HomeView, useLogoBackdrop luminance sampler)
 │   ├── student/                  # Student profile, GeneratedCV, cv-download, StudentHistory
 │   └── vacancies/                # Vacancy listing, VacancyFilters (5-mode sort), VacancyModal
 ├── lib/
-│   ├── auth/                     # Course directory mappings
-│   ├── data/                     # Canonical domain interfaces (types.ts) & Firestore access (firestore.ts)
+│   ├── auth/                     # Course & workspace directory employee-ID mappings (course-directory.ts)
+│   ├── data/                     # Canonical domain interfaces (types.ts), CSV exports (csv.ts), salary metadata, & Firestore access
 │   └── theme/                    # QIU-Red design tokens (tokens.css)
 ├── public/                       # Static assets & country GeoJSON map
 ├── scripts/                      # Data processing scripts (generate_data.py)

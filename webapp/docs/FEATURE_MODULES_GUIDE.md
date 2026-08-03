@@ -95,7 +95,11 @@ if (count && alive) setAuto(lum / count > 170 ? "dark" : "light");
 #### In-Modal Grounded RAG Assistant (`CompanyAssistant`)
 Operates on deterministic keyword matching (`answerAboutCompany`) grounded strictly to the selected company's summary, booth number, website, video URL, and active vacancies. Answers stream character-by-character into the typewriter chat interface.
 
+#### Company Recommendation Engine
+Suggests relevant companies dynamically based on available vacancies and match criteria, enhancing discovery of exhibitors during the event.
+
 ---
+
 
 ### Module 2: Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx))
 
@@ -151,7 +155,14 @@ AdminPanel (Admin View)
 
 - **Role Gating**: Employers see a streamlined menu scoped strictly to their assigned company (`company`, `addVac`, `manageVac`, `resumes`, `activity`, `chats`). Admins access webapp-wide tabs.
 
+#### Data Export & CSV Integration
+Admin and Employer sub-tabs feature integrated **CSV Export** buttons powered by a client-side exporter (`csv.ts`). This allows seamless offline extraction of application rosters, chat histories, vacancy stats, and event attendance straight from active table views without server-side processing.
+
+#### Workspace Employee ID Telemetry
+Automatically extracts the user's Employee ID from the Google Workspace Directory (`directory.readonly` scope) upon sign-in. This ID is subsequently stamped onto view events, candidate applications, and chat logs to guarantee internal tracking and accountability during events.
+
 ---
+
 
 ### Module 4: Employer Summary & Scoped Analytics ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx))
 
@@ -218,7 +229,11 @@ export function downloadCV(resume: Resume) {
 }
 ```
 
+#### Automated Application Withdrawal
+To maintain absolute data integrity and prevent broken application references, if a candidate removes or replaces a shared CV source document, the system automatically runs a cascading hook that seamlessly withdraws any active job applications tied to that original resume.
+
 ---
+
 
 ### Module 6: Global Toast Notification System ([toast.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/toast.tsx))
 
@@ -275,8 +290,10 @@ useEffect(() => {
 
 - **Step Selector**: Presenters toggle between **Step 1: Check-in** (session commencement) and **Step 2: Check-out** (session conclusion).
 - **SpeakerAvatar**: Renders speaker headshot photos or an SVG silhouette fallback when no image URL is configured.
+- **Multi-Speaker Support**: Events natively support distinct arrays of presenters and multiple speaker profiles, accommodating panels and co-hosted sessions.
 
 ---
+
 
 ### Module 9: Multi-Criteria Vacancy Sorting & QIU-Red Design Tokens ([VacancyFilters.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/vacancies/VacancyFilters.tsx))
 

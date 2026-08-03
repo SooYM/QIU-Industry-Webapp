@@ -175,18 +175,19 @@ flowchart LR
 - **[features/admin/AdminSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminSummary.tsx)**: Metric cards and top-applied company/job bar charts.
 - **[features/admin/ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx)**: Combined review queue for self-service employer signups, pending vacancy submissions, and staged profile edit diffs with 1-click **"Approve All"**.
 - **[features/admin/CompanyManager.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/CompanyManager.tsx)**: Exhibitor editor featuring website logo auto-fetching (`logoFromWebsite`).
+- **[features/admin/DataExport.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/DataExport.tsx)**: Reusable component providing 1-click UTF-8 BOM CSV exports across all admin and employer list views via `csv.ts`.
 - **[features/admin/EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx)**: Employer analytics overview scoped strictly to the assigned company.
-- **[features/admin/StudentActivity.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/StudentActivity.tsx)**: Accordion feed of student application activity.
+- **[features/admin/StudentActivity.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/StudentActivity.tsx)**: Accordion feed of student application activity, enriched with auto-extracted Workspace Employee IDs.
 - **[features/admin/ResumeViewer.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ResumeViewer.tsx)**: Candidate resume reviewer supporting PDF, link, and generated CV views.
 - **[features/admin/SettingsPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/SettingsPanel.tsx)**: System settings manager (portal titles, QR rotation frequency, CCA percentage/floor rules, tab toggles).
 
 ### 5.4 Student & Resume Subsystem
 - **[features/student/GeneratedCV.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/GeneratedCV.tsx)**: Rendered CV sheet displaying structured candidate profiles (headline, summary, CGPA, FYP, skills, links, experience, achievements).
 - **[features/student/cv-download.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/cv-download.ts)**: Standalone HTML generator exporting clean, printable CV documents.
-- **[features/student/StudentHistory.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/StudentHistory.tsx)**: Candidate application history dashboard with 1-click application withdrawal support (`deleteApplication`).
+- **[features/student/StudentHistory.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/StudentHistory.tsx)**: Candidate application history dashboard with 1-click application withdrawal support (`deleteApplication`), including cascaded withdrawals on shared CV removal.
 
 ### 5.5 Events & Anti-Cheat Attendance Subsystem
-- **[features/events/EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx)**: Live projector display screen writing 30-second rotating codes to secret `event_codes/{eventId}` documents.
+- **[features/events/EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx)**: Live projector display screen writing 30-second rotating codes to secret `event_codes/{eventId}` documents. Supports multiple distinct presenters.
 - **[features/events/SpeakerAvatar.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/SpeakerAvatar.tsx)**: Speaker photo component with placeholder SVG fallback.
 - **[features/events/EventAttendance.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventAttendance.tsx)**: Administrative attendance viewer rendering real-time check-in/checkout logs and exporting UTF-8 BOM CSV reports.
 
