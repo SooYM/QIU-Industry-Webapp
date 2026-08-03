@@ -12,6 +12,7 @@ import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } 
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryProfile, PEOPLE_SCOPE } from "../lib/auth/course-directory";
 import { submitSignup, subscribeMySignup } from "../lib/data/firestore";
+import { downloadCsv, toCsv } from "../lib/data/csv";
 import type { EmployerSignup } from "../lib/data/types";
 import { ImagePreview } from "../components/ImagePreview";
 import { notify } from "../components/toast";
@@ -44,6 +45,9 @@ type UserRecord = {
   displayName: string;
   photoURL: string;
   role: UserRole;
+  course?: string;
+  employeeId?: string;
+  company?: string;
 };
 
 type WhitelistedEmailRecord = {
@@ -382,6 +386,9 @@ export function RoleManager() {
         displayName: entry.data().displayName ?? "",
         photoURL: entry.data().photoURL ?? "",
         role: roleForEmail(entry.data().email, entry.data().role),
+        course: entry.data().course ?? "",
+        employeeId: entry.data().employeeId ?? "",
+        company: entry.data().company ?? "",
       })).sort((a, b) => a.email.localeCompare(b.email)))
     );
 
@@ -463,7 +470,15 @@ export function RoleManager() {
           <span className="detail-label">ACCESS CONTROL</span>
           <h3 id="role-manager-title">Portal User Roles & Whitelisted Accounts</h3>
         </div>
-        <small>{users.length} registered accounts</small>
+        <div className="flex items-center gap-2">
+          <small>{users.length} registered accounts</small>
+          <button type="button" className="admin-button" onClick={() => {
+            if (!users.length) { notify("Nothing to export.", "error"); return; }
+            const rows = users.map((u) => [u.displayName, u.email, u.role, u.employeeId ?? "", u.course ?? "", u.company ?? ""]);
+            downloadCsv(`accounts-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Name", "Email", "Role", "Employee ID", "Course", "Company"], rows));
+            notify(`Exported ${users.length} account${users.length === 1 ? "" : "s"}.`);
+          }} disabled={!users.length}>⬇ Export CSV</button>
+        </div>
       </div>
 
       {/* Admins & superadmin can approve external (non-QIU) accounts and set the

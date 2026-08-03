@@ -8,6 +8,7 @@ import { getYouTubeEmbedUrl, normalizeEmail } from "../../app/auth-policy";
 import { useAuth } from "../../app/auth-context";
 import { Modal } from "../../components/Modal";
 import { notify } from "../../components/toast";
+import { downloadCsv, toCsv } from "../../lib/data/csv";
 import { jobStatusMeta } from "../vacancies/vacancy-utils";
 
 /** Vacancy staged-edit diff rows. */
@@ -73,9 +74,20 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
 
   const run = async (fn: () => Promise<void>, ok: string, err: string) => { setMessage(""); try { await fn(); setMessage(ok); notify(ok); } catch { setMessage(err); notify(err, "error"); } };
 
+  const exportCsv = () => {
+    const rows = [
+      ...pendingJobs.map((j) => ["Vacancy", j.status === "pending_edit" ? "Edit" : "New", j.title, j.company, j.createdBy ?? ""]),
+      ...pendingSignups.map((s) => ["Company", "New registration", s.company, s.name, s.email]),
+      ...pendingCompanies.map((c) => ["Company", c.status === "pending_edit" ? "Profile edit" : "New", c.name, "", c.createdBy ?? ""]),
+    ];
+    if (!rows.length) { notify("Nothing to export.", "error"); return; }
+    downloadCsv(`approvals-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Type", "Kind", "Name", "Contact name", "Contact / created by"], rows));
+    notify(`Exported ${rows.length} pending item${rows.length === 1 ? "" : "s"}.`);
+  };
+
   return (
     <section aria-labelledby="approval-title">
-      <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Awaiting review</h3></div><strong aria-live="polite">{pendingJobs.length + companyCount}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Awaiting review</h3></div><div className="flex items-center gap-2"><strong aria-live="polite">{pendingJobs.length + companyCount}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!(pendingJobs.length + companyCount)}>⬇ Export CSV</button></div></div>
       <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pending registrations, vacancies and companies…" aria-label="Search approvals" />
       {message && <p className="admin-message" role="status" aria-live="polite">{message}</p>}
 

@@ -3,6 +3,10 @@ import { subscribeApplications, subscribeResumes } from "../../lib/data/firestor
 import { hasGeneratedCV, type Application, type Resume } from "../../lib/data/types";
 import { GeneratedCV } from "../student/GeneratedCV";
 import { downloadCV } from "../student/cv-download";
+import { csvWhen, downloadCsv, toCsv } from "../../lib/data/csv";
+import { notify } from "../../components/toast";
+
+const today = () => new Date().toISOString().slice(0, 10);
 
 /** Admin: every resume, both types. Employer: only their applicants, and only the
  *  resume type each student chose when applying (generated CV or link). */
@@ -42,6 +46,16 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
     }
     const jobGroups = [...byJob.entries()].sort((a, b) => b[1].length - a[1].length);
 
+    const exportCsv = () => {
+      if (!employerRows.length) { notify("Nothing to export.", "error"); return; }
+      const rows = employerRows.map(({ app, resume }) => {
+        const choice = app.resumeChoice ?? (resume && hasGeneratedCV(resume.profile) ? "generated" : "link");
+        return [app.studentName, app.studentEmail, app.studentEmployeeId ?? "", app.jobTitle, app.company, choice === "generated" ? "Generated CV" : "Shared link", resume?.fileUrl ?? "", csvWhen(app.appliedAt)];
+      });
+      downloadCsv(`applicants-${today()}.csv`, toCsv(["Student", "Email", "Employee ID", "Job", "Company", "Resume shared", "Resume link", "Applied at"], rows));
+      notify(`Exported ${employerRows.length} applicant${employerRows.length === 1 ? "" : "s"}.`);
+    };
+
     const renderRow = ({ app, resume }: (typeof employerRows)[number]) => {
       const choice = app.resumeChoice ?? (resume && hasGeneratedCV(resume.profile) ? "generated" : "link");
       const generated = choice === "generated" && resume && hasGeneratedCV(resume.profile);
@@ -65,7 +79,7 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
 
     return (
       <section className="local-jobs" aria-labelledby="resumes-title">
-        <div className="local-jobs-head"><div><span className="detail-label">CANDIDATE APPLICANTS</span><h3 id="resumes-title">Applicants by job</h3></div><strong>{employerRows.length}</strong></div>
+        <div className="local-jobs-head"><div><span className="detail-label">CANDIDATE APPLICANTS</span><h3 id="resumes-title">Applicants by job</h3></div><div className="flex items-center gap-2"><strong>{employerRows.length}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!employerRows.length}>⬇ Export CSV</button></div></div>
         <p className="text-[11px] text-accent">You only see the resume each student chose to share when applying.</p>
         {searchBox}
         {loading ? <p className="role-manager-state" role="status">Loading…</p>
@@ -81,9 +95,15 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
   }
 
   // ---- Admin view -----------------------------------------------------------
+  const exportAdmin = () => {
+    if (!adminRows.length) { notify("Nothing to export.", "error"); return; }
+    const rows = adminRows.map((r) => [r.studentName, r.studentEmail, r.employeeId ?? "", r.course ?? "", [hasGeneratedCV(r.profile) && "Generated CV", r.fileUrl && "Shared link"].filter(Boolean).join(" · "), r.fileUrl ?? "", csvWhen(r.updatedAt)]);
+    downloadCsv(`resumes-${today()}.csv`, toCsv(["Student", "Email", "Employee ID", "Course", "Resume types", "Resume link", "Updated at"], rows));
+    notify(`Exported ${adminRows.length} resume${adminRows.length === 1 ? "" : "s"}.`);
+  };
   return (
     <section className="local-jobs" aria-labelledby="resumes-title">
-      <div className="local-jobs-head"><div><span className="detail-label">RESUMES</span><h3 id="resumes-title">Submitted student resumes</h3></div><strong>{adminRows.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">RESUMES</span><h3 id="resumes-title">Submitted student resumes</h3></div><div className="flex items-center gap-2"><strong>{adminRows.length}</strong><button type="button" className="admin-button" onClick={exportAdmin} disabled={!adminRows.length}>⬇ Export CSV</button></div></div>
       {searchBox}
       {loading ? <p className="role-manager-state" role="status">Loading resumes…</p>
         : adminRows.length ? (

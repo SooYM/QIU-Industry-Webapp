@@ -4,6 +4,7 @@ import { useAuth } from "../../app/auth-context";
 import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
 import { ImagePreview } from "../../components/ImagePreview";
 import { notify } from "../../components/toast";
+import { downloadCsv, toCsv } from "../../lib/data/csv";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
 type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
@@ -112,7 +113,10 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
         <>
           <div className="local-jobs-head mt-4">
             <div><span className="detail-label">MANAGE</span><h3>All exhibitors</h3></div>
-            <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => { setMessage("All exhibitors cleared."); notify("All exhibitors cleared."); }); }}>Clear all</button>
+            <div className="flex items-center gap-2">
+              <button type="button" className="admin-button" onClick={() => { const rows = companies.map((c) => [c.name, c.boothNumber ?? "", c.website ?? "", c.videoUrl ?? "", isApprovedCompany(c) ? "Approved" : "Pending", c.createdBy ?? "", (c.summary ?? "").replace(/\s+/g, " ").trim()]); downloadCsv(`exhibitors-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Company", "Booth", "Website", "Video", "Status", "Created by", "Summary"], rows)); notify(`Exported ${companies.length} exhibitors.`); }}>⬇ Export CSV</button>
+              <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => { setMessage("All exhibitors cleared."); notify("All exhibitors cleared."); }); }}>Clear all</button>
+            </div>
           </div>
           <div className="local-job-list">
             {companies.map((c) => (

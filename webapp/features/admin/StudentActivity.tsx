@@ -36,9 +36,15 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
 
   if (mode === "company") {
     const sorted = [...scoped].sort((a, b) => whenValue(b.appliedAt) - whenValue(a.appliedAt));
+    const exportCompany = () => {
+      if (!sorted.length) { notify("Nothing to export.", "error"); return; }
+      const rows = sorted.map((a) => [a.studentName, a.studentEmail, a.studentEmployeeId ?? "", a.jobTitle, a.company, csvWhen(a.appliedAt)]);
+      downloadCsv(`applicants-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "Employee ID", "Job", "Company", "Applied at"], rows));
+      notify(`Exported ${sorted.length} applicant${sorted.length === 1 ? "" : "s"}.`);
+    };
     return (
       <section className="local-jobs" aria-labelledby="activity-title">
-        <div className="local-jobs-head"><div><span className="detail-label">STUDENT ACTIVITY</span><h3 id="activity-title">Applications to your company</h3></div><strong>{sorted.length}</strong></div>
+        <div className="local-jobs-head"><div><span className="detail-label">STUDENT ACTIVITY</span><h3 id="activity-title">Applications to your company</h3></div><div className="flex items-center gap-2"><strong>{sorted.length}</strong><button type="button" className="admin-button" onClick={exportCompany} disabled={!sorted.length}>⬇ Export CSV</button></div></div>
         <p className="text-[11px] text-accent">Only applications to your assigned company are shown.</p>
         {search}
         {loading ? <p className="role-manager-state" role="status">Loading…</p>
