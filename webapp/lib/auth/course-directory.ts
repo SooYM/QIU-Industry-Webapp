@@ -87,14 +87,13 @@ export async function fetchDirectoryProfile(accessToken: string, email?: string)
     // Employee ID: prefer the directory-search profile, fall back to people/me.
     const dirPerson = await fetchDirectoryPerson(accessToken, email ?? "");
     const employeeId = (dirPerson && extractEmployeeId(dirPerson)) || extractEmployeeId(data);
-    // TEMP diagnostic — shows exactly which directory fields came back so we can
-    // locate the employee ID field. Safe: only the signed-in user's own data.
-    if (!employeeId) {
-      console.info("[directory] employee id NOT found. Fields returned:", {
-        me_externalIds: data.externalIds, me_organizations: data.organizations, me_userDefined: data.userDefined,
-        dir_externalIds: dirPerson?.externalIds, dir_organizations: dirPerson?.organizations, dir_userDefined: dirPerson?.userDefined, dir_relations: (dirPerson as { relations?: unknown } | null)?.relations,
-      });
-    }
+    // TEMP diagnostic (error level so it's always visible) — a flat string of every
+    // directory field returned, so we can locate the employee-ID field. Only the
+    // signed-in user's own data; removed once the correct field is confirmed.
+    console.error("[DIRECTORY-DEBUG] employeeId=" + (employeeId ?? "NONE") + " :: " + JSON.stringify({
+      me: { externalIds: data.externalIds, organizations: data.organizations, userDefined: data.userDefined },
+      dir: dirPerson ?? "no-directory-result",
+    }));
 
     const candidates = [
       ...(data.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
