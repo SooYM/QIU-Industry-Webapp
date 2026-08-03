@@ -56,10 +56,10 @@ async function fetchDirectoryPerson(accessToken: string, email: string): Promise
   try {
     const url = "https://people.googleapis.com/v1/people:searchDirectoryPeople"
       + `?query=${encodeURIComponent(email)}&pageSize=10`
-      + "&readMask=emailAddresses,externalIds,organizations,occupations"
-      + "&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE";
+      + "&readMask=emailAddresses,externalIds,organizations,occupations,relations,userDefined"
+      + "&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_CONTACT";
     const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) return null;
+    if (!res.ok) { console.warn("[directory] search failed", res.status, await res.text().catch(() => "")); return null; }
     const data = (await res.json()) as { people?: (PeopleResponse & { emailAddresses?: { value?: string }[] })[] };
     const people = data.people ?? [];
     const lower = email.toLowerCase();
@@ -87,6 +87,14 @@ export async function fetchDirectoryProfile(accessToken: string, email?: string)
     // Employee ID: prefer the directory-search profile, fall back to people/me.
     const dirPerson = await fetchDirectoryPerson(accessToken, email ?? "");
     const employeeId = (dirPerson && extractEmployeeId(dirPerson)) || extractEmployeeId(data);
+    // TEMP diagnostic — shows exactly which directory fields came back so we can
+    // locate the employee ID field. Safe: only the signed-in user's own data.
+    if (!employeeId) {
+      console.info("[directory] employee id NOT found. Fields returned:", {
+        me_externalIds: data.externalIds, me_organizations: data.organizations, me_userDefined: data.userDefined,
+        dir_externalIds: dirPerson?.externalIds, dir_organizations: dirPerson?.organizations, dir_userDefined: dirPerson?.userDefined, dir_relations: (dirPerson as { relations?: unknown } | null)?.relations,
+      });
+    }
 
     const candidates = [
       ...(data.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
