@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { answerFromJobs } from "../app/chat.ts";
+import { AI_WARNING, answerFromJobs } from "../app/chat.ts";
 
 const jobs = [
   { id: 1, title: "Software Developer", company: "Example Tech", type: "Permanent", specialization: "IT - Software", vacancies: 1, location: "Selangor", salary: 3500, salaryLabel: "MYR3500", payFrequency: "Monthly", minimumRequirement: "Degree", email: "", companySummary: "" },
@@ -31,13 +31,24 @@ test("answers from newly loaded Firestore records", () => {
   assert.equal(result.sources[0].id, 3);
 });
 
+test("matches misspelled company names deterministically", () => {
+  assert.equal(answerFromJobs("Ledgr", jobs).sources[0].id, 3);
+  assert.ok(answerFromJobs("Exampel Tech", jobs).sources.some((source) => source.company === "Example Tech"));
+});
+
+test("includes the AI warning in every generated answer", () => {
+  for (const question of ["hi", "Ledger", "weather forecast"]) {
+    assert.equal(answerFromJobs(question, jobs).answer.split(AI_WARNING).length, 2);
+  }
+});
+
 test("handles conversational time and greeting intents gracefully without false job matches", () => {
   const timeResult = answerFromJobs("what is the time now", jobs);
   assert.match(timeResult.answer, /current local time/i);
   assert.deepEqual(timeResult.sources, []);
 
   const greetingResult = answerFromJobs("hi", jobs);
-  assert.match(greetingResult.answer, /Hello! I am your VacancyPortal AI Assistant/i);
+  assert.match(greetingResult.answer, /Hello! I am your QIU Industry Day AI Assistant/i);
   assert.deepEqual(greetingResult.sources, []);
 });
 

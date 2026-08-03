@@ -3,7 +3,7 @@
 // directly. Swapping backends later means reimplementing only this file.
 import {
   collection, deleteDoc, deleteField, doc, getDoc, getDocs, increment, onSnapshot, query, serverTimestamp,
-  setDoc, updateDoc, where, type Firestore,
+  setDoc, updateDoc, where, writeBatch, type DocumentReference, type Firestore,
 } from "firebase/firestore";
 import { db } from "../../app/firebase-client";
 import type { AppSettings, Application, Attendance, ChatLog, Company, EmployerSignup, EventCode, EventItem, Job, Resume, ViewEvent } from "./types";
@@ -23,15 +23,21 @@ export const COLLECTIONS = {
   companies: "companies",
   settings: "app_settings",
   signups: "employer_signups",
+  mail: "mail",
 } as const;
 
 /** Fallback settings before the settings doc loads (or if an admin hasn't saved any). */
 export const DEFAULT_SETTINGS: AppSettings = {
   portalTitle: "Industry Day 2026",
-  portalTagline: "QIU Industry Day 2026. Verify vacancy details directly with the employer.",
+  portalTagline: "QIU Industry Day 2026. Verify vacancy details directly with the company.",
   qrRotateSeconds: 30,
   ccaPercent: 80,
-  ccaFloorMinutes: 45,
+  eventSpecializations: [
+    "AI & Machine Learning", "Cybersecurity", "Web Development", "Data Analytics", "Software Engineering",
+    "Networking & Cloud", "Accounting", "Finance", "Business & Management", "Hospitality & Tourism",
+    "Marketing", "Engineering", "Food Technology", "Education", "Psychology & HR", "Pharmacy & Healthcare",
+    "Design & Multimedia", "Telecommunications", "Other",
+  ],
   tabs: { home: true, events: true, vacancies: true, resume: true, history: true },
 };
 
@@ -78,7 +84,22 @@ export async function approveJob(job: Job) {
   // immutable-createdAt rule would reject the write (this is why approve failed).
   const patch: Record<string, unknown> = { status: "approved", pendingEdit: null, updatedAt: serverTimestamp() };
   if (job.pendingEdit) Object.assign(patch, clean(job.pendingEdit)); // apply the staged edit
-  await updateDoc(doc(requireDb(), COLLECTIONS.vacancies, String(job.id)), patch);
+  const database = requireDb();
+  const batch = writeBatch(database);
+  batch.update(doc(database, COLLECTIONS.vacancies, String(job.id)), patch);
+  const recipient = job.createdBy?.trim().toLowerCase() ?? "";
+  const mailRef = doc(database, COLLECTIONS.mail, `vacancy-approved-${job.id}`);
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient) && !(await getDoc(mailRef)).exists()) {
+    batch.set(mailRef, {
+      to: recipient,
+      message: {
+        subject: `Vacancy approved: ${job.title}`,
+        text: `Your vacancy listing "${job.title}" for ${job.company} has been approved by the QIU Industry Day administrator. It is now available in the portal.`,
+      },
+      createdAt: serverTimestamp(),
+    });
+  }
+  await batch.commit();
 }
 
 export async function rejectJob(id: number) {
@@ -203,16 +224,15 @@ export async function setEventCode(eventId: number, code: EventCode) {
 
 export async function stopEventCode(eventId: number) {
   await setDoc(doc(requireDb(), COLLECTIONS.eventCodes, String(eventId)),
-    { activeStep: "none", activeCode: "", codeExpiry: 0 });
+    { activeStep: "none", activeCode: "", codeExpiry: 0, previousCode: "", previousCodeExpiry: 0 });
 }
 
 // ---- Attendance ------------------------------------------------------------
 
-/** CCA threshold: a % of the scheduled session (admin-tunable), else a minutes floor. */
-export function ccaThresholdMinutes(sessionMinutes: number, settings?: Pick<AppSettings, "ccaPercent" | "ccaFloorMinutes">) {
+/** CCA threshold: an admin-tunable percentage of the scheduled session. */
+export function ccaThresholdMinutes(sessionMinutes: number, settings?: Pick<AppSettings, "ccaPercent">) {
   const percent = settings?.ccaPercent ?? DEFAULT_SETTINGS.ccaPercent;
-  const floor = settings?.ccaFloorMinutes ?? DEFAULT_SETTINGS.ccaFloorMinutes;
-  return sessionMinutes > 0 ? Math.round((percent / 100) * sessionMinutes) : floor;
+  return sessionMinutes > 0 ? Math.ceil((percent / 100) * sessionMinutes) : 0;
 }
 
 export async function checkInAttendance(event: EventItem, uid: string, name: string, email: string, code: string) {
@@ -223,10 +243,10 @@ export async function checkInAttendance(event: EventItem, uid: string, name: str
   });
 }
 
-export async function checkOutAttendance(event: EventItem, uid: string, code: string, existing: Attendance, settings?: Pick<AppSettings, "ccaPercent" | "ccaFloorMinutes">) {
+export async function checkOutAttendance(event: EventItem, uid: string, code: string, existing: Attendance, settings?: Pick<AppSettings, "ccaPercent">) {
   const checkOutMs = Date.now();
-  const durationMinutes = existing.checkInMs ? Math.round((checkOutMs - existing.checkInMs) / 60000) : 0;
-  const caEligible = durationMinutes >= ccaThresholdMinutes(event.sessionMinutes, settings);
+  const durationMinutes = existing.checkInMs ? Math.floor((checkOutMs - existing.checkInMs) / 60000) : 0;
+  const caEligible = event.sessionMinutes > 0 && durationMinutes >= ccaThresholdMinutes(event.sessionMinutes, settings);
   await updateDoc(doc(requireDb(), COLLECTIONS.attendance, `${event.id}_${uid}`), {
     code, step: "checkout", checkOutMs, durationMinutes, caEligible, checkOutAt: serverTimestamp(),
   });
@@ -359,19 +379,70 @@ export function subscribeSignups(onData: (rows: EmployerSignup[]) => void) {
  */
 export async function approveSignup(signup: EmployerSignup, approverEmail: string) {
   const database = requireDb();
-  await setDoc(doc(database, COLLECTIONS.whitelist, signup.email), {
+  const companyId = companyIdForSignup(signup.email);
+  const batch = writeBatch(database);
+  batch.set(doc(database, COLLECTIONS.whitelist, signup.email), {
     email: signup.email, role: "employer", company: signup.company, active: true, addedBy: approverEmail, updatedAt: serverTimestamp(),
   }, { merge: true });
-  await saveCompany({
-    id: Date.now(),
+  batch.set(doc(database, COLLECTIONS.companies, String(companyId)), {
+    id: companyId,
     name: signup.company,
-    website: signup.website || undefined,
-    logoUrl: signup.logoUrl || undefined,
-    videoUrl: signup.videoUrl || undefined,
-    summary: signup.summary || undefined,
+    email: signup.email,
+    ...(signup.website ? { website: signup.website } : {}),
+    ...(signup.logoUrl ? { logoUrl: signup.logoUrl } : {}),
+    ...(signup.videoUrl ? { videoUrl: signup.videoUrl } : {}),
+    ...(signup.summary ? { summary: signup.summary } : {}),
     status: "approved",
-  }, false, signup.email);
-  await deleteDoc(doc(database, COLLECTIONS.signups, signup.email));
+    createdBy: signup.email,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  batch.delete(doc(database, COLLECTIONS.signups, signup.email));
+  batch.set(doc(database, COLLECTIONS.mail, `registration-approved-${signup.email}`), {
+    to: signup.email,
+    message: {
+      subject: `Company registration approved: ${signup.company}`,
+      text: `Hi ${signup.name},\n\n${signup.company}'s registration for QIU Industry Day has been approved. Sign in to the portal with this Google account to manage your company profile and vacancy listings.`,
+    },
+    createdAt: serverTimestamp(),
+  });
+  await batch.commit();
+}
+
+function companyIdForSignup(email: string) {
+  let hash = 2166136261;
+  for (const char of email.trim().toLowerCase()) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return 8_000_000_000_000 + (hash >>> 0);
+}
+
+/** Revoke one employer and atomically remove their exhibitor profile, vacancies,
+ * pending signup, and per-vacancy public counters. Recruitment history remains. */
+export async function revokeEmployerAccess(email: string, companyName = "") {
+  const database = requireDb();
+  const owner = email.trim().toLowerCase();
+  const company = companyName.trim();
+  const [ownedJobs, companyJobs, ownedProfiles, namedProfiles] = await Promise.all([
+    getDocs(query(collection(database, COLLECTIONS.vacancies), where("createdBy", "==", owner))),
+    company ? getDocs(query(collection(database, COLLECTIONS.vacancies), where("company", "==", company))) : null,
+    getDocs(query(collection(database, COLLECTIONS.companies), where("createdBy", "==", owner))),
+    company ? getDocs(query(collection(database, COLLECTIONS.companies), where("name", "==", company))) : null,
+  ]);
+  const vacancyRefs = new Map<string, DocumentReference>();
+  const companyRefs = new Map<string, DocumentReference>();
+  for (const snapshot of [ownedJobs, companyJobs]) snapshot?.docs.forEach((entry) => vacancyRefs.set(entry.ref.path, entry.ref));
+  for (const snapshot of [ownedProfiles, namedProfiles]) snapshot?.docs.forEach((entry) => companyRefs.set(entry.ref.path, entry.ref));
+  const writeCount = vacancyRefs.size * 2 + companyRefs.size + 2;
+  if (writeCount > 450) throw new Error("Company has too many records for one safe revoke operation.");
+  const batch = writeBatch(database);
+  vacancyRefs.forEach((ref) => {
+    batch.delete(ref);
+    batch.delete(doc(database, COLLECTIONS.jobStats, ref.id));
+  });
+  companyRefs.forEach((ref) => batch.delete(ref));
+  batch.delete(doc(database, COLLECTIONS.signups, owner));
+  batch.delete(doc(database, COLLECTIONS.whitelist, owner));
+  await batch.commit();
+  return { vacancies: vacancyRefs.size, profiles: companyRefs.size };
 }
 
 export async function deleteSignup(email: string) {
@@ -388,6 +459,7 @@ export async function resetAllData(superadminEmail: string) {
     COLLECTIONS.vacancies, COLLECTIONS.applications, COLLECTIONS.viewEvents, COLLECTIONS.resumes,
     COLLECTIONS.chatLogs, COLLECTIONS.events, COLLECTIONS.eventCodes, COLLECTIONS.attendance,
     COLLECTIONS.jobStats, COLLECTIONS.companies, COLLECTIONS.signups, COLLECTIONS.whitelist,
+    COLLECTIONS.mail,
   ];
   for (const c of cols) {
     const snap = await getDocs(collection(database, c));

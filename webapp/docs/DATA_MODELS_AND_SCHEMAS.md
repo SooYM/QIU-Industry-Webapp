@@ -131,6 +131,7 @@ export interface EventItem {
   sessionMinutes: number;         // Scheduled length driving CCA calculation
   presenters: string[];           // Whitelisted presenter emails
   qrRotateSeconds?: number;
+  specialization?: string;        // Target field (e.g. "AI & Machine Learning" or custom text)
   createdBy?: string;
 }
 
@@ -202,7 +203,6 @@ export interface AppSettings {
   portalTagline: string;
   qrRotateSeconds: number;
   ccaPercent: number;
-  ccaFloorMinutes: number;
   tabs: { home: boolean; events: boolean; vacancies: boolean; resume: boolean; history: boolean };
 }
 
@@ -214,6 +214,11 @@ export interface JobStats {
 ---
 
 ## 3. Detailed Firestore Collection Specifications
+
+#### Usage Notes
+- Employers can only manage `jobItems` where `createdBy` matches their UID email (`authorEmail`).
+- `employer_signups` are external non-QIU vendors awaiting approval. Once approved (`approved: true`), an Admin provisions an `appUsers` profile and adds them to `companies`.
+- Admins have access to a robust sort and filter panel in the Manage Vacancies dashboard to sort jobs by creation time, title, and company alphabetically.
 
 ### 3.1 `users/{uid}`
 - **Document ID**: User's Firebase Authentication UID (`request.auth.uid`).
@@ -348,13 +353,12 @@ export interface JobStats {
   - `status`: enum (`'pending'`, `'approved'`)
 
 ### 3.13 `app_settings/{docId}`
-- **Document ID**: `'default'`.
+- **Document ID**: `'app'`.
 - **Purpose**: Portal-wide administrative settings.
 - **Schema**:
   - `portalTitle`, `portalTagline`: string
   - `qrRotateSeconds`: number ($5$ to $600$)
   - `ccaPercent`: number ($0$ to $100$)
-  - `ccaFloorMinutes`: number ($0$ to $1,440$)
   - `tabs`: map of boolean tab toggles
 
 ---

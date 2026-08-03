@@ -68,17 +68,17 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
     ],
   },
   employer: {
-    title: "Welcome — your Employer Dashboard",
+    title: "Welcome — your Company Dashboard",
     intro: "Post roles, review candidates, and see what students ask. Reopen this any time from the ? button.",
     sections: [
       {
         heading: "1 · Post a vacancy",
         points: [
-          "Open the Employer dashboard and go to the Vacancies tab.",
+          "Open the Company dashboard and go to the Vacancies tab.",
           "Your company name is filled in automatically from your account, so you can leave that part to us.",
           "New listings and edits go to an admin for a quick approval before students see them.",
         ],
-        demo: <Demo><Chip className="admin-button">Employer dashboard</Chip><Chip className="save-job">Add vacancy</Chip></Demo>,
+        demo: <Demo><Chip className="admin-button">Company dashboard</Chip><Chip className="save-job">Add vacancy</Chip></Demo>,
       },
       {
         heading: "2 · Review candidates",
@@ -93,13 +93,13 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
   },
   admin: {
     title: "Welcome — Admin overview",
-    intro: "Manage vacancies and events, approve employer posts, and oversee activity. Reopen this any time from the ? button.",
+    intro: "Manage vacancies and events, approve company posts, and oversee activity. Reopen this any time from the ? button.",
     sections: [
       {
         heading: "1 · Vacancies & approvals",
         points: [
           "Admin dashboard → Vacancies to add, edit or delete any listing.",
-          "The Approvals tab holds employer submissions — approve/reject each, or approve them all at once.",
+          "The Approvals tab holds company submissions — approve/reject each, or approve them all at once.",
         ],
         demo: <Demo><Chip className="admin-button">Admin dashboard</Chip><Chip className="admin-button">✓ Approve all (3)</Chip></Demo>,
       },
@@ -116,7 +116,7 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
       {
         heading: "3 · People & oversight",
         points: [
-          "Access tab: assign roles and approve non-QIU employers (set their company).",
+          "Access tab: assign roles and approve non-QIU company representatives.",
           "Activity & Chats tabs list applications and questions grouped by student — click a student to expand.",
         ],
       },
@@ -124,9 +124,9 @@ const GUIDES: Record<"student" | "employer" | "admin", { title: string; intro: s
         heading: "4 · Settings (no code needed)",
         points: [
           "The Settings tab is where you change the portal without a developer.",
-          "Edit the title & tagline, add the exhibitor companies for the Home page, tune the QR rotate time and CCA rules, and show/hide whole tabs.",
+          "Edit the title and tagline, add companies for the Home page, tune QR and CCA rules, and show or hide tabs.",
         ],
-        demo: <Demo><Chip className="tone-accent" style={{ borderRadius: ".5rem", padding: ".4rem .7rem", fontWeight: 700 }}>Settings</Chip><Chip className="save-job">Add exhibitor</Chip></Demo>,
+        demo: <Demo><Chip className="tone-accent" style={{ borderRadius: ".5rem", padding: ".4rem .7rem", fontWeight: 700 }}>Settings</Chip><Chip className="save-job">Add company</Chip></Demo>,
       },
     ],
   },

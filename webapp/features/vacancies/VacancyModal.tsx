@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import type { Job } from "../../lib/data/types";
+import type { Company, Job } from "../../lib/data/types";
 import { getYouTubeEmbedUrl } from "../../app/auth-policy";
 import { useAuth } from "../../app/auth-context";
 import { logChat } from "../../lib/data/firestore";
 import { RichText } from "../../app/RichText";
 import { Modal } from "../../components/Modal";
 import { formatSalary } from "./vacancy-utils";
+import { AI_WARNING, withAiWarning } from "../../app/chat";
 
 /** Deterministic answer grounded ONLY in this job's own fields — no cross-listing search. */
 function answerAboutJob(question: string, job: Job): string {
@@ -16,10 +17,10 @@ function answerAboutJob(question: string, job: Job): string {
   const parts: string[] = [];
 
   if (has(/prepare|require|qualif|skill|need|eligib|experience|criteria/)) {
-    parts.push(req ? `**Requirements:** ${req}` : `The listing states a minimum requirement of **${job.minimumRequirement}**. No further requirements were provided.`);
+    parts.push(req ? `**Qualifications:** ${req}` : `The listing states a minimum qualification of **${job.minimumRequirement}**. No further qualifications were provided.`);
   }
-  if (has(/scope|responsib|\bdo\b|role|task|duties|day-to-day|involve/)) {
-    if (scope) parts.push(`**Job scope:** ${scope}`);
+  if (has(/scope|description|responsib|\bdo\b|role|task|duties|day-to-day|involve/)) {
+    if (scope) parts.push(`**Description:** ${scope}`);
   }
   if (has(/salary|pay|wage|rm|allowance|stipend/)) {
     parts.push(job.salary ? `The listed salary is **RM ${job.salary.toLocaleString()} / ${job.payFrequency.toLowerCase()}**.` : "The salary is not stated on this listing.");
@@ -33,9 +34,9 @@ function answerAboutJob(question: string, job: Job): string {
   if (parts.length) return parts.join("\n\n");
 
   // No specific intent — summarise strictly from the listing's description fields.
-  const summary = [scope && `**Scope:** ${scope}`, req && `**Requirements:** ${req}`].filter(Boolean).join("\n\n");
+  const summary = [scope && `**Description:** ${scope}`, req && `**Qualifications:** ${req}`].filter(Boolean).join("\n\n");
   if (summary) return `Here is what this listing says:\n\n${summary}`;
-  return `This is a **${job.type} ${job.title}** role at **${job.company}** in ${job.location} (minimum ${job.minimumRequirement}). The listing has no further description — contact ${job.email || "the employer"} for details.`;
+  return `This is a **${job.type} ${job.title}** role at **${job.company}** in ${job.location} (minimum qualification: ${job.minimumRequirement}). The listing has no further description — contact ${job.email || "the company"} for details.`;
 }
 
 /** Grounded assistant scoped to a SINGLE job. Streams the answer and auto-scrolls. */
@@ -45,7 +46,7 @@ function JobAssistant({ job }: { job: Job }) {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: `Ask me about the **${job.title}** role at **${job.company}**. I only answer from this listing.` },
+    { role: "assistant", content: withAiWarning(`Ask me about the **${job.title}** role at **${job.company}**. I only answer from this listing.`) },
   ]);
   const boxRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -64,7 +65,8 @@ function JobAssistant({ job }: { job: Job }) {
     if (!question || streaming) return;
     setInput("");
     const answer = answerAboutJob(question, job);
-    setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: "" }]);
+    const loggedAnswer = withAiWarning(answer);
+    setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: AI_WARNING }]);
     setStreaming(true);
     // Typewriter streaming.
     let i = 0;
@@ -72,7 +74,7 @@ function JobAssistant({ job }: { job: Job }) {
       i += 3;
       setMessages((m) => {
         const copy = m.slice();
-        copy[copy.length - 1] = { role: "assistant", content: answer.slice(0, i) };
+        copy[copy.length - 1] = { role: "assistant", content: `${AI_WARNING}\n\n${answer.slice(0, i)}` };
         return copy;
       });
       if (i < answer.length) window.setTimeout(stream, 16);
@@ -84,7 +86,7 @@ function JobAssistant({ job }: { job: Job }) {
         id: `${user.uid}_${Date.now()}`, studentUid: user.uid,
         ...(employeeId ? { studentEmployeeId: employeeId } : {}),
         studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Anonymous",
-        company: job.company, question, answer,
+        company: job.company, question, answer: loggedAnswer,
       }).catch(() => { /* best-effort */ });
     }
   }
@@ -103,7 +105,6 @@ function JobAssistant({ job }: { job: Job }) {
             <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Ask about ${job.title}…`} aria-label="Ask about this job" />
             <button disabled={!input.trim() || streaming} aria-label="Send question">↑</button>
           </form>
-          <p className="chat-disclaimer">⚠️ AI can make mistakes — verify important details.</p>
           <div ref={endRef} aria-hidden="true" />
         </>
       )}
@@ -113,6 +114,7 @@ function JobAssistant({ job }: { job: Job }) {
 
 export function VacancyModal({
   job,
+  company,
   isStudent,
   recommended = false,
   applied = false,
@@ -125,6 +127,7 @@ export function VacancyModal({
   onClose,
 }: {
   job: Job;
+  company?: Company;
   isStudent: boolean;
   recommended?: boolean;
   applied?: boolean;
@@ -136,7 +139,10 @@ export function VacancyModal({
   onGoToResume?: () => void;
   onClose: () => void;
 }) {
-  const embedUrl = getYouTubeEmbedUrl(job.youtubeUrl);
+  const jobEmbedUrl = getYouTubeEmbedUrl(job.youtubeUrl);
+  const corporateEmbedUrl = getYouTubeEmbedUrl(company?.videoUrl);
+  const embedUrl = jobEmbedUrl || corporateEmbedUrl;
+  const isJobVideo = Boolean(jobEmbedUrl);
   const hasVideo = Boolean(embedUrl);
   const hasResume = hasGeneratedResume || hasResumeLink;
   // Default the choice to whichever the student has (generated preferred when both).
@@ -159,32 +165,32 @@ export function VacancyModal({
       <div className="detail-grid">
         <div className="detail-main">
           {job.jobScope && job.jobScope.trim()
-            ? <section><span className="detail-label">JOB SCOPE</span><p style={{ whiteSpace: "pre-wrap" }}>{job.jobScope}</p></section>
+            ? <section><span className="detail-label">DESCRIPTION</span><p style={{ whiteSpace: "pre-wrap" }}>{job.jobScope}</p></section>
             : null}
           {job.requirement && job.requirement.trim()
-            ? <section><span className="detail-label">REQUIREMENTS</span><p style={{ whiteSpace: "pre-wrap" }}>{job.requirement}</p></section>
+            ? <section><span className="detail-label">QUALIFICATIONS</span><p style={{ whiteSpace: "pre-wrap" }}>{job.requirement}</p></section>
             : null}
           {!(job.jobScope && job.jobScope.trim()) && !(job.requirement && job.requirement.trim()) && (
-            <section><span className="detail-label">ABOUT THIS ROLE</span><p>Full scope and requirements to be confirmed with the employer.</p></section>
+            <section><span className="detail-label">ABOUT THIS ROLE</span><p>Full description and qualifications to be confirmed with the company.</p></section>
           )}
-          <section><span className="detail-label">LISTING DETAILS</span><dl><div><dt>Specialization</dt><dd>{job.specialization}</dd></div><div><dt>Minimum requirement</dt><dd>{job.minimumRequirement}</dd></div><div><dt>Available places</dt><dd>{job.vacancies}</dd></div><div><dt>Pay frequency</dt><dd>{job.payFrequency}</dd></div></dl></section>
+          <section><span className="detail-label">LISTING DETAILS</span><dl><div><dt>Specialization</dt><dd>{job.specialization}</dd></div><div><dt>Minimum qualification</dt><dd>{job.minimumRequirement}</dd></div><div><dt>Available places</dt><dd>{job.vacancies}</dd></div><div><dt>Pay frequency</dt><dd>{job.payFrequency}</dd></div></dl></section>
           {hasVideo && (
             <section className="mt-4">
-              <span className="detail-label flex items-center gap-1.5">🎬 JOB VIDEO</span>
+              <span className="detail-label">{isJobVideo ? "JOB VIDEO" : "CORPORATE VIDEO"}</span>
               <div className="overflow-hidden rounded-xl border border-token mt-1.5">
                 <iframe
                   src={embedUrl}
-                  title={`${job.company} Corporate Video`}
+                  title={isJobVideo ? `${job.title} job video` : `${job.company} corporate video`}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                   className="w-full aspect-video rounded-xl border-0"
                 />
               </div>
-              <small className="text-[11px] text-accent mt-1 block">Job video supplied by {job.company}.</small>
+              <small className="text-[11px] text-accent mt-1 block">{isJobVideo ? `Job video supplied by ${job.company}.` : `Corporate video supplied by ${job.company}.`}</small>
             </section>
           )}
         </div>
-        <aside className="market-card"><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email employer →</a> : <p>No enquiry email supplied.</p>}
+        <aside className="market-card"><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email company →</a> : <p>No enquiry email supplied.</p>}
         {isStudent && (
           <>
             <hr/>
@@ -205,7 +211,7 @@ export function VacancyModal({
                 )}
                 <button type="button" className="enquire-main" onClick={() => {
                   const label = resumeChoice === "generated" ? "generated CV" : "resume link";
-                  if (window.confirm(`Consent to apply\n\nBy applying, you agree to share your ${label}, name and email address with ${job.company} (the employer) and Quest International University, to be used for recruitment and QIU Industry Day purposes.\n\nDo you want to continue?`)) onApply?.(resumeChoice);
+                  if (window.confirm(`Consent to apply\n\nBy applying, you agree to share your ${label}, name and email address with ${job.company} and Quest International University, to be used for recruitment and QIU Industry Day purposes.\n\nDo you want to continue?`)) onApply?.(resumeChoice);
                 }}>Apply to this vacancy →</button>
                 <small className="text-accent">By applying, you consent to sharing your {hasGeneratedResume && hasResumeLink ? "chosen resume" : hasGeneratedResume ? "generated CV" : "resume link"}, name and email with <b>{job.company}</b> and <b>QIU</b> for recruitment purposes.</small>
               </>

@@ -10,21 +10,23 @@ import {
   subscribeEvents, subscribeJobStats, subscribeMyResume, subscribeSettings, subscribeVacancies, subscribeViews,
 } from "../lib/data/firestore";
 import type { AppSettings, Application, Attendance, Company, EventItem, Job, Resume, ViewEvent } from "../lib/data/types";
-import { hasGeneratedCV } from "../lib/data/types";
+import { hasGeneratedCV, isApprovedCompany } from "../lib/data/types";
+import { findCompanyByName } from "../lib/data/company-matching";
 import { jobMatchesCourse, resolveCourse } from "../lib/data/course-map";
 import { VacancyFilters } from "../features/vacancies/VacancyFilters";
 import { VacancyList } from "../features/vacancies/VacancyList";
 import { VacancyModal } from "../features/vacancies/VacancyModal";
 import { AdminPanel } from "../features/admin/AdminPanel";
-import { AdminSummary } from "../features/admin/AdminSummary";
+import { AdminSummary, type DashboardActivity } from "../features/admin/AdminSummary";
 import { EmployerSummary } from "../features/admin/EmployerSummary";
+import { DashboardConversationModal } from "../features/admin/DashboardConversationModal";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
 import { HomeView } from "../features/home/HomeView";
 import { EventsView } from "../features/events/EventsView";
 import { EventDetail } from "../features/events/EventDetail";
 import { Guide } from "../features/Guide";
-import { PREFS_KEY, type TextScale, type Theme } from "../features/vacancies/vacancy-utils";
+import { PREFS_KEY, type Theme, type VacancyView } from "../features/vacancies/vacancy-utils";
 import { notify } from "../components/toast";
 
 type Tab = "summary" | "home" | "vacancies" | "history" | "resume" | "events" | "dashboard";
@@ -43,13 +45,12 @@ export default function Home() {
   const [specialization, setSpecialization] = useState("All specializations");
   const [type, setType] = useState("All opportunities");
   const [maxSalary, setMaxSalary] = useState(10000);
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState(9);
   const [columns, setColumns] = useState(3);
-  const [textScale, setTextScale] = useState<TextScale>("default");
+  const [vacancyView, setVacancyView] = useState<VacancyView>("cards");
   const [theme, setTheme] = useState<Theme>("light");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedDashboardChat, setSelectedDashboardChat] = useState<DashboardActivity | null>(null);
   const [recommendationMode, setRecommendationMode] = useState<"all" | "recommended">("all");
   const [sort, setSort] = useState<"default" | "newest" | "oldest" | "salary_high" | "salary_low">("default");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
@@ -64,12 +65,11 @@ export default function Home() {
 
   useEffect(() => {
     try {
-      const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<{ perPage: number; columns: number; textScale: TextScale; theme: Theme }>;
+      const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<{ columns: number; vacancyView: VacancyView; theme: Theme }>;
       // Hydrate browser preferences only after mount.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if ([6, 9, 12, 24].includes(prefs.perPage ?? 0)) setPerPage(prefs.perPage!);
       if ([2, 3].includes(prefs.columns ?? 0)) setColumns(prefs.columns!);
-      if (["default", "large", "xlarge"].includes(prefs.textScale ?? "")) setTextScale(prefs.textScale!);
+      if (["cards", "list"].includes(prefs.vacancyView ?? "")) setVacancyView(prefs.vacancyView!);
       setTheme(prefs.theme ?? "light"); // default light regardless of system setting
     } catch { /* Ignore malformed device-local preferences. */ }
   }, []);
@@ -139,13 +139,12 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.classList.toggle("dark", theme === "dark");
-    document.documentElement.dataset.textScale = textScale;
-    localStorage.setItem(PREFS_KEY, JSON.stringify({ perPage, columns, textScale, theme }));
-  }, [perPage, columns, textScale, theme]);
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ columns, vacancyView, theme }));
+  }, [columns, vacancyView, theme]);
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setSelectedJob(null); setSelectedEvent(null); }
+      if (event.key === "Escape") { setSelectedJob(null); setSelectedEvent(null); setSelectedDashboardChat(null); }
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
@@ -168,7 +167,7 @@ export default function Home() {
     try { if (!localStorage.getItem(k)) { setGuideOpen(true); localStorage.setItem(k, "1"); } } catch { /* ignore */ }
   }, [user, role]);
 
-  const isAnyModalOpen = Boolean(selectedJob || selectedEvent || guideOpen);
+  const isAnyModalOpen = Boolean(selectedJob || selectedEvent || selectedDashboardChat || guideOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -199,7 +198,7 @@ export default function Home() {
     if (!isStudent) {
       const toggleable: [Tab, string][] = ([["home", role === "employer" ? "Companies" : "Home"], ["events", "Events"], ["vacancies", "Vacancies"]] as [Tab, string][])
         .filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
-      return [["summary", "Summary"] as [Tab, string], ["dashboard", role === "employer" ? "Employer tools" : "Admin tools"] as [Tab, string], ...toggleable];
+      return [["summary", "Summary"] as [Tab, string], ["dashboard", role === "employer" ? "Company tools" : "Admin tools"] as [Tab, string], ...toggleable];
     }
     const studentTabs: [Tab, string][] = [["home", "Home"], ["events", "Events"], ["resume", "My Resume"], ["vacancies", "Vacancies"], ["history", "History"]];
     return studentTabs.filter(([key]) => settings.tabs[key as keyof AppSettings["tabs"]] !== false);
@@ -223,6 +222,13 @@ export default function Home() {
   }, [visibleTabs, tab]);
   // Students browse only approved vacancies; managers see every record.
   const jobs = useMemo(() => (isStudent ? customJobs.filter(isApproved) : customJobs), [customJobs, isStudent]);
+  const companiesByName = useMemo(() => {
+    const approved = exhibitors.filter(isApprovedCompany);
+    return new Map(jobs.flatMap((job) => {
+      const match = findCompanyByName(approved, job.company);
+      return match ? [[job.company.trim().toLowerCase(), match] as const] : [];
+    }));
+  }, [exhibitors, jobs]);
   const appliedJobIds = useMemo(() => new Set(myApplications.map((a) => a.jobId)), [myApplications]);
   const programme = useMemo(() => (course ? resolveCourse(course) : null), [course]);
   const companies = useMemo(() => ["All companies", ...Array.from(new Set(jobs.map((job) => job.company))).filter(Boolean).sort()], [jobs]);
@@ -255,10 +261,7 @@ export default function Home() {
     return list;
   }, [jobs, query, company, specialization, type, maxSalary, recommendationMode, course, isStudent, sort]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
-  const currentPage = Math.min(page, pageCount);
-  const visibleJobs = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
-  const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setSort("default"); setPage(1); };
+  const resetFilters = () => { setQuery(""); setCompany("All companies"); setSpecialization("All specializations"); setType("All opportunities"); setMaxSalary(10000); setSort("default"); };
 
   function withdrawFromJob(job: Job) {
     if (!user) return;
@@ -292,9 +295,27 @@ export default function Home() {
     event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
   }
 
+  function openDashboardActivity(activity: DashboardActivity) {
+    if (activity.type === "question") { setSelectedDashboardChat(activity); return; }
+    if (activity.jobId) {
+      const job = customJobs.find((item) => item.id === activity.jobId);
+      if (job) { setSelectedJob(job); return; }
+      notify("This vacancy is no longer available.", "error");
+      return;
+    }
+    if (activity.eventId) {
+      const event = events.find((item) => item.id === activity.eventId);
+      if (event) { setSelectedEvent(event); return; }
+      notify("This event is no longer available.", "error");
+    }
+  }
+
   const [titleHead, ...titleRest] = settings.portalTitle.split(" ");
+  const brandTab: Tab = isStudent
+    ? (settings.tabs.home !== false ? "home" : visibleTabs[0]?.[0] ?? "home")
+    : "summary";
   const brand = (
-    <a className="brand" href="#top" aria-label={`${settings.portalTitle} home`}>
+    <a className="brand" href="#top" onClick={() => setTab(brandTab)} aria-label={`${settings.portalTitle} — go to ${brandTab}`}>
       <img className="brand-logo" src="/qiu-logo.png" alt="QIU" />
       <span>{titleHead}{titleRest.length ? <> <span>{titleRest.join(" ")}</span></> : null}</span>
     </a>
@@ -332,7 +353,7 @@ export default function Home() {
 
       {tab === "summary" && !isStudent && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          {role === "employer" ? <EmployerSummary companies={employerCompany ? [employerCompany] : []} /> : <AdminSummary />}
+          {role === "employer" ? <EmployerSummary companies={employerCompany ? [employerCompany] : []} onOpenActivity={openDashboardActivity} /> : <AdminSummary onOpenActivity={openDashboardActivity} />}
         </section>
       )}
 
@@ -352,9 +373,8 @@ export default function Home() {
       <section className="utility-bar" aria-label="Vacancy display settings">
         <div><strong>Browse vacancies</strong><span>{jobsLoading ? "Loading records…" : `${jobs.length} records available`}</span></div>
         <button className="mobile-filter-toggle" aria-expanded={mobileFiltersOpen} aria-controls="vacancy-filters" onClick={() => setMobileFiltersOpen((open) => !open)}>{mobileFiltersOpen ? "Hide filters" : "Filter results"}</button>
-        <label>Per page<select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>{[6, 9, 12, 24].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-        <label>Layout<select value={columns} onChange={(e) => setColumns(Number(e.target.value))}><option value={3}>3 columns</option><option value={2}>2 columns</option></select></label>
-        <label>Text size<select value={textScale} onChange={(e) => setTextScale(e.target.value as TextScale)}><option value="default">Default</option><option value="large">Large</option><option value="xlarge">Extra large</option></select></label>
+        <label>Card columns<select value={columns} disabled={vacancyView === "list"} onChange={(e) => setColumns(Number(e.target.value))}><option value={3}>3 columns</option><option value={2}>2 columns</option></select></label>
+        <label>View<select value={vacancyView} onChange={(e) => setVacancyView(e.target.value as VacancyView)}><option value="cards">Detailed cards</option><option value="list">List view</option></select></label>
       </section>
 
       <section className="workspace" id="jobs">
@@ -362,40 +382,38 @@ export default function Home() {
           isStudent={isStudent}
           programmeLabel={programme ? `${programme.name}${programme.level ? ` · ${programme.level}` : ""}` : undefined}
           recommendationMode={recommendationMode}
-          onRecommendationMode={(mode) => { setRecommendationMode(mode); setPage(1); }}
+          onRecommendationMode={setRecommendationMode}
           query={query}
-          onQuery={(value) => { setQuery(value); setPage(1); }}
+          onQuery={setQuery}
           company={company}
           companies={companies}
-          onCompany={(value) => { setCompany(value); setPage(1); }}
+          onCompany={setCompany}
           specialization={specialization}
           specializations={specializations}
-          onSpecialization={(value) => { setSpecialization(value); setPage(1); }}
+          onSpecialization={setSpecialization}
           type={type}
           types={types}
-          onType={(value) => { setType(value); setPage(1); }}
+          onType={setType}
           maxSalary={maxSalary}
-          onMaxSalary={(value) => { setMaxSalary(value); setPage(1); }}
+          onMaxSalary={setMaxSalary}
           sort={sort}
-          onSort={(value) => { setSort(value); setPage(1); }}
+          onSort={setSort}
           mobileFiltersOpen={mobileFiltersOpen}
           onReset={resetFilters}
         />
 
         <section className="results">
-          <div className="results-head"><div><span>VACANCIES</span><h1>{filtered.length} opportunities</h1></div><p>Choose a card to see the role overview, market benchmark, company context, and contact details.</p></div>
+          <div className="results-head"><div><span>VACANCIES</span><h1>{filtered.length} opportunities</h1></div><p>Choose an opportunity to see the role overview, market benchmark, company context, and contact details.</p></div>
           <VacancyList
-            jobs={visibleJobs}
+            jobs={filtered}
+            companiesByName={companiesByName}
             isStudent={isStudent}
             course={course}
             appliedIds={appliedJobIds}
             columns={columns}
-            currentPage={currentPage}
-            pageCount={pageCount}
+            view={vacancyView}
             onGlow={glow}
             onSelect={setSelectedJob}
-            onPrev={() => setPage((p) => Math.max(1, p - 1))}
-            onNext={() => setPage((p) => Math.min(pageCount, p + 1))}
             onReset={resetFilters}
           />
         </section>
@@ -422,9 +440,15 @@ export default function Home() {
 
       <footer>{brand}<p>{settings.portalTagline}</p></footer>
 
+      <a className="back-to-top" href="#top" aria-label="Back to top" title="Back to top">
+        <span aria-hidden="true">↑</span>
+        <span>Top</span>
+      </a>
+
       {selectedJob && (
         <VacancyModal
           job={selectedJob}
+          company={companiesByName.get(selectedJob.company.trim().toLowerCase())}
           isStudent={isStudent}
           recommended={isStudent && jobMatchesCourse(selectedJob, course)}
           applied={appliedJobIds.has(selectedJob.id)}
@@ -448,6 +472,8 @@ export default function Home() {
           onClose={() => setSelectedEvent(null)}
         />
       )}
+
+      {selectedDashboardChat && <DashboardConversationModal activity={selectedDashboardChat} onClose={() => setSelectedDashboardChat(null)} />}
 
       {guideOpen && <Guide role={role} onClose={() => setGuideOpen(false)} />}
     </main>

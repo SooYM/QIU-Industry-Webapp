@@ -150,6 +150,33 @@ test("only verified qiu.edu.my accounts can read vacancies", async () => {
   await assertFails(getDoc(doc(passwordUser.firestore(), "vacancies", "seed")));
 });
 
+test("inactive external whitelist entries lose access and cannot enumerate accounts", async () => {
+  await seedUsers([["employer-1", "hr@acme.com", "employer"]]);
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "vacancies", "seed"), vacancy("hr@acme.com"));
+    await updateDoc(doc(context.firestore(), "whitelisted_emails", "hr@acme.com"), { active: false });
+    await setDoc(doc(context.firestore(), "whitelisted_emails", "other@example.com"), { active: true });
+  });
+  const revoked = testEnv.authenticatedContext("employer-1", qiuAuth("hr@acme.com"));
+  await assertFails(getDoc(doc(revoked.firestore(), "vacancies", "seed")));
+  await assertSucceeds(getDoc(doc(revoked.firestore(), "whitelisted_emails", "hr@acme.com")));
+  await assertFails(getDocs(collection(revoked.firestore(), "whitelisted_emails")));
+});
+
+test("only admins can create immutable approval mail records", async () => {
+  await seedUsers([["admin-1", "admin@qiu.edu.my", "admin"]]);
+  const admin = testEnv.authenticatedContext("admin-1", qiuAuth("admin@qiu.edu.my"));
+  const user = testEnv.authenticatedContext("user-1", qiuAuth("user@qiu.edu.my"));
+  const message = {
+    to: "hr@acme.com",
+    message: { subject: "Registration approved", text: "Your company is approved." },
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(doc(admin.firestore(), "mail", "approval-1"), message));
+  await assertFails(setDoc(doc(user.firestore(), "mail", "approval-2"), message));
+  await assertFails(updateDoc(doc(admin.firestore(), "mail", "approval-1"), { message: { subject: "Changed", text: "Changed" } }));
+});
+
 test("users can bootstrap a user profile but cannot elevate their own role", async () => {
   const user = testEnv.authenticatedContext("user-1", qiuAuth("user@qiu.edu.my"));
   const profileRef = doc(user.firestore(), "users", "user-1");
@@ -329,6 +356,50 @@ test("chat_logs: students append their own; admins and employers read; no studen
   await assertSucceeds(getDoc(doc(admin.firestore(), "chat_logs", "chat-1")));
   await assertSucceeds(getDoc(doc(employer.firestore(), "chat_logs", "chat-1")));
   await assertFails(getDoc(doc(student.firestore(), "chat_logs", "chat-1")));
+});
+
+test("attendance accepts the previous rotating QR only during its grace interval", async () => {
+  const student = testEnv.authenticatedContext("student-1", qiuAuth("student@qiu.edu.my"));
+  const other = testEnv.authenticatedContext("student-2", qiuAuth("other@qiu.edu.my"));
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "event_codes", "42"), {
+      activeStep: "checkin",
+      activeCode: "current-code",
+      codeExpiry: Date.now() + 60_000,
+      previousCode: "previous-code",
+      previousCodeExpiry: Date.now() + 30_000,
+    });
+  });
+  const attendance = {
+    id: "42_student-1", eventId: 42, eventTitle: "Industry Talk",
+    studentUid: "student-1", studentEmail: "student@qiu.edu.my", studentName: "Student One",
+    code: "previous-code", step: "checkin", checkInMs: Date.now(), checkInAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(doc(student.firestore(), "attendance", attendance.id), attendance));
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await updateDoc(doc(context.firestore(), "event_codes", "42"), { previousCodeExpiry: 0 });
+  });
+  await assertFails(setDoc(doc(other.firestore(), "attendance", "42_student-2"), {
+    ...attendance, id: "42_student-2", studentUid: "student-2",
+  }));
+});
+
+test("admin settings allow static QR and configurable event specializations", async () => {
+  await seedUsers([["admin-1", "admin@qiu.edu.my", "admin"]]);
+  const admin = testEnv.authenticatedContext("admin-1", qiuAuth("admin@qiu.edu.my"));
+  await assertSucceeds(setDoc(doc(admin.firestore(), "app_settings", "app"), {
+    portalTitle: "Industry Day",
+    qrRotateSeconds: 0,
+    ccaPercent: 80,
+    eventSpecializations: ["Software Engineering", "Other"],
+    tabs: { events: true },
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(admin.firestore(), "app_settings", "app"), {
+    qrRotateSeconds: 1,
+    updatedAt: serverTimestamp(),
+  }));
 });
 
 test("catch-all denies unknown collections", async () => {

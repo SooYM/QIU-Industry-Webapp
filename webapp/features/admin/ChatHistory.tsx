@@ -94,7 +94,7 @@ function CompanyChats({ companies }: { companies: string[] }) {
   return (
     <section className="local-jobs" aria-labelledby="company-chats-title">
       <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="company-chats-title">Questions about your companies</h3></div><div className="flex items-center gap-2"><strong>{sorted.length}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!sorted.length}>⬇ Export CSV</button></div></div>
-      <p className="text-[11px] text-accent">🔒 Questions are anonymized — student identities are never shown to employers.</p>
+      <p className="text-[11px] text-accent">🔒 Questions are anonymized — student identities are never shown to companies.</p>
       {companies.length > 0 && <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by company or text…" aria-label="Search chats" />}
       {!companies.length ? (
         <div className="admin-jobs-empty"><strong>No companies yet</strong><p>Create a vacancy first. Chats mentioning your listed companies will appear here.</p></div>

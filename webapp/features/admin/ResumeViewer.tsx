@@ -5,6 +5,7 @@ import { GeneratedCV } from "../student/GeneratedCV";
 import { downloadCV } from "../student/cv-download";
 import { csvWhen, downloadCsv, toCsv } from "../../lib/data/csv";
 import { notify } from "../../components/toast";
+import { companyListIncludes } from "../../lib/data/company-matching";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -27,7 +28,7 @@ export function ResumeViewer({ employer }: { employer?: { companies: string[] } 
   const employerRows = useMemo(() => {
     if (!employer) return [];
     return apps
-      .filter((a) => employer.companies.includes(a.company))
+      .filter((a) => companyListIncludes(employer.companies, a.company))
       .map((a) => ({ app: a, resume: resumeByUid.get(a.studentUid) }))
       .filter(({ app }) => !q || [app.studentName, app.studentEmail, app.jobTitle, app.company].some((f) => (f ?? "").toLowerCase().includes(q)));
   }, [employer, apps, resumeByUid, q]);

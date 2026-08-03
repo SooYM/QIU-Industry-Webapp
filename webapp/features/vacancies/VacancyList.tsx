@@ -1,43 +1,41 @@
 import type { CSSProperties, PointerEvent } from "react";
-import type { Job } from "../../lib/data/types";
+import type { Company, Job } from "../../lib/data/types";
 import { jobMatchesCourse } from "../../lib/data/course-map";
+import type { VacancyView } from "./vacancy-utils";
 import { VacancyCard } from "./VacancyCard";
 
 export function VacancyList({
   jobs,
+  companiesByName,
   isStudent,
   course,
   appliedIds,
   columns,
-  currentPage,
-  pageCount,
+  view,
   onGlow,
   onSelect,
-  onPrev,
-  onNext,
   onReset,
 }: {
   jobs: Job[];
+  companiesByName?: ReadonlyMap<string, Company>;
   isStudent: boolean;
   course: string | null;
   appliedIds?: Set<number>;
   columns: number;
-  currentPage: number;
-  pageCount: number;
+  view: VacancyView;
   onGlow: (event: PointerEvent<HTMLElement>) => void;
   onSelect: (job: Job) => void;
-  onPrev: () => void;
-  onNext: () => void;
   onReset: () => void;
 }) {
   return (
     <>
       {jobs.length ? (
-        <div className="job-grid" style={{ "--columns": columns } as CSSProperties}>
+        <div className={`job-grid ${view === "list" ? "list-view" : "card-view"}`} style={{ "--columns": columns } as CSSProperties}>
           {jobs.map((job) => (
             <VacancyCard
               key={job.id}
               job={job}
+              company={companiesByName?.get(job.company.trim().toLowerCase())}
               recommended={isStudent && jobMatchesCourse(job, course)}
               applied={isStudent && Boolean(appliedIds?.has(job.id))}
               showStatus={!isStudent}
@@ -49,7 +47,6 @@ export function VacancyList({
       ) : (
         <div className="empty"><strong>No matching vacancies</strong><p>Try widening the salary range or clearing a filter.</p><button onClick={onReset}>Reset filters</button></div>
       )}
-      {pageCount > 1 && <div className="pagination"><button disabled={currentPage === 1} onClick={onPrev}>← Previous</button><span>Page {currentPage} of {pageCount}</span><button disabled={currentPage === pageCount} onClick={onNext}>Next →</button></div>}
     </>
   );
 }

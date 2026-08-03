@@ -114,7 +114,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
               );
             })}
           </div>
-        ) : <div className="admin-jobs-empty"><strong>No vacancies to review</strong><p>New employer vacancies and staged edits appear here.</p></div>}
+        ) : <div className="admin-jobs-empty"><strong>No vacancies to review</strong><p>New company vacancies and staged edits appear here.</p></div>}
       </div>
 
       {/* Companies — registrations (new) + profile edits, combined */}
@@ -131,7 +131,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
                 <div className="local-job-actions">
                   <a className="edit-local" href={`mailto:${s.email}?subject=${encodeURIComponent(`QIU Industry Day 2026 — ${s.company} registration`)}&body=${encodeURIComponent(`Hi ${s.name},\n\nThank you for registering ${s.company} for QIU Industry Day 2026.\n\n`)}`}>✉ Contact</a>
                   <button className="edit-local" onClick={() => setPreview({ name: s.company, website: s.website, logoUrl: s.logoUrl, videoUrl: s.videoUrl, summary: s.summary })}>View</button>
-                  <button className="edit-local" onClick={() => run(() => approveSignup(s, normalizeEmail(user?.email)), `Approved ${s.company} — added to exhibitors.`, "Could not approve.")}>Approve</button>
+                  <button className="edit-local" onClick={() => run(() => approveSignup(s, normalizeEmail(user?.email)), `Approved ${s.company} — added to companies.`, "Could not approve.")}>Approve</button>
                   <button className="delete-local" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email).then(() => notify(`Rejected ${s.company}.`)); }}>Reject</button>
                 </div>
               </div>
@@ -156,7 +156,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
               );
             })}
           </div>
-        ) : <div className="admin-jobs-empty"><strong>No companies to review</strong><p>Self-registrations and employer profile edits appear here. Approving publishes them to the Home exhibitor list.</p></div>}
+        ) : <div className="admin-jobs-empty"><strong>No companies to review</strong><p>Self-registrations and company profile edits appear here. Approving publishes them to the Home company list.</p></div>}
       </div>
 
       {preview && <CompanyPreview company={preview} onClose={() => setPreview(null)} />}

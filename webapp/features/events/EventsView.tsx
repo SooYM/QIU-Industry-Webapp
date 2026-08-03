@@ -71,12 +71,17 @@ export function EventsView({
   const filtered = [...events].filter((e) => !q || [e.title, e.location, e.speakerName].some((f) => (f ?? "").toLowerCase().includes(q)));
   const sorted = sort === "newest" ? filtered.sort((a, b) => b.startAt.localeCompare(a.startAt))
     : sort === "oldest" ? filtered.sort((a, b) => a.startAt.localeCompare(b.startAt))
-    : filtered.sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || a.startAt.localeCompare(b.startAt));
+    : filtered.sort((a, b) => order[eventStatus(a)] - order[eventStatus(b)] || (eventStatus(a) === "ended" ? b.startAt.localeCompare(a.startAt) : a.startAt.localeCompare(b.startAt)));
+  const sections = [
+    { key: "live", title: "Live events", empty: "No events are live now." },
+    { key: "upcoming", title: "Upcoming events", empty: "No upcoming events." },
+    { key: "ended", title: "Past events", empty: "No past events." },
+  ].map((section) => ({ ...section, events: sorted.filter((event) => eventStatus(event) === section.key) }));
 
   return (
     <section className="results" aria-labelledby="events-title">
       <div className="results-head">
-        <div><span>EVENTS</span><h1 id="events-title">Live &amp; upcoming events</h1></div>
+        <div><span>EVENTS</span><h1 id="events-title">Events</h1></div>
         {canManageEvents && <button className="admin-button" onClick={() => { setEditing(null); setFormOpen(true); }}>＋ Add event</button>}
       </div>
 
@@ -86,12 +91,19 @@ export function EventsView({
       </div>
 
       {sorted.length ? (
-        <div className="event-grid">
-          {sorted.map((ev) => {
+        <div className="event-sections">
+          {sections.map((section) => (
+            <section key={section.key} aria-labelledby={`events-${section.key}`} className="mt-8">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 id={`events-${section.key}`}>{section.title}</h2>
+                <span className="text-accent text-xs">{section.events.length}</span>
+              </div>
+              {section.events.length ? <div className="event-grid">
+          {section.events.map((ev) => {
             const st = eventStatus(ev);
             const meta = statusMeta[st];
             const att = attendanceByEvent.get(ev.id);
-            const canPresent = canManageEvents || (ev.presenters ?? []).includes(myLower);
+            const canPresent = st !== "ended" && (canManageEvents || (ev.presenters ?? []).includes(myLower));
             const speakers = eventSpeakers(ev);
             return (
               <article className="event-card" key={ev.id} role="button" tabIndex={0}
@@ -133,20 +145,23 @@ export function EventsView({
                   <div className="event-actions" onClick={(e) => e.stopPropagation()}>
                     {canPresent && <button className="edit-local" onClick={() => setPresenting(ev)}>▶ Present QR</button>}
                     {canManageEvents && <button className="edit-local" onClick={() => setViewing(ev)}>Attendance</button>}
-                    {canManageEvents && <button className="edit-local" onClick={() => { setEditing(ev); setFormOpen(true); }}>Edit</button>}
+                    {canManageEvents && st !== "ended" && <button className="edit-local" onClick={() => { setEditing(ev); setFormOpen(true); }}>Edit</button>}
                     {canManageEvents && <button className="delete-local" onClick={() => { if (confirm(`Delete "${ev.title}"?`)) deleteEvent(ev.id).then(() => notify(`Deleted “${ev.title}”.`)).catch(() => notify("Could not delete event.", "error")); }}>Delete</button>}
                   </div>
                 )}
               </article>
             );
           })}
+              </div> : <div className="empty"><p>{section.empty}</p></div>}
+            </section>
+          ))}
         </div>
       ) : (
         <div className="empty"><strong>No events yet</strong><p>{canManageEvents ? "Add the first event to get started." : "Events will appear here soon."}</p></div>
       )}
 
-      {formOpen && <EventForm editing={editing} userEmail={userEmail} defaultRotateSeconds={settings.qrRotateSeconds} onClose={() => { setFormOpen(false); setEditing(null); }} />}
-      {presenting && <EventPresenter event={presenting} rotateSeconds={presenting.qrRotateSeconds ?? settings.qrRotateSeconds} ccaSettings={{ ccaPercent: settings.ccaPercent, ccaFloorMinutes: settings.ccaFloorMinutes }} onClose={() => setPresenting(null)} />}
+      {formOpen && <EventForm editing={editing} userEmail={userEmail} defaultRotateSeconds={settings.qrRotateSeconds} specializationOptions={settings.eventSpecializations} onClose={() => { setFormOpen(false); setEditing(null); }} />}
+      {presenting && <EventPresenter event={presenting} rotateSeconds={presenting.qrRotateSeconds ?? settings.qrRotateSeconds} ccaSettings={{ ccaPercent: settings.ccaPercent }} onClose={() => setPresenting(null)} />}
       {viewing && <EventAttendance event={viewing} onClose={() => setViewing(null)} />}
     </section>
   );

@@ -61,14 +61,21 @@ flowchart TD
     LogoHook -->|"Draw 24x24 Canvas & Read Pixels"| LuminanceCalc["Calculate Luminance Y > 170"]
     LuminanceCalc -->|"Bright Logo"| DarkTile["Apply Dark Backdrop Tile (logo-dark)"]
     LuminanceCalc -->|"Dark/Normal Logo"| LightTile["Apply Light Backdrop Tile (logo-light)"]
-    DetailModal --> VideoSection["YouTube Video Embed (getYouTubeEmbedUrl)"]
+    DetailModal --> VideoSection["YouTube Video Embed (getYouTubeEmbedUrl with Live Parsing)"]
     DetailModal --> CompanyAssistant["Grounded Assistant (CompanyAssistant)"]
     CompanyAssistant -->|"Lexical Matching"| AnswerEngine["answerAboutCompany() Engine"]
+    CompanyCard -->|"Matched Profile"| RecommendedBadge["Green Border & Recommended Badge"]
 ```
 
 #### Brand Logo Luminance Sampling Hook (`useLogoBackdrop.ts`)
 Calculates image luminance using an HTML5 2D Canvas to automatically determine whether a company logo requires a light or dark background tile for optimal visual contrast:
+- Formula: $Y = 0.2126R + 0.7152G + 0.0722B$
+- Evaluates $Y > 170$ to switch `.logo-light` vs `.logo-dark`.
 
+#### Recommended Companies UI
+Companies with vacancies matching the student's program (using `jobMatchesCourse` logic) are rendered directly in the main `exhibitor-grid`. These cards are visually distinguished with a `.exhibitor-card.recommended` CSS green border and a "🌟 Has vacancies matching your profile" success badge.
+
+#### YouTube Live Embed
 ```ts
 // features/home/useLogoBackdrop.ts (L24-L39)
 const canvas = document.createElement("canvas");
@@ -88,8 +95,6 @@ for (let i = 0; i < data.length; i += 4) {
 if (count && alive) setAuto(lum / count > 170 ? "dark" : "light");
 ```
 
-- **Formula**: Relative luminance $Y = 0.2126R + 0.7152G + 0.0722B$.
-- **Threshold**: If average non-transparent pixel luminance exceeds $170$, the hook returns `"dark"`, applying a dark background tile.
 - **Cross-Origin Fallback**: If canvas pixel reading is blocked by CORS security, the hook gracefully defaults to `"light"`.
 
 #### In-Modal Grounded RAG Assistant (`CompanyAssistant`)
@@ -162,7 +167,6 @@ Admin and Employer sub-tabs feature integrated **CSV Export** buttons powered by
 Automatically extracts the user's Employee ID from the Google Workspace Directory (`directory.readonly` scope) upon sign-in. This ID is subsequently stamped onto view events, candidate applications, and chat logs to guarantee internal tracking and accountability during events.
 
 ---
-
 
 ### Module 4: Employer Summary & Scoped Analytics ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx))
 
@@ -266,6 +270,9 @@ Positioned directly under form text inputs for company logos, speaker headshots,
 ---
 
 ### Module 8: Events UX & 30-Second Dynamic QR Anti-Cheat Attendance ([EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx) & [SpeakerAvatar.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/SpeakerAvatar.tsx))
+
+#### Target Specializations & Event Matches
+Events utilize a single `specialization` string selected from a predefined list (shared with Vacancies, plus an "Other" custom option). If a student's course matches this specialization via regex pattern, the event card displays a "🌟 Relevant to you" badge in `EventsView.tsx`.
 
 #### Live Presenter Screen (`EventPresenter.tsx`)
 Displays a live projector view generating a dynamic rotating QR code every 30 seconds (`REFRESH_MS = 30000`):

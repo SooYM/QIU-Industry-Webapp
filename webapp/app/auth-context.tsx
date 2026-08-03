@@ -11,7 +11,7 @@ import {
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryProfile, PEOPLE_SCOPE } from "../lib/auth/course-directory";
-import { submitSignup, subscribeMySignup } from "../lib/data/firestore";
+import { revokeEmployerAccess, submitSignup, subscribeMySignup } from "../lib/data/firestore";
 import { downloadCsv, toCsv } from "../lib/data/csv";
 import type { EmployerSignup } from "../lib/data/types";
 import { ImagePreview } from "../components/ImagePreview";
@@ -101,11 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let whitelisted: string[] = [];
       try {
-        const whitelistSnap = await getDocs(collection(activeDb, "whitelisted_emails"));
-        // A revoked entry (active === false) no longer grants access.
-        whitelisted = whitelistSnap.docs.filter((doc) => doc.data().active !== false).map((doc) => normalizeEmail(doc.data().email || doc.id));
+        const email = normalizeEmail(nextUser.email);
+        const whitelistSnap = email ? await getDoc(doc(activeDb, "whitelisted_emails", email)) : null;
+        if (whitelistSnap?.exists() && whitelistSnap.data().active !== false) whitelisted = [email];
       } catch {
-        // Fallback to empty whitelist if network fails
+        // Fallback to empty whitelist if network or access check fails.
       }
 
       if (!nextUser.emailVerified) {
@@ -254,10 +254,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
         <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><img className="brand-logo" src="/qiu-logo.png" alt="QIU" /><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
-        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Students &amp; staff: use your @qiu.edu.my Google account. Companies: sign in with any Google account and register to attend.</p></div>
+        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Students and staff use their QIU Google account. Company representatives can register separately for admin approval.</p></div>
         {error && <p className="auth-error" role="alert">{error}</p>}
-        <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with Google account</button>
-        <small className="auth-boundary">QIU accounts get in instantly · external companies register for admin approval</small>
+        <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with QIU Google</button>
+        <div className="auth-choice" aria-hidden="true"><span>Company representative</span></div>
+        <button className="company-register-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured} aria-describedby="company-registration-help"><GoogleMark />Register a company account with a Google account</button>
+        <small className="auth-boundary" id="company-registration-help">No company-domain email needed. Use the representative&apos;s personal Google account. No Google account? Contact the Industry Day organiser.</small>
       </section>
     </main>;
   }
@@ -312,7 +314,7 @@ function RegisterGate() {
         <div className="auth-copy">
           <span className="detail-label">⏳ WAITING FOR APPROVAL</span>
           <h1 id="register-title">Thanks, {pendingName} — you&apos;re in the queue</h1>
-          <p>We&apos;ve received your registration{pendingCompany ? <> for <b>{pendingCompany}</b></> : ""}. Its status is <b>Pending</b> — an admin will review and approve it shortly. You&apos;ll get employer access on your next sign-in after approval.</p>
+          <p>We&apos;ve received your registration{pendingCompany ? <> for <b>{pendingCompany}</b></> : ""}. Its status is <b>Pending</b> — an admin will review and approve it shortly. You&apos;ll get company access on your next sign-in after approval.</p>
           <p style={{ marginTop: ".5rem" }}><span className="rounded px-1.5 py-0.5 text-[11px] font-bold tone-neutral">Pending approval</span></p>
           <button className="google-sign-in" type="button" onClick={signOut} style={{ marginTop: "1rem" }}>Sign out</button>
         </div>
@@ -352,7 +354,7 @@ export function AuthAccount() {
   if (!user || !role) return null;
   const subtitle = role === "superadmin" ? "Super admin"
     : role === "admin" ? "Admin"
-    : role === "employer" ? "Employer"
+    : role === "employer" ? "Company"
     : (course || ""); // students see their course; staff/unmatched stay blank
   return <div className="auth-account">
     {user.photoURL && photoOk
@@ -433,6 +435,7 @@ export function RoleManager() {
       await setDoc(doc(db, "whitelisted_emails", emailToSave), {
         email: emailToSave,
         role: newRole,
+        active: true,
         ...(company ? { company } : {}),
         addedBy: normalizeEmail(user?.email),
         createdAt: serverTimestamp(),
@@ -448,18 +451,19 @@ export function RoleManager() {
     }
   }
 
-  async function removeWhitelistedEmail(emailId: string) {
+  async function removeWhitelistedEmail(record: WhitelistedEmailRecord) {
     if (!db) return;
+    const scope = record.company ? ` This permanently deletes ${record.company}'s company profile and every vacancy listing.` : " This permanently deletes company profiles and vacancy listings owned by this account.";
+    if (!confirm(`Revoke access for ${record.email}?${scope}`)) return;
     setMessage("");
     try {
-      await setDoc(doc(db, "whitelisted_emails", emailId), { active: false }, { merge: true });
-      // Delete doc
-      setWhitelistedEmails((prev) => prev.filter((item) => item.id !== emailId));
-      setMessage(`Removed ${emailId} from whitelist.`);
-      notify(`Access revoked for ${emailId}.`);
+      const removed = await revokeEmployerAccess(record.email, record.company);
+      setWhitelistedEmails((prev) => prev.filter((item) => item.id !== record.id));
+      setMessage(`Revoked ${record.email}; deleted ${removed.profiles} profile and ${removed.vacancies} vacancies.`);
+      notify(`Access revoked for ${record.email}.`);
     } catch {
-      setMessage(`Could not remove ${emailId}.`);
-      notify(`Could not revoke ${emailId}.`, "error");
+      setMessage(`Could not revoke ${record.email}. No access changes were applied.`);
+      notify(`Could not revoke ${record.email}.`, "error");
     }
   }
 
@@ -487,11 +491,11 @@ export function RoleManager() {
         <details className="access-approve panel-accent">
           <summary><span>➕ Approve Non-@qiu.edu.my account</span><small>{whitelistedEmails.length} approved</small></summary>
           <div className="access-approve-body">
-            <p>By default, non-QIU emails cannot log in. Approve external emails (e.g. Employers or External Admins) here. For an employer, set which company they represent.</p>
+            <p>By default, non-QIU emails cannot log in. Approve company representatives or external admins here. For a company account, set which company it represents.</p>
             <form onSubmit={addWhitelistedEmail} className="access-approve-form">
-              <input type="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="e.g. employer@company.com" />
+              <input type="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="e.g. representative@company.com" />
               <select value={newRole} onChange={(e) => setNewRole(e.target.value as UserRole)}>
-                <option value="employer">Employer (Own Jobs Only)</option>
+                <option value="employer">Company (Own Vacancies Only)</option>
                 <option value="admin">Admin (All Jobs)</option>
                 <option value="user">User / Student (Browse Only)</option>
               </select>
@@ -506,7 +510,7 @@ export function RoleManager() {
                 {whitelistedEmails.map((item) => (
                   <div key={item.id} className="access-approved-row">
                     <span>{item.email} <span className="role-pill">{item.role}</span>{item.company ? <small> · {item.company}</small> : null}</span>
-                    <button type="button" className="access-revoke" onClick={() => removeWhitelistedEmail(item.id)}>Revoke</button>
+                    <button type="button" className="access-revoke" onClick={() => removeWhitelistedEmail(item)}>Revoke and delete company</button>
                   </div>
                 ))}
               </div>
@@ -515,7 +519,7 @@ export function RoleManager() {
         </details>
       )}
 
-      <p>Users can browse. Employers can manage their own jobs. Admins can manage all jobs. Superadmin identity is fixed. Approve new company registrations in the Approvals tab.</p>
+      <p>Users can browse. Companies can manage their own vacancies. Admins can manage all vacancies. Superadmin identity is fixed. Approve new company registrations in the Approvals tab.</p>
       <input type="search" className="admin-search" value={userQuery} onChange={(e) => setUserQuery(e.target.value)} placeholder="Search accounts by name or email…" aria-label="Search accounts" />
       {loading ? (
         <p className="role-manager-state" role="status">Loading accounts…</p>
@@ -534,7 +538,7 @@ export function RoleManager() {
                     <span className="sr-only">Role for {record.email}</span>
                     <select value={record.role} onChange={(event) => assignRole(record, event.target.value as UserRole)}>
                       <option value="user">User / Student</option>
-                      <option value="employer">Employer</option>
+                      <option value="employer">Company</option>
                       <option value="admin">Admin</option>
                     </select>
                   </label>

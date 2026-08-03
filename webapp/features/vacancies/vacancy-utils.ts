@@ -4,7 +4,7 @@ import type { Job } from "../../lib/data/types";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string; sources?: Job[] };
 export type Theme = "light" | "dark";
-export type TextScale = "default" | "large" | "xlarge";
+export type VacancyView = "cards" | "list";
 export type CountryShape = { name: string; path: string };
 export type GeoFeature = { properties: { name: string }; geometry: { type: "Polygon" | "MultiPolygon"; coordinates: number[][][] | number[][][][] } };
 export type AdminDraft = Pick<Job, "title" | "company" | "type" | "specialization" | "vacancies" | "minimumRequirement" | "email"> & {
@@ -91,5 +91,5 @@ export function roleDescription(job: Job) {
   else if (/admin|clerical|reception|secretar/.test(role + specialization)) focus = "handle routine administration, organise documents, coordinate enquiries, and keep office information up to date";
   else if (/sales|retail|customer/.test(role + specialization)) focus = "assist customers, explain available products or services, follow up on enquiries, and maintain accurate sales records";
   else if (/engineer|technician|maintenance|production|quality/.test(role + specialization)) focus = "support technical or production work, follow safety and quality procedures, document findings, and escalate operational issues";
-  return `This ${job.type.toLowerCase()} opportunity is expected to ${focus}. The listing asks for at least ${job.minimumRequirement.toLowerCase()} level and is based in ${job.location}. This overview is generated from the vacancy title and specialization; confirm exact duties with the employer.`;
+  return `This ${job.type.toLowerCase()} opportunity is expected to ${focus}. The listing asks for at least ${job.minimumRequirement.toLowerCase()} level and is based in ${job.location}. This overview is generated from the vacancy title and specialization; confirm exact duties with the company.`;
 }

@@ -7,7 +7,7 @@
  * 3. Natural Language Synthesis & Citation Grounding
  */
 
-import { retrieveJobs, type JobRecord } from "./chat";
+import { retrieveJobs, type JobRecord } from "./chat.ts";
 
 export interface SlmModelMeta {
   name: string;

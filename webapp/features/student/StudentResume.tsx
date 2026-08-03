@@ -62,7 +62,7 @@ export function StudentResume({
         source: myResume?.fileUrl ? "link" : "generated",
         profile: previewProfile,
       });
-      done("CV details saved. Employers and admins can view your generated CV.");
+      done("CV details saved. Companies and admins can view your generated CV.");
     } catch {
       done("Could not save your CV details. Please try again.", true);
     } finally {
@@ -120,7 +120,7 @@ export function StudentResume({
         course: course ?? undefined, ...(emp ? { employeeId: emp } : {}), fileUrl: url, fileName: "Resume link", source: "link",
         profile: myResume?.profile,
       });
-      done("Resume link saved. Employers and admins can now open it.");
+      done("Resume link saved. Companies and admins can now open it.");
       setLink("");
     } catch {
       done("Could not save your link. Please try again.", true);
@@ -137,7 +137,7 @@ export function StudentResume({
       <div className="results-head"><div><span>MY RESUME</span><h1 id="resume-title">Build your CV</h1></div><p>Fill in your details to generate a clean CV, and/or paste a link to your own resume. When you apply, you choose which one to send.</p></div>
 
       <section className="local-jobs" aria-labelledby="resume-current-title">
-        <div className="local-jobs-head"><div><span className="detail-label">ON FILE</span><h3 id="resume-current-title">What employers can see</h3></div>{emp && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">ID {emp}</span>}</div>
+        <div className="local-jobs-head"><div><span className="detail-label">ON FILE</span><h3 id="resume-current-title">What companies can see</h3></div>{emp && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">ID {emp}</span>}</div>
         <div className="resume-status-grid">
           <div className={`resume-status ${generatedOnFile ? "ready" : ""}`}>
             <strong>{generatedOnFile ? "✓ Generated CV ready" : "Generated CV not built yet"}</strong>
@@ -201,7 +201,7 @@ export function StudentResume({
           <button type="submit" className="save-job" disabled={busy || !link.trim()}>{busy ? "Saving…" : "Save link"}</button>
         </form>
         <div className="resume-hint" role="note">
-          <b>How to share:</b> paste a <b>Google Drive / OneDrive / Dropbox</b> link, then set its sharing to <b>&ldquo;Anyone with the link&rdquo;</b> so employers and admins can open it. <b>PDF preferred.</b>
+          <b>How to share:</b> paste a <b>Google Drive / OneDrive / Dropbox</b> link, then set its sharing to <b>&ldquo;Anyone with the link&rdquo;</b> so companies and admins can open it. <b>PDF preferred.</b>
         </div>
       </div>
 

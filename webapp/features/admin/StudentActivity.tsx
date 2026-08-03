@@ -3,6 +3,7 @@ import { subscribeApplications, subscribeViews } from "../../lib/data/firestore"
 import type { Application, ViewEvent } from "../../lib/data/types";
 import { csvWhen, downloadCsv, toCsv } from "../../lib/data/csv";
 import { notify } from "../../components/toast";
+import { companyListIncludes } from "../../lib/data/company-matching";
 
 function formatWhen(ts: unknown): string {
   if (ts && typeof ts === "object" && "toDate" in ts) {
@@ -30,7 +31,7 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
   useEffect(() => (mode === "all" ? subscribeViews(setViews) : undefined), [mode]);
 
   const q = query.trim().toLowerCase();
-  const base = mode === "all" ? apps : apps.filter((a) => companies.includes(a.company));
+  const base = mode === "all" ? apps : apps.filter((a) => companyListIncludes(companies, a.company));
   const scoped = q ? base.filter((a) => [a.studentName, a.studentEmail, a.jobTitle, a.company].some((f) => (f ?? "").toLowerCase().includes(q))) : base;
   const search = <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, email, job or company…" aria-label="Search activity" />;
 

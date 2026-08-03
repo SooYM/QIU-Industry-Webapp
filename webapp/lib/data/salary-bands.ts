@@ -1,6 +1,9 @@
 // Indicative Malaysian monthly salary ranges by job title, shown to employers as
-// a hint while posting a vacancy. Sourced from an HR reference sheet (range.xlsx).
-// Matched loosely against the typed title — purely advisory, never enforced.
+// a reference while posting a vacancy. Matched loosely against the typed title;
+// never enforced as a hiring or compensation requirement.
+
+export const SALARY_REFERENCE_URL = "https://fastlanerecruit.com/blog/average-salary-in-malaysia-2025/#average-salary-by-job-role-and-industry-2025-in-malaysia";
+export const SALARY_REFERENCE_LABEL = "FastLaneRecruit Malaysia salary guide 2025";
 
 export interface SalaryBand { title: string; range: string; }
 

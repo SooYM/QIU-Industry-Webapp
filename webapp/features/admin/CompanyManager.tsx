@@ -3,15 +3,16 @@ import { isApprovedCompany, type Company } from "../../lib/data/types";
 import { useAuth } from "../../app/auth-context";
 import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
 import { ImagePreview } from "../../components/ImagePreview";
+import { Modal } from "../../components/Modal";
 import { notify } from "../../components/toast";
 import { downloadCsv, toCsv } from "../../lib/data/csv";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
-type Draft = { name: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
-const emptyDraft: Draft = { name: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", logoBackground: "auto" };
+type Draft = { name: string; email: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
+const emptyDraft: Draft = { name: "", email: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", logoBackground: "auto" };
 
 /**
- * Exhibitor editor. Admins manage every company (edit / delete / clear all;
+ * Company editor. Admins manage every company (edit / delete / clear all;
  * approval lives in the Approvals tab). In employer mode it edits ONLY that
  * employer's own single profile — the company name is fixed by their admin
  * assignment, and every save is submitted as `pending` for admin approval.
@@ -35,17 +36,19 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
 
   function fill(c: Company) {
     setEditingId(c.id);
-    setDraft({ name: c.name, website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", logoBackground: c.logoBackground ?? "auto" });
+    setDraft({ name: c.name, email: c.email ?? "", website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", logoBackground: c.logoBackground ?? "auto" });
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const name = employer ? employer.companyName : draft.name.trim();
     if (!name) { setMessage(employer ? "Your account has no company assigned — ask an admin." : "Company name is required."); return; }
+    if (!employer && !draft.email.trim()) { setMessage("Company email is required."); return; }
     const existing = editingId !== null ? companies.find((c) => c.id === editingId) : undefined;
     const record: Company = {
       id: editingId ?? Date.now(),
       name,
+      email: employer ? existing?.email : draft.email.trim(),
       website: draft.website.trim() || undefined,
       logoUrl: draft.logoUrl.trim() || undefined,
       videoUrl: draft.videoUrl.trim() || undefined,
@@ -69,14 +72,15 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
       } else {
         await saveCompany(record, editingId !== null, normalizeEmail(user?.email));
         if (!employer) { setDraft(emptyDraft); setEditingId(null); }
-        msg = employer ? "Submitted for admin approval." : editingId ? "Exhibitor updated." : "Exhibitor added.";
+        msg = employer ? "Submitted for admin approval." : editingId ? "Company updated." : "Company added.";
         if (employer) kind = "info";
       }
       setMessage(msg); notify(msg, kind);
     } catch { setMessage("Could not save. Please try again."); notify("Could not save. Please try again.", "error"); }
   }
 
-  function edit(c: Company) { fill(c); setMessage("Editing exhibitor. Save to apply changes."); }
+  function edit(c: Company) { fill(c); setMessage("Editing company. Save to apply changes."); }
+  function cancelEdit() { setEditingId(null); setDraft(emptyDraft); setMessage(""); }
 
   // ---- Employer mode: a single self-service profile form --------------------
   if (employer) {
@@ -96,32 +100,36 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
   }
 
   // ---- Admin mode -----------------------------------------------------------
-  // The Manage tab shows the edit form inline only while editing an exhibitor.
-  const showForm = view !== "manage" || editingId !== null;
+  const showAddForm = view !== "manage" && editingId === null;
   const showList = view !== "add";
   return (
     <section className="local-jobs" aria-labelledby="company-manager-title">
-      <div className="local-jobs-head"><div><span className="detail-label">EXHIBITORS</span><h3 id="company-manager-title">{showForm && !showList ? "Add an exhibitor" : showList && !showForm ? "Manage exhibitors" : "Exhibitors"}</h3></div><strong>{companies.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">COMPANIES</span><h3 id="company-manager-title">{showAddForm && !showList ? "Add a company" : showList && !showAddForm ? "Manage companies" : "Companies"}</h3></div><strong>{companies.length}</strong></div>
 
-      {showForm && <>
-        <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel={editingId ? "Save changes" : "Add exhibitor"}
-          onCancel={editingId ? () => { setEditingId(null); setDraft(emptyDraft); setMessage(""); } : undefined} />
+      {showAddForm && <>
+        <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel="Add company" />
         {message && <p className="admin-message mt-2" role="status" aria-live="polite">{message}</p>}
       </>}
+
+      {editingId !== null && <Modal className="admin-panel" labelledBy="exhibitor-edit-title" closeLabel="Close company editor" onClose={cancelEdit}>
+        <span className="detail-label">COMPANIES</span><h2 id="exhibitor-edit-title">Edit company</h2>
+        <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel="Save changes" onCancel={cancelEdit} />
+        {message && <p className="admin-message mt-2" role="status" aria-live="polite">{message}</p>}
+      </Modal>}
 
       {showList && companies.length > 0 && (
         <>
           <div className="local-jobs-head mt-4">
-            <div><span className="detail-label">MANAGE</span><h3>All exhibitors</h3></div>
+            <div><span className="detail-label">MANAGE</span><h3>All companies</h3></div>
             <div className="flex items-center gap-2">
-              <button type="button" className="admin-button" onClick={() => { const rows = companies.map((c) => [c.name, c.boothNumber ?? "", c.website ?? "", c.videoUrl ?? "", isApprovedCompany(c) ? "Approved" : "Pending", c.createdBy ?? "", (c.summary ?? "").replace(/\s+/g, " ").trim()]); downloadCsv(`exhibitors-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Company", "Booth", "Website", "Video", "Status", "Created by", "Summary"], rows)); notify(`Exported ${companies.length} exhibitors.`); }}>⬇ Export CSV</button>
-              <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} exhibitors? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => { setMessage("All exhibitors cleared."); notify("All exhibitors cleared."); }); }}>Clear all</button>
+              <button type="button" className="admin-button" onClick={() => { const rows = companies.map((c) => [c.name, c.email ?? "", c.boothNumber ?? "", c.website ?? "", c.videoUrl ?? "", isApprovedCompany(c) ? "Approved" : "Pending", c.createdBy ?? "", (c.summary ?? "").replace(/\s+/g, " ").trim()]); downloadCsv(`companies-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Company", "Email", "Booth", "Website", "Video", "Status", "Created by", "Summary"], rows)); notify(`Exported ${companies.length} companies.`); }}>⬇ Export CSV</button>
+              <button type="button" className="delete-local" onClick={() => { if (confirm(`Remove ALL ${companies.length} companies? This cannot be undone.`)) clearCompanies(companies.map((c) => c.id)).then(() => { setMessage("All companies cleared."); notify("All companies cleared."); }); }}>Clear all</button>
             </div>
           </div>
           <div className="local-job-list">
             {companies.map((c) => (
               <div className="local-job" key={c.id}>
-                <span><b>{c.name} {!isApprovedCompany(c) && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Pending</span>}{c.boothNumber && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">Booth {c.boothNumber}</span>}</b><small>{[c.createdBy, c.website].filter(Boolean).join(" · ") || "No links"}</small></span>
+                <span><b>{c.name} {!isApprovedCompany(c) && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-neutral">Pending</span>}{c.boothNumber && <span className="ml-1 rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">Booth {c.boothNumber}</span>}</b><small>{[c.email, c.website].filter(Boolean).join(" · ") || "No contact details"}</small></span>
                 <div className="local-job-actions">
                   <button className="edit-local" onClick={() => { edit(c); }}>Edit</button>
                   <button className="delete-local" onClick={() => { if (confirm(`Remove "${c.name}" from the Home page?`)) deleteCompany(c.id).then(() => notify(`Removed ${c.name}.`)).catch(() => notify("Could not remove.", "error")); }}>Delete</button>
@@ -131,7 +139,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
           </div>
         </>
       )}
-      {showList && companies.length === 0 && !showForm && <div className="admin-jobs-empty"><strong>No exhibitors yet</strong><p>Add one from the “Add exhibitor” tab.</p></div>}
+      {showList && companies.length === 0 && !showAddForm && <div className="admin-jobs-empty"><strong>No companies yet</strong><p>Add one from the “Add company” tab.</p></div>}
     </section>
   );
 }
@@ -148,6 +156,7 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
   return (
     <form onSubmit={onSubmit} className="admin-form">
       {showName && <label className="full">Company name<input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>}
+      {showName && <label>Company email<input type="email" required value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>}
       <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
       {showBooth && <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>}
       <label className="full">Logo image URL

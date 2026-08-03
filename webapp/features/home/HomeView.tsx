@@ -5,6 +5,8 @@ import { getYouTubeEmbedUrl } from "../../app/auth-policy";
 import { useAuth } from "../../app/auth-context";
 import { isApproved, logChat } from "../../lib/data/firestore";
 import { jobMatchesCourse } from "../../lib/data/course-map";
+import { companyNamesMatch } from "../../lib/data/company-matching";
+import { AI_WARNING, withAiWarning } from "../../app/chat";
 import { RichText } from "../../app/RichText";
 import { Modal } from "../../components/Modal";
 import { useLogoBackdrop } from "./useLogoBackdrop";
@@ -37,7 +39,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: `Ask me about **${company.name}** — their vacancies, booth or profile. I only answer from this company's details.` },
+    { role: "assistant", content: withAiWarning(`Ask me about **${company.name}** — their vacancies, booth or profile. I only answer from this company's details.`) },
   ]);
   const boxRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -56,17 +58,18 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
     if (!question || streaming) return;
     setInput("");
     const answer = answerAboutCompany(question, company, jobs);
-    setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: "" }]);
+    const loggedAnswer = withAiWarning(answer);
+    setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: AI_WARNING }]);
     setStreaming(true);
     let i = 0;
     const stream = () => {
       i += 3;
-      setMessages((m) => { const copy = m.slice(); copy[copy.length - 1] = { role: "assistant", content: answer.slice(0, i) }; return copy; });
+      setMessages((m) => { const copy = m.slice(); copy[copy.length - 1] = { role: "assistant", content: `${AI_WARNING}\n\n${answer.slice(0, i)}` }; return copy; });
       if (i < answer.length) window.setTimeout(stream, 16); else setStreaming(false);
     };
     window.setTimeout(stream, 60);
     if (user) {
-      logChat({ id: `${user.uid}_${Date.now()}`, studentUid: user.uid, ...(employeeId ? { studentEmployeeId: employeeId } : {}), studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Anonymous", company: company.name, question, answer }).catch(() => {});
+      logChat({ id: `${user.uid}_${Date.now()}`, studentUid: user.uid, ...(employeeId ? { studentEmployeeId: employeeId } : {}), studentEmail: user.email ?? "", studentName: user.displayName || user.email || "Anonymous", company: company.name, question, answer: loggedAnswer }).catch(() => {});
     }
   }
 
@@ -84,7 +87,6 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
             <input value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Ask about ${company.name}…`} aria-label="Ask about this company" />
             <button disabled={!input.trim() || streaming} aria-label="Send question">↑</button>
           </form>
-          <p className="chat-disclaimer">⚠️ AI can make mistakes — verify important details.</p>
           <div ref={endRef} aria-hidden="true" />
         </>
       )}
@@ -102,7 +104,7 @@ function CompanyDetail({ company, jobs, isStudent, course, onOpenJob, onClose }:
 }) {
   const embedUrl = getYouTubeEmbedUrl(company.videoUrl);
   const backdrop = useLogoBackdrop(company.logoUrl, company.logoBackground ?? "auto");
-  const companyJobs = jobs.filter((j) => j.company === company.name && isApproved(j));
+  const companyJobs = jobs.filter((j) => companyNamesMatch(j.company, company.name) && isApproved(j));
 
   return (
     <Modal className="job-detail" labelledBy="company-detail-title" closeLabel="Close company profile" onClose={onClose}>
@@ -206,7 +208,7 @@ export function HomeView({
     if (!isStudent || !course) return new Set<number>();
     const ids = new Set<number>();
     for (const c of companies) {
-      if (jobs.some((j) => j.company === c.name && isApproved(j) && jobMatchesCourse(j, course))) ids.add(c.id);
+      if (jobs.some((j) => companyNamesMatch(j.company, c.name) && isApproved(j) && jobMatchesCourse(j, course))) ids.add(c.id);
     }
     return ids;
   }, [companies, jobs, isStudent, course]);
@@ -235,7 +237,7 @@ export function HomeView({
       </div>
 
       <div className="section-heading">
-        <div><span>EXHIBITORS</span><h2>Companies attending</h2></div>
+        <div><span>COMPANIES</span><h2>Companies attending</h2></div>
         {visible.length > 1 && (
           <label className="event-sort">Sort
             <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort companies">
@@ -260,7 +262,7 @@ export function HomeView({
           ))}
         </div>
       ) : (
-        <div className="empty"><strong>Exhibitor line-up coming soon</strong><p>Companies attending Industry Day will appear here.</p></div>
+        <div className="empty"><strong>Company line-up coming soon</strong><p>Companies attending Industry Day will appear here.</p></div>
       )}
 
       {selected && (

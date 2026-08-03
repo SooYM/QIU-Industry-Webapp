@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { positionTooltip } from "../app/map-tooltip.ts";
 
-const [page, styles] = await Promise.all([
-  readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+const [panel, styles] = await Promise.all([
+  readFile(new URL("../features/admin/AdminPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
 ]);
 
@@ -26,7 +26,7 @@ test("country labels stay inside the map at every edge", () => {
     assert.ok(position.top + tooltip.height <= container.height);
   }
 
-  assert.match(page, /positionTooltip\(hoveredCountry\.x, hoveredCountry\.y/);
+  assert.match(panel, /positionTooltip\(hoveredCountry\.x, hoveredCountry\.y/);
   const tooltipRule = styles.match(/\.country-tooltip\s*\{([^}]*)\}/)?.[1] ?? "";
   assert.doesNotMatch(tooltipRule, /transform:/);
   assert.match(tooltipRule, /max-width:calc\(100% - 1rem\)/);

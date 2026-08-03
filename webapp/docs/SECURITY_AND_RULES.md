@@ -246,16 +246,14 @@ When a student checks out, the system calculates elapsed attendance duration ($\
 
 $$\Delta T_{\text{attendance}} = \left\lfloor \frac{t_{\text{checkOutMs}} - t_{\text{checkInMs}}}{60\,000} \right\rfloor \text{ minutes}$$
 
-The required minimum attendance threshold ($T_{\text{threshold}}$) is calculated using global application settings (`ccaPercent` and `ccaFloorMinutes`):
+The required minimum attendance threshold ($T_{\text{threshold}}$) is calculated from the scheduled event duration and global `ccaPercent` setting:
 
-$$T_{\text{threshold}} = \begin{cases} 
-\left\lfloor \frac{\text{ccaPercent}}{100} \times \text{sessionMinutes} \right\rfloor & \text{if } \text{sessionMinutes} > 0 \\
-\text{ccaFloorMinutes} & \text{if } \text{sessionMinutes} = 0 
-\end{cases}$$
+$$T_{\text{threshold}} = \left\lceil \frac{\text{ccaPercent}}{100} \times \text{sessionMinutes} \right\rceil$$
+
+Events must have a positive scheduled duration. Invalid zero-minute legacy events cannot award CCA eligibility until corrected.
 
 Default portal configuration parameters:
 - $\text{ccaPercent} = 80\%$
-- $\text{ccaFloorMinutes} = 45\text{ minutes}$
 
 ### Eligibility Assertion
 $$\text{caEligible} = \begin{cases} 

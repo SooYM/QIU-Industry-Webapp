@@ -154,7 +154,7 @@ export interface EventItem {
 
 /** An event's target fields as an array, tolerating the legacy single field. */
 export function eventSpecializations(e: Pick<EventItem, "specialization" | "specializations">): string[] {
-  if (e.specializations && e.specializations.length) return e.specializations;
+  if (e.specializations) return e.specializations;
   return e.specialization ? [e.specialization] : [];
 }
 
@@ -177,6 +177,8 @@ export interface EventCode {
   activeStep: "checkin" | "checkout" | "none";
   activeCode: string;
   codeExpiry: number;     // epoch ms
+  previousCode?: string;  // last rotated code, retained for one grace interval
+  previousCodeExpiry?: number;
 }
 
 /** A student's attendance record for one event (doc id `${eventId}_${uid}`). */
@@ -216,6 +218,7 @@ export interface UserRecord {
 export interface Company {
   id: number;
   name: string;
+  email?: string;
   website?: string;
   logoUrl?: string;
   videoUrl?: string;       // YouTube corporate video URL
@@ -259,8 +262,8 @@ export interface EmployerSignup {
 export interface AppSettings {
   portalTitle: string;
   portalTagline: string;
-  qrRotateSeconds: number; // default QR rotation when an event doesn't override it
+  qrRotateSeconds: number; // 0 = static while presenting; otherwise rotation interval
   ccaPercent: number;      // % of session length needed for CCA credit
-  ccaFloorMinutes: number; // minimum minutes floor when a session has no length
+  eventSpecializations: string[];
   tabs: { home: boolean; events: boolean; vacancies: boolean; resume: boolean; history: boolean };
 }

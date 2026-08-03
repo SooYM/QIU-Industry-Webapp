@@ -1,4 +1,10 @@
-import { generateSlmResponse, SLM_MODEL_INFO } from "./slm-engine";
+import { generateSlmResponse } from "./slm-engine.ts";
+
+export const AI_WARNING = "⚠️ AI can make mistakes — verify important details.";
+
+export function withAiWarning(message: string) {
+  return message.includes(AI_WARNING) ? message : `${message}\n\n${AI_WARNING}`;
+}
 
 export type JobRecord = {
   id: number;
@@ -34,6 +40,27 @@ function tokens(text: string) {
     .filter((word) => word.length > 1 && !stopWords.has(word));
 }
 
+/** Small typo matcher for company-name words only. */
+function companyTokenMatches(queryToken: string, companyToken: string) {
+  if (queryToken === companyToken) return true;
+  if (queryToken.length < 4 || companyToken.length < 4 || Math.abs(queryToken.length - companyToken.length) > 2) return false;
+
+  const rows = Array.from({ length: queryToken.length + 1 }, (_, i) =>
+    Array.from({ length: companyToken.length + 1 }, (_, j) => i || j),
+  );
+  for (let i = 1; i <= queryToken.length; i += 1) {
+    for (let j = 1; j <= companyToken.length; j += 1) {
+      const cost = queryToken[i - 1] === companyToken[j - 1] ? 0 : 1;
+      rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && queryToken[i - 1] === companyToken[j - 2] && queryToken[i - 2] === companyToken[j - 1]) {
+        rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  const maxDistance = Math.max(queryToken.length, companyToken.length) >= 8 ? 2 : 1;
+  return rows[queryToken.length][companyToken.length] <= maxDistance;
+}
+
 function isComputingStudyArea(question: string) {
   return /\b(computer scienc(?:es?)?|software engineering|information technology|information systems|programming|coding)\b/i.test(question);
 }
@@ -59,6 +86,7 @@ export function retrieveJobs(question: string, jobs: JobRecord[]) {
   return jobs
     .map((job) => {
       let score = 0;
+      const companyTokens = tokens(job.company);
 
       queryTokens.forEach((token) => {
         // Enforce exact word-boundary matching so "art" never matches "Smart" or "Department"
@@ -66,7 +94,7 @@ export function retrieveJobs(question: string, jobs: JobRecord[]) {
 
         const inTitle = boundaryRegex.test(job.title);
         const inSpec = boundaryRegex.test(job.specialization);
-        const inCompany = boundaryRegex.test(job.company);
+        const inCompany = companyTokens.some((companyToken) => companyTokenMatches(token, companyToken));
         const inLoc = boundaryRegex.test(job.location);
         const inReq = boundaryRegex.test(job.minimumRequirement);
 
@@ -106,5 +134,6 @@ export function retrieveJobs(question: string, jobs: JobRecord[]) {
 }
 
 export function answerFromJobs(question: string, jobs: JobRecord[]) {
-  return generateSlmResponse(question, jobs);
+  const response = generateSlmResponse(question, jobs);
+  return { ...response, answer: withAiWarning(response.answer) };
 }

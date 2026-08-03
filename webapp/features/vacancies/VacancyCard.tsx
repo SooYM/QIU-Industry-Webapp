@@ -1,9 +1,12 @@
 import type { PointerEvent } from "react";
-import type { Job } from "../../lib/data/types";
+import { useState } from "react";
+import type { Company, Job } from "../../lib/data/types";
+import { useLogoBackdrop } from "../home/useLogoBackdrop";
 import { formatSalary, jobStatusMeta } from "./vacancy-utils";
 
 export function VacancyCard({
   job,
+  company,
   recommended = false,
   applied = false,
   showStatus = false,
@@ -11,6 +14,7 @@ export function VacancyCard({
   onOpen,
 }: {
   job: Job;
+  company?: Company;
   recommended?: boolean;
   applied?: boolean;
   showStatus?: boolean;
@@ -18,6 +22,8 @@ export function VacancyCard({
   onOpen: (job: Job) => void;
 }) {
   const status = showStatus ? jobStatusMeta(job) : null;
+  const backdrop = useLogoBackdrop(company?.logoUrl, company?.logoBackground ?? "auto");
+  const [logoOk, setLogoOk] = useState(true);
   return (
     <article className={`job-card${recommended ? " is-recommended" : ""}${applied ? " is-applied" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${applied ? " — you have applied" : ""}${recommended ? " — recommended for your profile" : ""}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
       {applied && (
@@ -39,13 +45,14 @@ export function VacancyCard({
           {recommended && (
             <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Recommended for your profile</span>
           )}
+          {applied && <span className="applied-label rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">Applied</span>}
           {status && (
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${status.tone}`}>{status.label}</span>
           )}
         </div>
         <span className="vacancies">{job.vacancies} {job.vacancies === 1 ? "place" : "places"}</span>
       </div>
-      <h2>{job.title}</h2><p className="company">{job.company}</p>
+      <h2>{job.title}</h2><div className="job-company-line">{company?.logoUrl && logoOk && <img className={`job-company-logo logo-${backdrop}`} src={company.logoUrl} alt="" onError={() => setLogoOk(false)} />}<p className="company">{job.company}</p></div>
       <div className="meta"><span>{job.location}</span><span>{job.specialization}</span><span>{job.minimumRequirement}</span></div>
       <div className="card-foot"><div><small>LISTED SALARY</small><strong>{formatSalary(job)}</strong></div><span className="view-job">View details <span>→</span></span></div>
     </article>

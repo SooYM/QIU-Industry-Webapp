@@ -51,12 +51,13 @@ function addMinutes(start: string, mins: number) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }: { editing: EventItem | null; userEmail: string; defaultRotateSeconds: number; onClose: () => void }) {
+export function EventForm({ editing, userEmail, defaultRotateSeconds, specializationOptions, onClose }: { editing: EventItem | null; userEmail: string; defaultRotateSeconds: number; specializationOptions: string[]; onClose: () => void }) {
+  const availableSpecializations = Array.from(new Set((specializationOptions.length ? specializationOptions : [...PREDEFINED_SPECS, "Other"]).map((item) => item.trim()).filter(Boolean)));
   const [draft, setDraft] = useState<Draft>(() => {
     if (!editing) return emptyDraft;
     const all = eventSpecializations(editing);
-    const known = all.filter((s) => PREDEFINED_SPECS.includes(s));
-    const custom = all.filter((s) => !PREDEFINED_SPECS.includes(s));
+    const known = all.filter((s) => availableSpecializations.includes(s));
+    const custom = all.filter((s) => !availableSpecializations.includes(s));
     return {
       title: editing.title, description: editing.description, location: editing.location, startAt: editing.startAt, endAt: editing.endAt, sessionMinutes: editing.sessionMinutes,
       specializations: custom.length ? [...known, "Other"] : known,
@@ -67,18 +68,32 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
     const list = editing ? eventSpeakers(editing) : [];
     return list.length ? list.map((s) => ({ name: s.name, photoUrl: s.photoUrl ?? "", linksText: (s.links ?? []).join("\n") })) : [{ ...blankSpeaker }];
   });
-  const [presentersText, setPresentersText] = useState((editing?.presenters ?? []).join(", "));
+  const [presenters, setPresenters] = useState<string[]>(() => Array.from(new Set((editing?.presenters ?? []).map(normalizeEmail).filter(Boolean))));
+  const [presenterEmail, setPresenterEmail] = useState("");
+  const [presenterMessage, setPresenterMessage] = useState("");
   const [rotateSeconds, setRotateSeconds] = useState(editing?.qrRotateSeconds ?? defaultRotateSeconds);
   const [message, setMessage] = useState("");
 
   const updateSpeaker = (i: number, patch: Partial<SpeakerDraft>) => setSpeakers((rows) => rows.map((s, j) => (j === i ? { ...s, ...patch } : s)));
   const speakerLinks = (text: string) => Array.from(new Set(text.split(/[\s,]+/).map((l) => l.trim()).filter(Boolean))).slice(0, 10);
 
+  function addPresenter() {
+    const email = normalizeEmail(presenterEmail);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setPresenterMessage("Enter a valid email address."); return; }
+    if (presenters.includes(email)) { setPresenterMessage("This presenter is already added."); return; }
+    if (presenters.length >= 50) { setPresenterMessage("Maximum 50 presenters per event."); return; }
+    setPresenters([...presenters, email]);
+    setPresenterEmail("");
+    setPresenterMessage("");
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.title.trim() || !draft.startAt || !draft.endAt) { setMessage("Title, start and end are required."); return; }
-    if (editing && !window.confirm("Save changes to this event? Students who already checked in will see the updated details.")) return;
-    const presenters = Array.from(new Set(presentersText.split(/[\s,;]+/).map((e) => normalizeEmail(e)).filter(Boolean)));
+    if (presenterEmail.trim()) { setPresenterMessage("Add this email or clear the field before saving."); return; }
+    const sessionMinutes = minutesBetween(draft.startAt, draft.endAt);
+    if (sessionMinutes <= 0) { setMessage("End time must be after start time."); return; }
+    if (!Number.isFinite(rotateSeconds) || rotateSeconds < 0 || rotateSeconds > 600 || (rotateSeconds > 0 && rotateSeconds < 5)) { setMessage("QR rotation must be 0 (static) or between 5 and 600 seconds."); return; }
     // Build the distinct speaker list, then derive the legacy flat fields from it
     // (names joined, links flattened, first photo) so old readers still work.
     const speakerList: Speaker[] = speakers
@@ -91,6 +106,8 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
     const specializations = Array.from(new Set(draft.specializations.flatMap((s) =>
       s === "Other" ? (draft.customSpecialization ?? "").split(",").map((v) => v.trim()).filter(Boolean) : [s],
     )));
+    if (specializations.length > 20 || specializations.some((item) => item.length > 160)) { setMessage("Choose up to 20 specializations, with no label longer than 160 characters."); return; }
+    if (editing && !window.confirm("Save changes to this event? Students who already checked in will see the updated details.")) return;
     const record: EventItem = {
       id: editing?.id ?? Date.now(),
       title: draft.title.trim(),
@@ -100,12 +117,12 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       speakerLinks: flatLinks,
       ...(firstPhoto ? { speakerPhotoUrl: firstPhoto } : {}),
       ...(speakerList.length ? { speakers: speakerList } : {}),
-      ...(specializations.length ? { specializations } : {}),
+      specializations,
       startAt: draft.startAt,
       endAt: draft.endAt,
-      sessionMinutes: minutesBetween(draft.startAt, draft.endAt),
+      sessionMinutes,
       presenters,
-      qrRotateSeconds: Math.min(600, Math.max(5, Number(rotateSeconds) || defaultRotateSeconds)),
+      qrRotateSeconds: rotateSeconds,
     };
     try {
       await saveEvent(record, Boolean(editing), normalizeEmail(userEmail));
@@ -121,17 +138,21 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
       <form onSubmit={submit} className="admin-form">
         <label className="full">Event title<input required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></label>
         <label className="full"><span className="field-label">Description</span><textarea rows={3} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></label>
-        <fieldset className="full"><legend className="field-label">Target specializations <small>Tick all that apply — the event is recommended to students in these fields</small></legend>
-          <div className="toggle-grid">
-            {[...PREDEFINED_SPECS, "Other"].map((item) => {
-              const on = draft.specializations.includes(item);
-              return (
-                <label key={item} className="toggle-row">
-                  <input type="checkbox" checked={on} onChange={(e) => setDraft({ ...draft, specializations: e.target.checked ? [...draft.specializations, item] : draft.specializations.filter((s) => s !== item) })} /> {item}
-                </label>
-              );
-            })}
-          </div>
+        <fieldset className="full specialization-field"><legend className="field-label">Target specializations <small>Select all fields this event applies to</small></legend>
+          <details className="specialization-select">
+            <summary><span>{draft.specializations.length ? `${draft.specializations.length} selected` : "Choose specializations"}</span><small>Open list</small></summary>
+            <div className="specialization-options">
+              {availableSpecializations.map((item) => {
+                const on = draft.specializations.includes(item);
+                return (
+                  <label key={item} className="specialization-option">
+                    <input type="checkbox" checked={on} onChange={(e) => setDraft({ ...draft, specializations: e.target.checked ? [...draft.specializations, item] : draft.specializations.filter((s) => s !== item) })} /> <span>{item}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </details>
+          {draft.specializations.length > 0 && <div className="specialization-selection" aria-live="polite">{draft.specializations.map((item) => <span key={item}>{item}</span>)}</div>}
         </fieldset>
         {draft.specializations.includes("Other") && (
           <label className="full">
@@ -140,10 +161,10 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
           </label>
         )}
         <label>Starts (date &amp; time)<input type="datetime-local" required value={draft.startAt} onChange={(e) => setDraft({ ...draft, startAt: e.target.value })} /></label>
-        <label>Ends (date &amp; time)<input type="datetime-local" required value={draft.endAt} onChange={(e) => setDraft({ ...draft, endAt: e.target.value })} /></label>
+        <label>Ends (date &amp; time)<input type="datetime-local" required min={draft.startAt || undefined} value={draft.endAt} onChange={(e) => setDraft({ ...draft, endAt: e.target.value })} /></label>
         <label>Location / hall<input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} /></label>
-        <label>Session length (minutes) <small className="field-label">auto from start &amp; end — edit to move the end time</small><input type="number" min="0" value={minutesBetween(draft.startAt, draft.endAt)} disabled={!draft.startAt} onChange={(e) => setDraft({ ...draft, endAt: addMinutes(draft.startAt, Math.max(0, Number(e.target.value) || 0)) })} /></label>
-        <label>QR rotate (seconds)<input type="number" min="5" max="600" value={rotateSeconds || ""} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">How often the attendance QR changes. Default {defaultRotateSeconds}s.</small></label>
+        <label>Session length (minutes)<input type="number" min="1" value={minutesBetween(draft.startAt, draft.endAt)} disabled={!draft.startAt} onChange={(e) => setDraft({ ...draft, endAt: addMinutes(draft.startAt, Math.max(1, Number(e.target.value) || 1)) })} /><small className="field-label">Auto-calculated from start and end.</small></label>
+        <label className="full">QR rotation (seconds)<input type="number" min="0" max="600" value={rotateSeconds} onChange={(e) => setRotateSeconds(Number(e.target.value))} /><small className="field-label">Set 0 for a static QR that does not rotate. Otherwise use 5–600 seconds. Rotated codes remain valid for one additional rotation interval.</small></label>
         <fieldset className="full speaker-editor"><legend className="field-label">Speakers / Hosts <small>Add each speaker with their own photo &amp; links</small></legend>
           {speakers.map((sp, i) => (
             <div className="speaker-row" key={i}>
@@ -156,7 +177,14 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, onClose }:
           ))}
           <button type="button" className="admin-button self-start" onClick={() => setSpeakers([...speakers, { ...blankSpeaker }])}>＋ Add speaker</button>
         </fieldset>
-        <label className="full"><span className="field-label">QR presenters <small>Optional — one or more emails allowed to show this event&apos;s QR (comma or space separated)</small></span><textarea rows={2} value={presentersText} placeholder="volunteer1@qiu.edu.my, staff2@qiu.edu.my, staff3@qiu.edu.my" onChange={(e) => setPresentersText(e.target.value)} /></label>
+        <fieldset className="full presenter-editor"><legend className="field-label">QR presenters <small>Optional — add each portal-approved account separately</small></legend>
+          <div className="presenter-add-row">
+            <input type="email" value={presenterEmail} placeholder="presenter@qiu.edu.my" aria-label="Presenter email" onChange={(e) => { setPresenterEmail(e.target.value); setPresenterMessage(""); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPresenter(); } }} />
+            <button type="button" className="presenter-add-button" onClick={addPresenter}>Add presenter</button>
+          </div>
+          {presenterMessage && <p className="presenter-message" role="status">{presenterMessage}</p>}
+          {presenters.length > 0 ? <ul className="presenter-list">{presenters.map((email) => <li key={email}><span>{email}</span><button type="button" onClick={() => setPresenters(presenters.filter((item) => item !== email))} aria-label={`Remove ${email}`}>Remove</button></li>)}</ul> : <p className="presenter-empty">No additional presenters assigned.</p>}
+        </fieldset>
         <div className="admin-form-footer full">
           {message && <p className="admin-message error" role="status">{message}</p>}
           <div className="admin-submit"><button className="save-job" type="submit">{editing ? "Save changes" : "Add event"}</button></div>

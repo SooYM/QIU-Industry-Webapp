@@ -28,7 +28,7 @@ export function SettingsPanel() {
   useEffect(() => subscribeSettings(setForm), []);
 
   async function resetAll() {
-    const answer = window.prompt("DANGER: this permanently erases ALL vacancies, applications, resumes, events, attendance, exhibitors, registrations and non-superadmin accounts. This cannot be undone.\n\nType CONFIRM-RESET to proceed:");
+    const answer = window.prompt("DANGER: this permanently erases ALL vacancies, applications, resumes, events, attendance, companies, registrations and non-superadmin accounts. This cannot be undone.\n\nType CONFIRM-RESET to proceed:");
     if (answer !== "CONFIRM-RESET") { setMessage(answer == null ? "" : "Reset cancelled — you must type CONFIRM-RESET exactly."); return; }
     setResetting(true);
     setMessage("Resetting all data…");
@@ -47,9 +47,9 @@ export function SettingsPanel() {
     try {
       await saveSettings({
         ...form,
-        qrRotateSeconds: Math.min(600, Math.max(5, Number(form.qrRotateSeconds) || DEFAULT_SETTINGS.qrRotateSeconds)),
+        qrRotateSeconds: Number(form.qrRotateSeconds) === 0 ? 0 : Math.min(600, Math.max(5, Number(form.qrRotateSeconds) || DEFAULT_SETTINGS.qrRotateSeconds)),
         ccaPercent: Math.min(100, Math.max(0, Number(form.ccaPercent))),
-        ccaFloorMinutes: Math.min(1440, Math.max(0, Number(form.ccaFloorMinutes))),
+        eventSpecializations: Array.from(new Set(form.eventSpecializations.map((item) => item.trim()).filter(Boolean))).slice(0, 50),
       });
       setMessage("Settings saved. Changes apply to everyone immediately.");
       notify("Settings saved.");
@@ -65,9 +65,10 @@ export function SettingsPanel() {
         <label className="full">Tagline<input value={form.portalTagline} maxLength={200} onChange={(e) => set({ portalTagline: e.target.value })} /><small className="field-label">Shown on the Home page and in the footer.</small></label>
 
         <div className="section-heading full"><div><span>ATTENDANCE</span><h3>QR &amp; CCA rules</h3></div></div>
-        <label>Default QR rotate (seconds)<input type="number" min="5" max="600" value={form.qrRotateSeconds || ""} onChange={(e) => set({ qrRotateSeconds: Number(e.target.value) })} /><small className="field-label">Per-event value overrides this. Saved value is clamped to 5–600s.</small></label>
+        <label>Default QR rotate (seconds)<input type="number" min="0" max="600" value={form.qrRotateSeconds} onChange={(e) => set({ qrRotateSeconds: Number(e.target.value) })} /><small className="field-label">Use 0 for one static QR. Otherwise use 5–600 seconds; the previous QR remains valid for one extra interval.</small></label>
         <label>CCA threshold (% of session)<input type="number" min="0" max="100" value={form.ccaPercent || ""} onChange={(e) => set({ ccaPercent: Number(e.target.value) })} /></label>
-        <label>CCA minimum minutes floor<input type="number" min="0" max="1440" value={form.ccaFloorMinutes || ""} onChange={(e) => set({ ccaFloorMinutes: Number(e.target.value) })} /><small className="field-label">Used when an event has no set length.</small></label>
+
+        <label className="full"><span className="field-label">Event specializations <small>One option per line; include “Other” wherever it should appear.</small></span><textarea rows={8} value={form.eventSpecializations.join("\n")} onChange={(e) => set({ eventSpecializations: e.target.value.split("\n") })} /></label>
 
         <div className="section-heading full"><div><span>SECTIONS</span><h3>Show / hide tabs</h3></div></div>
         <fieldset className="toggle-grid full">
@@ -87,7 +88,7 @@ export function SettingsPanel() {
       {role === "superadmin" && (
         <div className="danger-zone">
           <div className="section-heading"><div><span>DANGER ZONE</span><h3>Reset all data</h3></div></div>
-          <p>Wipes every vacancy, application, resume, event, attendance record, exhibitor and registration back to empty. Portal settings and your superadmin account are kept. This cannot be undone.</p>
+          <p>Wipes every vacancy, application, resume, event, attendance record, company and registration back to empty. Portal settings and your superadmin account are kept. This cannot be undone.</p>
           <button type="button" className="delete-local danger-reset" onClick={resetAll} disabled={resetting}>{resetting ? "Resetting…" : "Reset all data & start empty"}</button>
         </div>
       )}

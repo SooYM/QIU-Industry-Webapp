@@ -16,7 +16,7 @@ function when(iso: string) {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 }
-const statusMeta = { live: { label: "● Live now", tone: "tone-success" }, upcoming: { label: "Upcoming", tone: "tone-accent" }, ended: { label: "Ended", tone: "tone-neutral" } };
+const statusMeta = { live: { label: "● Live now", tone: "tone-success" }, upcoming: { label: "Upcoming", tone: "tone-accent" }, ended: { label: "Past", tone: "tone-neutral" } };
 
 export function EventDetail({
   event,
@@ -30,13 +30,14 @@ export function EventDetail({
   canManageEvents: boolean;
   userEmail: string;
   attendance: Attendance | null;
-  settings: Pick<AppSettings, "ccaPercent" | "ccaFloorMinutes">;
+  settings: Pick<AppSettings, "ccaPercent">;
   onClose: () => void;
 }) {
   const st = status(event);
   const meta = statusMeta[st];
   const isPresenter = canManageEvents || (event.presenters ?? []).includes(userEmail.trim().toLowerCase());
   const threshold = ccaThresholdMinutes(event.sessionMinutes, settings);
+  const hasValidDuration = event.sessionMinutes > 0;
   const speakers = eventSpeakers(event);
 
   return (
@@ -78,8 +79,8 @@ export function EventDetail({
           <dl>
             <div><dt>Starts</dt><dd>{when(event.startAt)}</dd></div>
             <div><dt>Ends</dt><dd>{when(event.endAt)}</dd></div>
-            <div><dt>Session length</dt><dd>{event.sessionMinutes} min</dd></div>
-            <div><dt>CCA eligible at</dt><dd>≥ {threshold} min attended</dd></div>
+            <div><dt>Session length</dt><dd>{hasValidDuration ? `${event.sessionMinutes} min` : "Needs correction"}</dd></div>
+            <div><dt>CCA eligible at</dt><dd>{hasValidDuration ? `≥ ${threshold} min attended` : "Unavailable"}</dd></div>
           </dl>
         </section>
 
@@ -95,7 +96,7 @@ export function EventDetail({
             {attendance ? (
               <p className={`rounded-lg px-3 py-2 text-xs font-bold ${attendance.caEligible ? "tone-success" : attendance.checkOutMs ? "tone-danger" : "tone-neutral"}`}>
                 {attendance.caEligible ? `✓ CCA eligible — ${attendance.durationMinutes} min attended`
-                  : attendance.checkOutMs ? `Checked out — ${attendance.durationMinutes} min (below ${threshold} min)`
+                  : attendance.checkOutMs ? hasValidDuration ? `Checked out — ${attendance.durationMinutes} min (below ${threshold} min)` : `Checked out — ${attendance.durationMinutes} min (event duration needs correction)`
                   : "Checked in — remember to check out at the end to earn CCA."}
               </p>
             ) : (
@@ -106,7 +107,7 @@ export function EventDetail({
           </section>
         )}
 
-        {isPresenter && !canManageEvents && (
+        {isPresenter && !canManageEvents && st !== "ended" && (
           <p className="text-accent text-xs">You are assigned to present this event&apos;s QR. Use the ▶ Present QR button on the event card.</p>
         )}
       </div>
