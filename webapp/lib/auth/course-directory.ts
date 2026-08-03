@@ -12,9 +12,10 @@ import { resolveCourse } from "../data/course-map";
 export const PEOPLE_SCOPE = "https://www.googleapis.com/auth/directory.readonly";
 
 type PeopleResponse = {
-  organizations?: { title?: string; department?: string; name?: string }[];
+  organizations?: { title?: string; department?: string; name?: string; costCenter?: string; symbol?: string; description?: string }[];
   occupations?: { value?: string }[];
   externalIds?: { value?: string; type?: string; formattedType?: string }[];
+  userDefined?: { key?: string; value?: string }[];
 };
 
 export interface DirectoryProfile {
@@ -23,24 +24,39 @@ export interface DirectoryProfile {
   employeeId: string | null;
 }
 
-/** Pull the Workspace employee ID from People API externalIds / organizations. */
+/**
+ * Pull the Workspace employee ID from a People API domain profile. Google stores
+ * it inconsistently across tenants — most commonly in externalIds (type
+ * "organization"), but some domains put it in organizations.costCenter/symbol or
+ * a userDefined field. Scan them all, preferring the most explicit.
+ */
 function extractEmployeeId(data: PeopleResponse): string | null {
+  const clean = (v?: string) => (v ?? "").trim();
   const ids = data.externalIds ?? [];
-  // Prefer an entry explicitly typed as an organisation/employee id, else the first.
-  const preferred = ids.find((e) => /organ|employee|account/i.test(`${e.type ?? ""} ${e.formattedType ?? ""}`));
-  return (preferred?.value || ids[0]?.value || "").trim() || null;
+  const typed = ids.find((e) => /organ|employee|emp|staff|student|id/i.test(`${e.type ?? ""} ${e.formattedType ?? ""}`));
+  const userDef = (data.userDefined ?? []).find((u) => /employee|emp|staff|student|\bid\b/i.test(u.key ?? ""));
+  const orgs = data.organizations ?? [];
+  const candidate =
+    clean(typed?.value) ||
+    clean(ids[0]?.value) ||
+    clean(userDef?.value) ||
+    clean(orgs.find((o) => o.costCenter)?.costCenter) ||
+    clean(orgs.find((o) => o.symbol)?.symbol);
+  return candidate || null;
 }
 
 /**
  * Fetch the student's directory course + employee ID from People API. Never
  * throws — directory access is best-effort and returns nulls on any failure.
+ * `sources=READ_SOURCE_TYPE_PROFILE` is required so the admin-set DOMAIN profile
+ * fields (employee ID, org unit) are returned, not just the user's own profile.
  */
 export async function fetchDirectoryProfile(accessToken: string): Promise<DirectoryProfile> {
   const empty: DirectoryProfile = { course: null, employeeId: null };
   if (!accessToken) return empty;
   try {
     const res = await fetch(
-      "https://people.googleapis.com/v1/people/me?personFields=organizations,occupations,externalIds",
+      "https://people.googleapis.com/v1/people/me?personFields=organizations,occupations,externalIds,userDefined&sources=READ_SOURCE_TYPE_PROFILE",
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     if (!res.ok) return empty;

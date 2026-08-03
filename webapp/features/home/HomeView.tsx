@@ -40,8 +40,13 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
     { role: "assistant", content: `Ask me about **${company.name}** — their vacancies, booth or profile. I only answer from this company's details.` },
   ]);
   const boxRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
-  useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages, open]);
+  // Pin the message list to the newest line as the answer streams in.
+  useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages]);
+  // Inside the company modal the assistant sits below the fold — when it opens,
+  // scroll the modal down so the conversation is actually visible.
+  useEffect(() => { if (open) sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [open]);
 
   function ask(event: FormEvent) {
     event.preventDefault();
@@ -64,7 +69,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
   }
 
   return (
-    <section className="job-assistant mt-4">
+    <section className="job-assistant mt-4" ref={sectionRef}>
       <button type="button" className="job-assistant-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span aria-hidden="true">✦</span> Chat with AI about {company.name} <span aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>

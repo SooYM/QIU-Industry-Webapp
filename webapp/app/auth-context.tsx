@@ -348,7 +348,7 @@ function AuthStatus({ title, detail, loading = false }: { title: string; detail:
 }
 
 export function AuthAccount() {
-  const { user, role, course, signOut } = useAuth();
+  const { user, role, course, employeeId, signOut } = useAuth();
   const [photoOk, setPhotoOk] = useState(true);
   if (!user || !role) return null;
   const subtitle = role === "superadmin" ? "Super admin"
@@ -359,7 +359,7 @@ export function AuthAccount() {
     {user.photoURL && photoOk
       ? <img className="auth-photo" src={user.photoURL} alt="" referrerPolicy="no-referrer" onError={() => setPhotoOk(false)} />
       : <span className="auth-avatar" aria-hidden="true">{(user.displayName || user.email || "Q").charAt(0).toUpperCase()}</span>}
-    <span><strong>{user.displayName || user.email}</strong><small>{subtitle}</small></span>
+    <span><strong>{user.displayName || user.email}</strong><small>{subtitle}</small>{employeeId && <small className="auth-empid">ID {employeeId}</small>}</span>
     <button type="button" onClick={signOut}>Sign out</button>
   </div>;
 }
