@@ -4,7 +4,6 @@ import { createContext, FormEvent, ReactNode, useContext, useEffect, useMemo, us
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
-  reauthenticateWithPopup,
   signInWithPopup,
   signOut as firebaseSignOut,
   type User,
@@ -56,11 +55,6 @@ type WhitelistedEmailRecord = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-// Base provider carries NO sensitive scopes, so non-QIU sign-in never triggers the
-// "unverified app" consent. The People API directory scope is requested
-// incrementally in signIn(), only for @qiu.edu.my accounts.
-const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: "select_account" });
 
 function readableAuthError(error: unknown) {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -205,21 +199,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setError("");
       try {
-        const result = await signInWithPopup(auth, provider);
-        // Course auto-detection is for @qiu.edu.my students only. Request the
-        // People API directory scope INCREMENTALLY here, so non-QIU accounts never
-        // see the sensitive-scope "unverified app" consent. Best-effort — a failed
-        // or dismissed lookup never blocks sign-in.
-        const dbg = (v: unknown) => { try { (globalThis as unknown as { __DIR_DEBUG__?: unknown }).__DIR_DEBUG__ = v; } catch { /* noop */ } };
-        dbg({ stage: "signed-in", email: result.user.email, isQIU: isAllowedQiuEmail(result.user.email) });
+        // Request the People/directory scope in THIS single, user-initiated popup.
+        // A second popup (the old reauthenticateWithPopup) is blocked by the browser
+        // because the click gesture is already spent — that "auth/popup-blocked" is
+        // exactly why course/employee-ID capture silently failed. One popup fixes it.
+        // The token from this result is then used for the QIU directory lookup only.
+        const signInProvider = new GoogleAuthProvider();
+        signInProvider.addScope(PEOPLE_SCOPE);
+        signInProvider.setCustomParameters({ prompt: "select_account" });
+        const result = await signInWithPopup(auth, signInProvider);
         if (isAllowedQiuEmail(result.user.email) && db) {
           try {
-            const scoped = new GoogleAuthProvider();
-            scoped.addScope(PEOPLE_SCOPE);
-            dbg({ stage: "requesting-scope-popup" });
-            const scopedResult = await reauthenticateWithPopup(result.user, scoped);
-            const token = GoogleAuthProvider.credentialFromResult(scopedResult)?.accessToken;
-            dbg({ stage: "reauth-done", hasToken: Boolean(token) });
+            const token = GoogleAuthProvider.credentialFromResult(result)?.accessToken;
             if (token) {
               const { course: resolved, employeeId } = await fetchDirectoryProfile(token, result.user.email ?? undefined);
               const patch: Record<string, unknown> = {};
@@ -231,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (resolved && resolved.code) setCourse(resolved.name);
               if (employeeId) setEmployeeId(employeeId);
             }
-          } catch (dirErr) { dbg({ stage: "error", error: String(dirErr) }); /* best-effort */ }
+          } catch { /* Directory lookup is best-effort; never blocks sign-in. */ }
         }
       } catch (nextError) {
         setError(readableAuthError(nextError));
