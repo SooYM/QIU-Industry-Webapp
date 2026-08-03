@@ -217,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const scopedResult = await reauthenticateWithPopup(result.user, scoped);
             const token = GoogleAuthProvider.credentialFromResult(scopedResult)?.accessToken;
             if (token) {
-              const { course: resolved, employeeId } = await fetchDirectoryProfile(token);
+              const { course: resolved, employeeId } = await fetchDirectoryProfile(token, result.user.email ?? undefined);
               const patch: Record<string, unknown> = {};
               // Only a recognised QIU programme counts. Staff/lecturers (or any
               // unmatched directory value) leave the course blank.

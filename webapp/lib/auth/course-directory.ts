@@ -46,12 +46,35 @@ function extractEmployeeId(data: PeopleResponse): string | null {
 }
 
 /**
- * Fetch the student's directory course + employee ID from People API. Never
- * throws — directory access is best-effort and returns nulls on any failure.
- * `sources=READ_SOURCE_TYPE_PROFILE` is required so the admin-set DOMAIN profile
- * fields (employee ID, org unit) are returned, not just the user's own profile.
+ * The admin-set "Employee ID" lives in the DOMAIN directory, not the user's own
+ * `people/me` profile — so we query the same directory-search endpoint that powers
+ * the Google Contacts directory card (which any domain user can view). Returns the
+ * matching person's profile, or null.
  */
-export async function fetchDirectoryProfile(accessToken: string): Promise<DirectoryProfile> {
+async function fetchDirectoryPerson(accessToken: string, email: string): Promise<PeopleResponse | null> {
+  if (!email) return null;
+  try {
+    const url = "https://people.googleapis.com/v1/people:searchDirectoryPeople"
+      + `?query=${encodeURIComponent(email)}&pageSize=10`
+      + "&readMask=emailAddresses,externalIds,organizations,occupations"
+      + "&sources=DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE";
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { people?: (PeopleResponse & { emailAddresses?: { value?: string }[] })[] };
+    const people = data.people ?? [];
+    const lower = email.toLowerCase();
+    return people.find((p) => (p.emailAddresses ?? []).some((e) => (e.value ?? "").toLowerCase() === lower)) ?? people[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch the student's directory course + employee ID. Course comes from the
+ * user's own `people/me` profile; the employee ID from a directory search (the
+ * data source the Contacts directory card uses). Never throws — best-effort.
+ */
+export async function fetchDirectoryProfile(accessToken: string, email?: string): Promise<DirectoryProfile> {
   const empty: DirectoryProfile = { course: null, employeeId: null };
   if (!accessToken) return empty;
   try {
@@ -59,12 +82,16 @@ export async function fetchDirectoryProfile(accessToken: string): Promise<Direct
       "https://people.googleapis.com/v1/people/me?personFields=organizations,occupations,externalIds,userDefined&sources=READ_SOURCE_TYPE_PROFILE",
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
-    if (!res.ok) return empty;
-    const data = (await res.json()) as PeopleResponse;
-    const employeeId = extractEmployeeId(data);
+    const data = res.ok ? ((await res.json()) as PeopleResponse) : {};
+
+    // Employee ID: prefer the directory-search profile, fall back to people/me.
+    const dirPerson = await fetchDirectoryPerson(accessToken, email ?? "");
+    const employeeId = (dirPerson && extractEmployeeId(dirPerson)) || extractEmployeeId(data);
+
     const candidates = [
       ...(data.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
       ...(data.occupations ?? []).map((o) => o.value),
+      ...(dirPerson?.organizations ?? []).flatMap((o) => [o.title, o.department, o.name]),
     ].filter(Boolean) as string[];
     for (const candidate of candidates) {
       const resolved = resolveCourse(candidate);
