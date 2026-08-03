@@ -48,10 +48,14 @@ function JobAssistant({ job }: { job: Job }) {
     { role: "assistant", content: `Ask me about the **${job.title}** role at **${job.company}**. I only answer from this listing.` },
   ]);
   const boxRef = useRef<HTMLDivElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
+  // Keep the newest answer and the input in view: pin the message list to its
+  // bottom and scroll the conversation's end into the modal on every turn / stream.
   useEffect(() => {
     const el = boxRef.current;
-    if (el) el.scrollTop = el.scrollHeight; // auto-scroll to newest
+    if (el) el.scrollTop = el.scrollHeight;
+    if (open) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, open]);
 
   function ask(event: FormEvent) {
@@ -100,6 +104,7 @@ function JobAssistant({ job }: { job: Job }) {
             <button disabled={!input.trim() || streaming} aria-label="Send question">↑</button>
           </form>
           <p className="chat-disclaimer">⚠️ AI can make mistakes — verify important details.</p>
+          <div ref={endRef} aria-hidden="true" />
         </>
       )}
     </section>

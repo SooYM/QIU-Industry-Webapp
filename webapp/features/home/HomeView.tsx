@@ -40,13 +40,15 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
     { role: "assistant", content: `Ask me about **${company.name}** — their vacancies, booth or profile. I only answer from this company's details.` },
   ]);
   const boxRef = useRef<HTMLDivElement>(null);
-  const sectionRef = useRef<HTMLElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
 
-  // Pin the message list to the newest line as the answer streams in.
-  useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight; }, [messages]);
-  // Inside the company modal the assistant sits below the fold — when it opens,
-  // scroll the modal down so the conversation is actually visible.
-  useEffect(() => { if (open) sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [open]);
+  // Keep the newest answer AND the input visible: pin the message list to its
+  // bottom, and scroll the whole conversation's end into the modal on every turn
+  // and while the answer streams (the assistant sits below the modal fold).
+  useEffect(() => {
+    const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight;
+    if (open) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, open]);
 
   function ask(event: FormEvent) {
     event.preventDefault();
@@ -69,7 +71,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
   }
 
   return (
-    <section className="job-assistant mt-4" ref={sectionRef}>
+    <section className="job-assistant mt-4">
       <button type="button" className="job-assistant-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span aria-hidden="true">✦</span> Chat with AI about {company.name} <span aria-hidden="true">{open ? "▲" : "▼"}</span>
       </button>
@@ -83,6 +85,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
             <button disabled={!input.trim() || streaming} aria-label="Send question">↑</button>
           </form>
           <p className="chat-disclaimer">⚠️ AI can make mistakes — verify important details.</p>
+          <div ref={endRef} aria-hidden="true" />
         </>
       )}
     </section>
