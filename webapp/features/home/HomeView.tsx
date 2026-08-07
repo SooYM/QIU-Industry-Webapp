@@ -6,6 +6,7 @@ import { useAuth } from "../../app/auth-context";
 import { countCompanyViews, isApproved, logChat, subscribeCompanyChats } from "../../lib/data/firestore";
 import { estimateReplyHours, replyTimeLabel, whatsappLink } from "../../lib/data/reply-time";
 import { jobMatchesCourse } from "../../lib/data/course-map";
+import { businessNatureMatchesCourse } from "../../lib/data/business-nature";
 import { companyNamesMatch } from "../../lib/data/company-matching";
 import { AI_WARNING, withAiWarning } from "../../app/chat";
 import { RichText } from "../../app/RichText";
@@ -71,8 +72,8 @@ function answerAboutCompany(question: string, company: Company, jobs: Job[]): st
   if (has(/looking for|interested in|which course|what course|who do they want/)) {
     recognised = true;
     parts.push(company.interestedIn?.length
-      ? `They are looking for students from: ${company.interestedIn.join(", ")}.`
-      : "They have not said which courses they are looking for.");
+      ? `Their nature of business is ${company.interestedIn[0]}${company.interestedIn[0].toLowerCase() === "all students" ? " — they welcome students from every course" : ", so students in a related field are a good fit"}.`
+      : "They have not stated their nature of business.");
   }
   if (has(/who|about|what.*(do|they)|overview|background|tell me/)) {
     recognised = true;
@@ -241,7 +242,7 @@ function CompanyDetail({ company, jobs, isStudent, course, canSeeVisits, onOpenJ
 
         {(company.interestedIn?.length ?? 0) > 0 && (
           <section>
-            <span className="detail-label">LOOKING FOR</span>
+            <span className="detail-label">NATURE OF BUSINESS</span>
             <div className="exhibitor-tags mt-1.5">
               {company.interestedIn!.map((field) => <span key={field} className="exhibitor-tag">{field}</span>)}
             </div>
@@ -362,13 +363,9 @@ export function HomeView({
   // they had no interest in that course.
   const recommendedIds = useMemo(() => {
     if (!isStudent || !course) return new Set<number>();
-    const wanted = course.trim().toLowerCase();
     const ids = new Set<number>();
     for (const c of companies) {
-      if ((c.interestedIn ?? []).some((field) => {
-        const v = field.trim().toLowerCase();
-        return v === "all students" || v === wanted;
-      })) ids.add(c.id);
+      if (businessNatureMatchesCourse((c.interestedIn ?? [])[0], course)) ids.add(c.id);
     }
     return ids;
   }, [companies, isStudent, course]);

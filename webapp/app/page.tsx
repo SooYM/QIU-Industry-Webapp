@@ -320,6 +320,16 @@ export default function Home() {
         </div>
       )}
 
+      {role === "employer" && incompleteCompany && (
+        <div className="scan-banner" role="status">
+          <span>
+            <b>{incompleteCompany.name}</b> has no profile details yet — students see an empty card on the Home
+            page. Add a description, website and booth number so they know who you are.
+          </span>
+          <button type="button" className="nudge-btn" onClick={() => { setTab("dashboard"); }}>Complete profile</button>
+        </div>
+      )}
+
       <nav className="utility-bar main-tabs" aria-label="Sections" style={{ minHeight: "auto", gap: ".4rem", flexWrap: "wrap" }}>
         {visibleTabs.map(([key, label]) => (
           <button key={key} type="button" aria-current={tab === key ? "page" : undefined}
@@ -331,18 +341,7 @@ export default function Home() {
       {tab === "summary" && !isStudent && (
         <section className="workspace space-y-6" style={{ gridTemplateColumns: "1fr" }}>
           {role === "employer" ? (
-            <>
-              {incompleteCompany && (
-                <div className="scan-banner" role="status">
-                  <span>
-                    <b>{incompleteCompany.name}</b> has no profile details yet — students see an empty card on the Home
-                    page. Add a description, website and booth number so they know who you are.
-                  </span>
-                  <button type="button" className="nudge-btn" onClick={() => setTab("dashboard")}>Complete profile</button>
-                </div>
-              )}
-              <EmployerSummary companies={employerCompany ? [employerCompany] : []} onOpenActivity={openDashboardActivity} />
-            </>
+            <EmployerSummary companies={employerCompany ? [employerCompany] : []} onOpenActivity={openDashboardActivity} />
           ) : (
             <AdminSummary onOpenActivity={openDashboardActivity} />
           )}

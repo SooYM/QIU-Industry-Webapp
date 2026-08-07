@@ -274,7 +274,7 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
   margin-top: 0.5rem;
 }
 
-.scan-banner { max-width:1500px; margin:0 auto; display:flex; align-items:center; gap:1rem; padding:1.1rem clamp(1.25rem,3.5vw,3.5rem); background:var(--color-danger-soft); color:var(--color-danger); border-bottom:1px solid color-mix(in srgb,var(--color-danger) 30%,var(--line)); font-size:.9rem; font-weight:700; line-height:1.5; }
+.scan-banner { width:100%; display:flex; align-items:center; gap:1rem; padding:1.1rem clamp(1.25rem,5vw,5rem); background:var(--color-danger-soft); color:var(--color-danger); border-bottom:1px solid color-mix(in srgb,var(--color-danger) 30%,var(--line)); font-size:.9rem; font-weight:700; line-height:1.5; }
 .scan-banner button { margin-left:auto; border:0; background:none; font-size:1.15rem; color:var(--muted); }
 .scan-banner .nudge-btn { margin-left:auto; border:0; background:var(--blue); color:var(--color-on-primary); border-radius:.55rem; padding:.5rem .85rem; font-size:.76rem; font-weight:800; }
 
