@@ -188,10 +188,15 @@ test("form controls reach 16px on mobile so iOS does not zoom", () => {
   }
 });
 
-test("modals animate in and the tab strips show there is more to scroll", () => {
+test("modals animate in and the main tabs scroll without a black fade", () => {
   assert.match(styles, /@keyframes sheet-in/);
   assert.match(styles, /\.modal-backdrop \{ animation:backdrop-in/);
-  assert.match(styles, /\.main-tabs \{ -webkit-mask-image/);
+  // The tabs scroll as one row. They used to do it behind a `mask-image` fade,
+  // but a mask makes the strip itself transparent and the page behind it is
+  // charcoal, so the affordance rendered as a black smear over the last tab.
+  // A partly-visible next tab is the affordance instead — no mask may come back.
+  assert.match(styles, /\.main-tabs \{[^}]*overflow-x:auto/);
+  assert.doesNotMatch(styles, /\.main-tabs[^{]*\{[^}]*mask-image/);
   // …and all of it collapses under the reduced-motion catch-all, which must
   // cover every element rather than the old hand-listed allow-list.
   const rm = styles.slice(styles.lastIndexOf("@media (prefers-reduced-motion:reduce)"));

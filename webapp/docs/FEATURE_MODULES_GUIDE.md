@@ -17,22 +17,27 @@ webapp/
 │   ├── Modal.tsx                 # Accessible modal dialog container
 │   └── toast.tsx                 # Global reactive toast notification system
 ├── features/
+│   ├── Guide.tsx                 # Interactive 4-role user guide (Student, Employer, Admin, Super-Admin)
 │   ├── admin/
 │   │   ├── AdminPanel.tsx        # Sub-tab navigation container
-│   │   ├── AdminSummary.tsx      # System overview metrics & bar charts
+│   │   ├── AdminSummary.tsx      # System overview metrics, bar charts & bento action pop-outs
 │   │   ├── ApprovalQueue.tsx     # Review queue & 1-click bulk approvals
-│   │   ├── CompanyManager.tsx    # Exhibitor editor & website logo fetcher
-│   │   ├── EmployerSummary.tsx   # Scoped employer analytics
+│   │   ├── CompanyManager.tsx    # Exhibitor editor, study area chip selector & JSON bulk importer
+│   │   ├── DashboardActivityListModal.tsx # Bento metric card log pop-out modal
+│   │   ├── DashboardStudentsModal.tsx # Active student engagement summary modal
+│   │   ├── EmployerSummary.tsx   # Scoped employer analytics & bento pop-outs
 │   │   ├── ResumeViewer.tsx      # Multi-mode candidate resume viewer
 │   │   ├── SettingsPanel.tsx     # System settings & portal toggles
-│   │   └── StudentActivity.tsx   # Candidate application feeds
+│   │   ├── StudentActivity.tsx   # Candidate application feeds
+│   │   └── TalkChatHistory.tsx   # Talk Q&A audit trail & CSV report exporter
 │   ├── events/
 │   │   ├── EventAttendance.tsx   # Attendance log & CSV report exporter
 │   │   ├── EventPresenter.tsx    # Live 30s rotating QR projector view
 │   │   ├── EventsView.tsx        # Industry Day event schedule dashboard
-│   │   └── SpeakerAvatar.tsx     # Speaker headshot avatar fallback
+│   │   ├── SpeakerAvatar.tsx     # Speaker headshot avatar fallback
+│   │   └── TalkLiveChat.tsx      # Live Q&A, presentation mode font zoom & attendance gating
 │   ├── home/
-│   │   ├── HomeView.tsx          # Exhibitor landing directory & RAG assistant
+│   │   ├── HomeView.tsx          # Exhibitor landing directory, course matching & RAG assistant
 │   │   └── useLogoBackdrop.ts    # HTML5 Canvas 2D logo luminance sampler
 │   ├── student/
 │   │   ├── cv-download.ts        # Standalone HTML/PDF download engine
@@ -43,19 +48,27 @@ webapp/
 │       ├── VacancyCard.tsx       # Vacancy listing card component
 │       ├── VacancyFilters.tsx    # 5-mode vacancy sorting & search
 │       └── VacancyModal.tsx      # Vacancy popup & JobAssistant RAG
+└── lib/
+    └── data/
+        └── course-map.ts         # 43 QIU programmes, 12 study areas, course resolver & match logic
 ```
 
 ---
 
 ## 2. Deep Dive Technical Feature Specifications
 
-### Module 1: Home Directory & Company RAG ([HomeView.tsx](../features/home/HomeView.tsx) & [useLogoBackdrop.ts](../features/home/useLogoBackdrop.ts))
+### Module 1: Home Directory, Nature of Business & Course Recommendations ([HomeView.tsx](../features/home/HomeView.tsx), [course-map.ts](../lib/data/course-map.ts) & [useLogoBackdrop.ts](../features/home/useLogoBackdrop.ts))
 
 #### Overview
-Renders the primary Industry Day exhibitor directory page displaying participating company cards, corporate summaries, booth tags, embedded YouTube videos, and a grounded per-company RAG assistant.
+Renders the primary Industry Day exhibitor directory page displaying participating company cards, corporate summaries, booth tags, target study area badges, embedded YouTube videos, and a grounded per-company RAG assistant.
 
 ```mermaid
 flowchart TD
+    CandidateCourse["Candidate Programme (e.g. BCS)"] --> ResolveArea["courseArea() / resolveCourse() in course-map.ts"]
+    ResolveArea --> AreaResult["12 Areas of Study (e.g. Computer Science & IT)"]
+    AreaResult --> MatchEngine["recommendedIds Match Engine in HomeView.tsx"]
+    CompanyProfile["Company Target Choice (interestedIn)"] --> MatchEngine
+    MatchEngine -->|"Match Found or 'All students'"| RecCard["Render 🌟 Looking for your course Badge"]
     CompanyCard["Exhibitor Card (ExhibitorCard)"] -->|"User Click"| DetailModal["Company Detail Modal (CompanyDetail)"]
     DetailModal --> LogoHook["useLogoBackdrop.ts Hook"]
     LogoHook -->|"Draw 24x24 Canvas & Read Pixels"| LuminanceCalc["Calculate Luminance Y > 170"]
@@ -64,78 +77,50 @@ flowchart TD
     DetailModal --> VideoSection["YouTube Video Embed (getYouTubeEmbedUrl with Live Parsing)"]
     DetailModal --> CompanyAssistant["Grounded Assistant (CompanyAssistant)"]
     CompanyAssistant -->|"Lexical Matching"| AnswerEngine["answerAboutCompany() Engine"]
-    CompanyCard -->|"Matched Profile"| RecommendedBadge["Green Border & Recommended Badge"]
 ```
+
+#### Nature of Business & Target Study Areas (`course-map.ts`)
+Catalogue of 43 QIU academic programmes across 6 faculties mapped to 12 broad Areas of Study (`AREAS_OF_STUDY`):
+- **12 Areas of Study**: *"Accounting & Finance"*, *"Actuarial Science Mathematics & Statistics"*, *"Biological Environmental & Life Sciences"*, *"Business Management & Administration"*, *"Computer Science & Information Technology"*, *"Education & Pedagogy"*, *"Engineering & Industrial Technology"*, *"Hospitality Tourism & Culinary Arts"*, *"Media Communication & Advertising"*, *"Medicine Biomedical & Healthcare"*, *"Pharmacy & Pharmaceutical Sciences"*, *"Social Sciences & Psychology"*.
+- **Course Resolution (`resolveCourse`)**: Normalizes raw user course strings (e.g. `"BCS"`, `"BCS - Year 2"`, `"Bachelor of Computer Science (Hons)"`) against `PROGRAMMES`, matching longest abbreviations first, then programme names, then returning free text fallback.
+- **Area Extraction (`courseArea`)**: Resolves candidate programme code to its primary study area string.
+
+#### Target Selection & Recommendation Match Engine (`recommendedIds`)
+- **Exhibitor Multi-Select**: Employers pick target study areas from a multi-select dropdown (`ALL_STUDENTS` + 12 study areas), rendered as removable chips saved to `interestedIn`.
+- **Match Evaluation**: `recommendedIds` computes a `Set<number>` of matching company IDs by testing candidate study area or exact course string against company `interestedIn` arrays (or `"all students"`).
+- **UI Surface**: Matching company cards display a `🌟 Looking for your course` success badge and gain top priority under the "Recommended for you" sort option.
 
 #### Brand Logo Luminance Sampling Hook (`useLogoBackdrop.ts`)
 Calculates image luminance using an HTML5 2D Canvas to automatically determine whether a company logo requires a light or dark background tile for optimal visual contrast:
 - Formula: $Y = 0.2126R + 0.7152G + 0.0722B$
 - Evaluates $Y > 170$ to switch `.logo-light` vs `.logo-dark`.
 
-#### Recommended Companies UI
-Companies with vacancies matching the student's program (using `jobMatchesCourse` logic) are rendered directly in the main `exhibitor-grid`. These cards are visually distinguished with a `.exhibitor-card.recommended` CSS green border and a "🌟 Has vacancies matching your profile" success badge.
-
-#### YouTube Live Embed
-```ts
-// features/home/useLogoBackdrop.ts (L24-L39)
-const canvas = document.createElement("canvas");
-const w = (canvas.width = 24), h = (canvas.height = 24);
-const ctx = canvas.getContext("2d", { willReadFrequently: true });
-ctx.drawImage(img, 0, 0, w, h);
-const { data } = ctx.getImageData(0, 0, w, h);
-
-let lum = 0, count = 0;
-for (let i = 0; i < data.length; i += 4) {
-  const a = data[i + 3];
-  if (a < 24) continue; // Skip transparent background pixels
-  // Relative Luminance formula (ITU-R BT.709)
-  lum += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) * (a / 255);
-  count++;
-}
-if (count && alive) setAuto(lum / count > 170 ? "dark" : "light");
-```
-
-- **Cross-Origin Fallback**: If canvas pixel reading is blocked by CORS security, the hook gracefully defaults to `"light"`.
-
-#### In-Modal Grounded RAG Assistant (`CompanyAssistant`)
-Operates on deterministic keyword matching (`answerAboutCompany`) grounded strictly to the selected company's summary, booth number, website, video URL, and active vacancies. Answers stream character-by-character into the typewriter chat interface.
-
-#### Company Recommendation Engine
-Suggests relevant companies dynamically based on available vacancies and match criteria, enhancing discovery of exhibitors during the event.
-
 ---
 
-
-### Module 2: Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](../features/admin/ApprovalQueue.tsx))
+### Module 2: Employer Self-Registration & Company Bulk JSON Import ([ApprovalQueue.tsx](../features/admin/ApprovalQueue.tsx) & [CompanyManager.tsx](../features/admin/CompanyManager.tsx))
 
 #### Overview
-Enables external partner employers to self-register for Industry Day access without requiring manual upfront email entry by administrators.
+Enables external partner employers to self-register for Industry Day access and allows administrators to bulk-import exhibitor profiles from JSON files.
 
 ```mermaid
 sequenceDiagram
-    actor Employer as External Employer
     actor Admin as System Administrator
     participant Portal as Webapp Client
-    participant SignupsDB as Firestore (employer_signups)
-    participant WhitelistDB as Firestore (whitelisted_emails)
-    participant CompaniesDB as Firestore (companies)
+    participant File as JSON Upload File
+    participant Firestore as Cloud Firestore (companies)
 
-    Employer->>Portal: Fill Registration Form (Company, Website, Contact)
-    Portal->>SignupsDB: setDoc employer_signups/{email} (status: 'pending')
-    Admin->>Portal: Open Admin Panel -> Approvals Queue
-    Portal->>SignupsDB: Query pending signups
-    Admin->>Portal: Review profile preview & Click "Approve"
-    Portal->>WhitelistDB: setDoc whitelisted_emails/{email} (company: companyName)
-    Portal->>CompaniesDB: setDoc companies/{companyId} (status: 'approved')
-    Portal->>SignupsDB: updateDoc employer_signups/{email} (status: 'approved')
-    Portal-->>Admin: Show success toast ("Approved company — added to exhibitors")
+    Admin->>Portal: Click "Import JSON" in CompanyManager
+    Portal->>File: Read JSON Array
+    Portal->>Portal: Parse Directory Schema (Company Name, Website, Nature of Business, Profile)
+    Portal->>Firestore: Check Existing Company Names (Case-Insensitive)
+    Portal->>Firestore: saveCompany() Batch Writes for New Records
+    Portal-->>Admin: Show Success Toast ("Imported N companies")
 ```
 
-#### Key Capabilities
-- **Self-Service Registration**: External employers submit registration details (`employer_signups/{email}`).
-- **1-Click Admin Approval**: Approving a signup atomically whitelists the email in `whitelisted_emails`, assigns the employer role, and creates an exhibitor profile in `companies`.
-- **Staged Edits (`pendingEdit`)**: Employer edits to live vacancies or company profiles stage diff records instead of overwriting live documents.
-- **Bulk "Approve All"**: Admins can approve all pending vacancy submissions and staged edits simultaneously with 1 click (`approveAll`).
+#### Company Bulk JSON Import (`importJson`)
+- **JSON Parsing**: Accepts JSON arrays of objects conforming to either directory export schemas (`Company Name`, `Company Website`, `Nature of Business`, `Company Profile`) or standard schemas (`name`, `website`, `summary`).
+- **Summary Synthesis**: Merges profile description and nature of business into a clean pre-formatted summary (`[profile, nature && 'Nature of business: ' + nature].filter(Boolean).join('\n\n')`).
+- **Deduplication Engine**: Converts incoming names to lowercase and cross-references existing database entries and intra-file records to prevent duplicate creation.
 
 ---
 
@@ -148,17 +133,27 @@ The admin dashboard features modular sub-tabs partitioned by administrative resp
 AdminPanel (Admin View)
 ├── access            ──> RoleManager (Promote/demote user roles)
 ├── approvals         ──> ApprovalQueue (Review signups, vacancies, staged edit diffs)
-├── manageExhibitor   ──> CompanyManager [view="manage"] (Edit/delete existing exhibitors)
+├── manageExhibitor   ──> CompanyManager [view="manage"] (Edit/delete existing exhibitors, JSON import)
 ├── addExhibitor      ──> CompanyManager [view="add"] (Add new exhibitor with logo fetcher)
 ├── manageVac         ──> Vacancy Manager (Filter, search, edit, delete vacancies)
 ├── addVac            ──> Vacancy Form (Create new vacancy listing)
 ├── activity          ──> StudentActivity [mode="all"] (Candidate application accordions)
 ├── resumes           ──> ResumeViewer (Search & view student PDF/Link/Generated CVs)
 ├── chats             ──> ChatHistory [mode="all"] (Audit assistant chat turns)
-└── settings          ──> SettingsPanel (Portal title, QR rotation speed, CCA rules)
+├── talkChats         ──> TalkChatHistory (Audit live talk questions & CSV export)
+└── settings          ──> SettingsPanel (Portal title, QR rotation speed, CCA rules, data reset)
 ```
 
 - **Role Gating**: Employers see a streamlined menu scoped strictly to their assigned company (`company`, `addVac`, `manageVac`, `resumes`, `activity`, `chats`). Admins access webapp-wide tabs.
+
+#### Interactive Bento Metric Pop-outs (`Stat`)
+Metric tiles in `AdminSummary.tsx` double as interactive buttons (`stat-card-action`). Clicking any metric tile opens `DashboardActivityListModal.tsx`, which displays the full list of records matching the metric's scope (applications, job views, check-ins, assistant queries) with 1-click item navigation.
+
+#### Active Students Summary Modal (`DashboardStudentsModal.tsx`)
+Clicking the "Students active" tile opens `DashboardStudentsModal.tsx`. It aggregates all activity records in the selected time range by candidate key (`studentUid` or `actor`), calculating distinct active student counts, action tallies per candidate, and last active dates.
+
+#### Talk Q&A Audit Log (`TalkChatHistory.tsx`)
+Maintains a full admin audit log of every question asked across live talk sessions. Presenters may delete inappropriate messages from the live room feed, making the live feed insufficient for post-event auditing. `TalkChatHistory` reads all chat logs, groups them by event, provides query filtering, and supports 1-click CSV export (`talk-questions-YYYY-MM-DD.csv`).
 
 #### Data Export & CSV Integration
 Admin and Employer sub-tabs feature integrated **CSV Export** buttons powered by a client-side exporter (`csv.ts`). This allows seamless offline extraction of application rosters, chat histories, vacancy stats, and event attendance straight from active table views without server-side processing.
@@ -179,16 +174,17 @@ flowchart TD
     ScopeCheck --> FetchApps["Subscribe Applications (where company == assigned)"]
     ScopeCheck --> FetchChats["Subscribe Chat Logs (where company == assigned)"]
     FetchApps --> CalcStats["Calculate Metrics: Total Apps, Unique Applicants, Jobs"]
-    FetchApps --> RankJobs["BarChart: Applications by Vacancy"]
+    FetchApps --> PopoutModal["Click Bento Card -> DashboardActivityListModal"]
     FetchChats --> CountQuestions["Stat Card: Questions Asked via Assistant"]
 ```
 
-#### Metrics Displayed
+#### Metrics Displayed & Interactive Pop-outs
 - **Total Applications**: Total candidate applications submitted for company vacancies.
 - **Unique Applicants**: Count of distinct student UIDs (`Set(studentUid)`).
 - **Jobs Applied To**: Count of active vacancies with candidates.
 - **Assistant Queries**: Count of student questions asked about the company via `JobAssistant` / `CompanyAssistant`.
-- **Ranked Bar Charts**: Visual bar charts displaying application distributions by vacancy title.
+- **Interactive Bento Pop-outs**: Clicking application or question tiles opens `DashboardActivityListModal` scoped to the employer's company.
+- **Server-Side Profile View Telemetry (`countCompanyViews`)**: Profile visits are counted server-side per student per session, preventing duplicate inflations.
 - **Tenant Scope Isolation**: Strict client-side and server-side filtering preventing employers from viewing competitor data.
 
 ---
@@ -238,7 +234,6 @@ To maintain absolute data integrity and prevent broken application references, i
 
 ---
 
-
 ### Module 6: Global Toast Notification System ([toast.tsx](../components/toast.tsx))
 
 #### Overview
@@ -269,10 +264,7 @@ Positioned directly under form text inputs for company logos, speaker headshots,
 
 ---
 
-### Module 8: Events UX & 30-Second Dynamic QR Anti-Cheat Attendance ([EventPresenter.tsx](../features/events/EventPresenter.tsx) & [SpeakerAvatar.tsx](../features/events/SpeakerAvatar.tsx))
-
-#### Target Specializations & Event Matches
-Events utilize a single `specialization` string selected from a predefined list (shared with Vacancies, plus an "Other" custom option). If a student's course matches this specialization via regex pattern, the event card displays a "🌟 Relevant to you" badge in `EventsView.tsx`.
+### Module 8: Events UX, 30s Dynamic QR & Live Q&A ([EventPresenter.tsx](../features/events/EventPresenter.tsx) & [TalkLiveChat.tsx](../features/events/TalkLiveChat.tsx))
 
 #### Live Presenter Screen (`EventPresenter.tsx`)
 Displays a live projector view generating a dynamic rotating QR code every 30 seconds (`REFRESH_MS = 30000`):
@@ -295,31 +287,31 @@ useEffect(() => {
 }, [event.id, step, refreshMs]);
 ```
 
-- **Step Selector**: Presenters toggle between **Step 1: Check-in** (session commencement) and **Step 2: Check-out** (session conclusion).
-- **SpeakerAvatar**: Renders speaker headshot photos or an SVG silhouette fallback when no image URL is configured.
-- **Multi-Speaker Support**: Events natively support distinct arrays of presenters and multiple speaker profiles, accommodating panels and co-hosted sessions.
+#### Attendance Gating for Live Q&A (`TalkLiveChat.tsx`)
+Students must have checked into the talk (`attended === true`, verified via live QR check-in) to ask questions. Unattended candidates receive a prompt instructing them to scan the hall screen QR code before submitting questions.
+
+#### Presenter Full-Screen Presentation Mode & Font Zoom (`TalkLiveChat.tsx`)
+Facilitators can project approved questions onto hall screens:
+- **Projector Overlay**: Launches a fixed full-screen overlay displaying one approved question at a time.
+- **Font Scale Controls (`presentScale`)**: Real-time text scaling via `A−` / `%` reset / `A+` UI buttons and hotkeys (`+`/`-`/`=`, Left/Right arrows navigation, ESC to exit).
 
 ---
-
 
 ### Module 9: Multi-Criteria Vacancy Sorting & QIU-Red Design Tokens ([VacancyFilters.tsx](../features/vacancies/VacancyFilters.tsx))
 
 #### 5-Mode Vacancy Sorting Dropdown
-Integrated directly into the reactive vacancy search sidebar, supporting instant client-side re-ordering across five modes:
+Integrated directly into the reactive vacancy search sidebar, supporting instant client-side re-ordering across five modes: `default` (course recommendation fit), `newest`, `oldest`, `salary_high`, `salary_low`.
 
-| Sort Mode | Operational Logic | Primary Target User |
-| --- | --- | --- |
-| `default` | Sorts by course recommendation match score first; newest listings second. | QIU Students seeking relevant roles |
-| `newest` | Sorts vacancies by creation ID in descending order (`b.id - a.id`). | Returning students checking new openings |
-| `oldest` | Sorts vacancies by creation ID in ascending order (`a.id - b.id`). | Administrators auditing legacy records |
-| `salary_high` | Sorts vacancies by monthly RM salary descending (`b.salary - a.salary`). | Jobseekers prioritizing compensation |
-| `salary_low` | Sorts vacancies by monthly RM salary ascending (`a.salary - b.salary`). | Comparative wage analysis |
+---
 
-#### Signature QIU-Red Visual Identity
-Configured via CSS custom properties in [tokens.css](../lib/theme/tokens.css):
-- Core brand red: `#ba1a1a` / `#900010` (`--color-primary: #d12a32`).
-- Dark mode adjustment: `#ef5a60` for optimal contrast on dark surfaces.
-- Logo inversion filter: `filter: invert(1) brightness(1.9)` applied to dark headers.
+### Module 10: Expanded Multi-Role & Super-Admin User Guide ([Guide.tsx](../features/Guide.tsx))
+
+#### Overview
+An accessible modal guide (`Guide.tsx`) opened via the top navigation `?` button, tailored to the user's active role:
+- **Student Guide (8 steps)**: Covers Navigation Tabs, Home Exhibitor Cards, Resume Builder options (Form CV vs PDF Link), Vacancy Filtering & `★ APPLIED` Markers, Application & Withdrawal, Mock Interview / Consultancy Booking (with overlap prevention), Talk Attendance & Live Q&A, and History Tracking.
+- **Employer Guide (5 steps)**: Covers Account Registration & Admin Approval, Company Profile Setup & Staged Edits, Posting Vacancies with Salary Benchmarks, Managing Mock Interview Slots, and Candidate Applicant & Chat Analytics.
+- **Admin Guide (6 steps)**: Covers Admin Tabs Overview, Company Approvals & JSON Import, Access Control & Email Whitelisting, Vacancy Management, Event QR Presenter Mode & Live Q&A Moderation, and Talk Q&A Audit History & Portal Settings.
+- **Super-Admin Guide (7 steps)**: Inherits all Admin steps and adds Step 7: Account Roster Oversight (full active student telemetry), Danger Zone Reset (`CONFIRM-RESET` text confirmation requirement), and Super-Admin Account Immutability.
 
 ---
 

@@ -16,7 +16,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, 
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryProfile, PEOPLE_SCOPE } from "../lib/auth/course-directory";
 import { revokeEmployerAccess, subscribeCompanies, submitSignup, subscribeMySignup } from "../lib/data/firestore";
-import { BUSINESS_NATURES } from "../lib/data/business-nature";
+import { AREAS_OF_STUDY } from "../lib/data/course-map";
 import { downloadCsv, toCsv } from "../lib/data/csv";
 import type { Company, EmployerSignup } from "../lib/data/types";
 import { notify } from "../components/toast";
@@ -437,7 +437,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
 /** Non-QIU visitor: submit an employer registration, then wait for admin approval. */
 const REGISTER_ALL_STUDENTS = "All students";
-const REGISTER_NATURE_LABELS = new Set<string>([REGISTER_ALL_STUDENTS, ...BUSINESS_NATURES]);
 
 function RegisterGate() {
   const { user, signOut } = useAuth();
@@ -452,8 +451,9 @@ function RegisterGate() {
   const [contact, setContact] = useState("");
   const [website, setWebsite] = useState("");
   const [summary, setSummary] = useState("");
-  const [interestedIn, setInterestedIn] = useState(""); // nature of business / "All students" / custom
-  const [natureOthers, setNatureOthers] = useState(false);
+  const [interestedIn, setInterestedIn] = useState(""); // comma-separated areas of study / "All students"
+  // Already-picked areas drop out of the dropdown.
+  const registerChosen = new Set(interestedIn.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   // Latch: once a submit is accepted by the server, stay on the pending screen
@@ -472,7 +472,7 @@ function RegisterGate() {
     if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
     setBusy(true);
     // await resolves only after the server accepts the write, so it has persisted.
-    try { await submitSignup(email, { name, company: companyName, contact, website, summary, interestedIn: interestedIn.trim() ? [interestedIn.trim()] : [] }); clearPendingSignup(); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
+    try { await submitSignup(email, { name, company: companyName, contact, website, summary, interestedIn: interestedIn.split(",").map((s) => s.trim()).filter(Boolean) }); clearPendingSignup(); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
     catch { setMessage("Could not submit your registration. Please try again."); notify("Could not submit registration.", "error"); }
     finally { setBusy(false); }
   }
@@ -501,24 +501,26 @@ function RegisterGate() {
           <label className="register-field">Company name<input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={200} placeholder="e.g. Acme Sdn Bhd" /></label>
           <label className="register-field">Website <small>optional</small><input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} maxLength={2048} placeholder="https://acme.com" /></label>
           <label className="register-field">Contact (phone / email) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
-          <label className="register-field">Nature of business <small>optional — students in a matching field see your profile recommended</small>
-            {(() => {
-              const nature = interestedIn.trim();
-              const showCustom = natureOthers || (nature !== "" && !REGISTER_NATURE_LABELS.has(nature));
-              return <>
-                <select value={showCustom ? "__other" : nature} onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === "__other") { setNatureOthers(true); setInterestedIn(""); }
-                  else { setNatureOthers(false); setInterestedIn(v); }
-                }}>
-                  <option value="">Not specified</option>
-                  <option value={REGISTER_ALL_STUDENTS}>⭐ All students (recommend to everyone)</option>
-                  {BUSINESS_NATURES.map((n) => <option key={n} value={n}>{n}</option>)}
-                  <option value="__other">Others (type your own)…</option>
-                </select>
-                {showCustom && <input value={nature} placeholder="e.g. Renewable Energy" maxLength={120} onChange={(e) => setInterestedIn(e.target.value)} />}
-              </>;
-            })()}
+          <label className="register-field">Students you are looking for <small>optional — these students see your profile recommended</small>
+            <select value="" onChange={(e) => {
+              const val = e.target.value;
+              e.target.value = "";
+              if (!val) return;
+              if (val === REGISTER_ALL_STUDENTS) { setInterestedIn(REGISTER_ALL_STUDENTS); return; }
+              const cur = interestedIn.split(",").map((s) => s.trim()).filter((s) => s && s.toLowerCase() !== REGISTER_ALL_STUDENTS.toLowerCase());
+              setInterestedIn(Array.from(new Set([...cur, val])).join(", "));
+            }}>
+              <option value="" disabled>＋ Add an area of study…</option>
+              {!registerChosen.has(REGISTER_ALL_STUDENTS.toLowerCase()) && <option value={REGISTER_ALL_STUDENTS}>⭐ All students (recommend to everyone)</option>}
+              {AREAS_OF_STUDY.filter((a) => !registerChosen.has(a.toLowerCase())).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {interestedIn.trim() && (
+              <div className="selected-chip-row">
+                {interestedIn.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+                  <span key={s} className="selected-chip">{s}<button type="button" aria-label={`Remove ${s}`} onClick={() => setInterestedIn(interestedIn.split(",").map((x) => x.trim()).filter((x) => x && x !== s).join(", "))}>✕</button></span>
+                ))}
+              </div>
+            )}
           </label>
           <label className="register-field">Company profile / blurb <small>optional</small><textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={5000} /></label>
           {message && <p className="auth-error" role="alert">{message}</p>}

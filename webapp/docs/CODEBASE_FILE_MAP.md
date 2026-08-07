@@ -168,12 +168,16 @@ This document serves as the authoritative, file-by-file technical reference for 
 ### 3.1 Role Guide (`Guide.tsx`)
 
 #### [Guide.tsx](../features/Guide.tsx)
-- **Main Purpose & Architectural Role**: Interactive role-specific onboarding guide modal. Displays customized walkthrough steps and live UI button snapshot chips for students, employers, and administrators.
+- **Main Purpose & Architectural Role**: Interactive multi-role onboarding guide modal accessible via the topbar `?` button. Displays customized walkthrough steps and live UI button snapshot chips for Students (8 steps), Employers (5 steps), Admins (6 steps), and Super-Admins (7 steps).
 - **Exported Symbols**: `Guide({ role, onClose })`.
 - **Detailed Code Block Breakdown**:
-  - Helper Components (`L8-L13`): `Chip` (renders non-interactive styled button badge matching live UI tokens) and `Demo` (wraps chip in preview frame).
-  - `GUIDES` Spec Dictionary (`L15-L133`): Walkthrough configuration dictionary containing step headings, bullet points, and demo chips for `student` (Home, Resume, Vacancies, Applications, Assistant, Events), `employer` (Post vacancy, Candidate review, Anonymous chats), and `admin` (Approvals, Events anti-cheat QR, Access control, Settings).
-  - `Guide` Component (`L135-L155`): Resolves current role key, renders `<Modal>` with section list, bullet items, UI snapshot previews, and a *"Got it"* dismiss button.
+  - Helper Components (`L8-L17`): `Chip` (renders non-interactive styled button badge matching live UI design tokens) and `Demo` (wraps chips in structured preview containers).
+  - `GUIDES` Spec Dictionary (`L18-L270`): Configuration dictionary establishing walkthrough headings, bullet points, and live UI button previews across four role profiles:
+    - `student` (8 steps): Welcome/Tabs, Home directory exploration & `🌟 Recommended for you` tags, Resume builder options (Form CV vs shared PDF link), Vacancy filtering & `★ APPLIED` stamps, Application submission & withdrawal, Mock interview/consultancy booking with clash detection, Event attendance QR check-in/out & live Q&A & reviews, and In-modal AI Assistant.
+    - `employer` (5 steps): Registration & admin approval flow, Company profile setup & staged edits, Vacancy posting with market salary benchmarks, Mock interview scheduling & candidate review, and Applicant & chat analytics.
+    - `admin` (6 steps): Sub-tabs overview, Company approvals & bulk JSON import, Access control & whitelist management, Vacancy operations, Event QR presenter mode & live Q&A moderation, and Talk Q&A audit history & portal settings.
+    - `superadmin` (7 steps): Inherits all Admin steps and adds Step 7: Account Roster Oversight (full active student telemetry), Danger Zone full data reset (requiring explicit `CONFIRM-RESET` text verification), and Super-Admin account immutability (cannot be demoted or deleted).
+  - `Guide` Component (`L271-L292`): Resolves current role key, renders `<Modal>` with section list, bullet items, UI snapshot previews, and a *"Got it"* dismiss button.
 
 ### 3.2 Home Subsystem (`features/home/`)
 

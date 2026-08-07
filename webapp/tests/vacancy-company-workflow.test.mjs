@@ -99,7 +99,9 @@ test("companies can name the courses they want, and WhatsApp", async () => {
   assert.match(types, /interestedIn\?: string\[\]/);
   assert.match(types, /whatsapp\?: string/);
   const home = await readFile(new URL("../features/home/HomeView.tsx", import.meta.url), "utf8");
-  assert.match(home, /Chat on WhatsApp/);
+  assert.match(home, /Chat with us on WhatsApp/);
+  // The pre-filled opener is written for whoever is looking, not always a student.
+  assert.match(home, /function whatsappOpener/);
   assert.match(home, /LOOKING FOR/);
   // The recommendation now follows what a company says it wants, not its vacancies.
   assert.match(home, /c\.interestedIn \?\? \[\]/);

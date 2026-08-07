@@ -4,6 +4,7 @@ import {
   bookInterviewSlot, cancelInterviewBooking, subscribeInterviewSlots, subscribeMyInterviewBookings,
 } from "../../lib/data/firestore";
 import { Modal } from "../../components/Modal";
+import { interviewCalendarUrl } from "../../lib/calendar";
 import { offerLabel } from "../admin/MockInterviews";
 
 /** Two slots on the same day clash when neither one finishes before the other starts. */
@@ -62,6 +63,10 @@ export function InterviewBookingModal({
       return;
     }
 
+    // Opened BEFORE the await, for the same reason as marking a talk interested:
+    // window.open() in a continuation has lost the user-activation token and the
+    // browser blocks it as a popup. Closed again if the booking itself fails.
+    const calendarTab = window.open(interviewCalendarUrl(slot, sessionType), "_blank", "noopener");
     try {
       const studentData: InterviewBookingStudent = {
         studentUid,
@@ -73,8 +78,9 @@ export function InterviewBookingModal({
       };
       await bookInterviewSlot(slot.id, studentData);
       setChoosingSlot(null);
-      setSuccess(`Booked a ${sessionType === "consultancy" ? "consultancy" : "mock interview"} with ${slot.companyName}, ${slot.date} at ${slot.startTime}.`);
+      setSuccess(`Booked a ${sessionType === "consultancy" ? "consultancy" : "mock interview"} with ${slot.companyName}, ${slot.date} at ${slot.startTime} — added to your Google Calendar.`);
     } catch (err: unknown) {
+      calendarTab?.close();
       setError(err instanceof Error ? err.message : "Failed to book this mock interview.");
     }
   };

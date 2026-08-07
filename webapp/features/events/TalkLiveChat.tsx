@@ -178,7 +178,7 @@ export function TalkLiveChat({
             ref={feedRef}
             aria-live="polite"
             aria-label="Questions asked during this talk"
-            className="overflow-y-auto p-2 ui-card max-h-48 space-y-2 text-xs"
+            className="overflow-y-auto p-2 ui-card space-y-2 talk-chat-feed"
           >
             {visible.length === 0 ? (
               <p className="ui-muted italic text-center py-4">
@@ -189,8 +189,8 @@ export function TalkLiveChat({
                 const isMine = msg.studentUid === userUid;
                 return (
                   <div key={msg.id} className={`ui-panel p-2 ${msg.approved ? "" : "opacity-80"}`}>
-                    <div className="font-semibold ui-strong flex justify-between gap-3 items-center">
-                      <span className="flex items-center gap-2">
+                    <div className="font-semibold ui-strong talk-chat-head">
+                      <span className="talk-chat-who">
                         {msg.studentName}
                         {!msg.approved && (
                           <span className="px-1.5 py-0.5 text-[10px] rounded font-bold tone-neutral">
@@ -201,15 +201,15 @@ export function TalkLiveChat({
                           <span className="px-1.5 py-0.5 text-[10px] rounded font-bold tone-success">Approved</span>
                         )}
                       </span>
-                      <span className="flex items-center gap-2">
-                        <span className="ui-muted text-[10px]">{chatTime(msg.createdAt)}</span>
+                      <span className="talk-chat-actions">
+                        <span className="ui-muted talk-chat-note">{chatTime(msg.createdAt)}</span>
                         {isPresenter && (
                           <>
                             {msg.approved ? (
                               <button
                                 type="button"
                                 onClick={() => setPresentIndex(approved.findIndex((a) => a.id === msg.id))}
-                                className="text-[10px] font-bold rounded ui-btn ui-btn-quiet px-2 py-0.5"
+                                className="font-bold rounded ui-btn ui-btn-quiet"
                               >
                                 Present
                               </button>
@@ -217,7 +217,7 @@ export function TalkLiveChat({
                               <button
                                 type="button"
                                 onClick={() => handleApprove(msg, true)}
-                                className="text-[10px] font-bold rounded ui-btn ui-btn-success px-2 py-0.5"
+                                className="font-bold rounded ui-btn ui-btn-success"
                               >
                                 Approve
                               </button>
@@ -226,7 +226,7 @@ export function TalkLiveChat({
                               <button
                                 type="button"
                                 onClick={() => handleApprove(msg, false)}
-                                className="text-[10px] font-bold rounded ui-btn ui-btn-quiet px-2 py-0.5"
+                                className="font-bold rounded ui-btn ui-btn-quiet"
                                 title="Hide from the room again"
                               >
                                 Unapprove
@@ -245,9 +245,9 @@ export function TalkLiveChat({
                         )}
                       </span>
                     </div>
-                    <p className="ui-strong mt-0.5">{msg.message}</p>
+                    <p className="ui-strong mt-0.5 talk-chat-message">{msg.message}</p>
                     {!msg.approved && isMine && !isPresenter && (
-                      <p className="ui-muted italic text-[10px] mt-1">Only you can see this until a facilitator approves it.</p>
+                      <p className="ui-muted italic talk-chat-note mt-1">Only you can see this until a facilitator approves it.</p>
                     )}
                   </div>
                 );

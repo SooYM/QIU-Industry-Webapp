@@ -7,19 +7,50 @@ function formatDateForCalendar(dateStr: string): string {
   return d.toISOString().replace(/-|:|\.\d\d\d/g, "");
 }
 
-export function generateGoogleCalendarUrl(event: EventItem): string {
-  const start = formatDateForCalendar(event.startAt);
-  const end = formatDateForCalendar(event.endAt);
-  const speakers = eventSpeakers(event).map((s) => s.name).filter(Boolean).join(", ");
+/** A calendar entry from anywhere in the portal — a talk, a booked interview. */
+export type CalendarEntry = {
+  title: string;
+  details?: string;
+  location?: string;
+  /** Local datetime strings, e.g. "2026-09-01T14:00". */
+  startAt: string;
+  endAt: string;
+};
 
-  const title = encodeURIComponent(event.title);
-  const details = encodeURIComponent(
-    `${event.description || ""}\n\nSpeaker(s): ${speakers || "TBA"}\nOrganized by QIU Industry Day 2026`,
-  );
-  const location = encodeURIComponent(event.location || "QIU Campus");
+export function googleCalendarUrl(entry: CalendarEntry): string {
+  const start = formatDateForCalendar(entry.startAt);
+  const end = formatDateForCalendar(entry.endAt);
+  const title = encodeURIComponent(entry.title);
+  const details = encodeURIComponent(entry.details ?? "");
+  const location = encodeURIComponent(entry.location || "QIU Campus");
 
   const datesParam = start && end ? `&dates=${start}/${end}` : "";
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}${datesParam}`;
+}
+
+export function generateGoogleCalendarUrl(event: EventItem): string {
+  const speakers = eventSpeakers(event).map((s) => s.name).filter(Boolean).join(", ");
+  return googleCalendarUrl({
+    title: event.title,
+    details: `${event.description || ""}\n\nSpeaker(s): ${speakers || "TBA"}\nOrganized by QIU Industry Day 2026`,
+    location: event.location,
+    startAt: event.startAt,
+    endAt: event.endAt,
+  });
+}
+
+/** A booked mock interview / consultancy slot, for the student's own calendar. */
+export function interviewCalendarUrl(slot: {
+  companyName: string; date: string; startTime: string; endTime: string; location?: string;
+}, sessionType: "interview" | "consultancy"): string {
+  const kind = sessionType === "consultancy" ? "Consultancy" : "Mock interview";
+  return googleCalendarUrl({
+    title: `${kind} — ${slot.companyName}`,
+    details: `${kind} with ${slot.companyName} at QIU Industry Day 2026.\n\nBring a copy of your resume and arrive a few minutes early.`,
+    location: slot.location,
+    startAt: `${slot.date}T${slot.startTime}`,
+    endAt: `${slot.date}T${slot.endTime}`,
+  });
 }
 
 export function downloadIcsFile(event: EventItem): void {

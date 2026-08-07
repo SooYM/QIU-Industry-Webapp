@@ -48,20 +48,22 @@ webapp/
 │   ├── Modal.tsx                 # Accessible modal dialog container
 │   └── toast.tsx                 # Global reactive toast notification system
 ├── docs/                         # Project technical documentation
+│   ├── CODEBASE_FILE_MAP.md
 │   ├── DATA_MODELS_AND_SCHEMAS.md
 │   ├── FEATURE_MODULES_GUIDE.md
 │   ├── SECURITY_AND_RULES.md
 │   └── SOFTWARE_DOCUMENTATION.md
 ├── features/                     # Feature modules
-│   ├── admin/                    # Admin sub-tabs (AdminSummary, ApprovalQueue, CompanyManager, DataExport, etc.)
+│   ├── Guide.tsx                 # Interactive 4-role user guide (Student, Employer, Admin, Super-Admin)
+│   ├── admin/                    # Admin sub-tabs (AdminSummary, EmployerSummary, DashboardActivityListModal, DashboardStudentsModal, TalkChatHistory, CompanyManager JSON import)
 │   ├── chat/                     # Grounded in-modal streaming assistant
-│   ├── events/                   # Events module (EventsView, EventPresenter 30s QR, SpeakerAvatar)
-│   ├── home/                     # Home landing directory (HomeView, useLogoBackdrop luminance sampler)
+│   ├── events/                   # Events module (EventsView, TalkLiveChat presentation zoom/gating, EventPresenter 30s QR, SpeakerAvatar)
+│   ├── home/                     # Home landing directory (HomeView recommendedIds, useLogoBackdrop luminance sampler)
 │   ├── student/                  # Student profile, GeneratedCV, cv-download, StudentHistory
 │   └── vacancies/                # Vacancy listing, VacancyFilters (5-mode sort), VacancyModal
 ├── lib/
 │   ├── auth/                     # Course & workspace directory employee-ID mappings (course-directory.ts)
-│   ├── data/                     # Canonical domain interfaces (types.ts), CSV exports (csv.ts), salary metadata, & Firestore access
+│   ├── data/                     # Canonical domain interfaces (types.ts), 43 programmes/12 study areas (course-map.ts), CSV exports (csv.ts), salary metadata, & Firestore access
 │   └── theme/                    # QIU-Red design tokens (tokens.css)
 ├── public/                       # Static assets & country GeoJSON map
 ├── scripts/                      # Data processing scripts (generate_data.py)

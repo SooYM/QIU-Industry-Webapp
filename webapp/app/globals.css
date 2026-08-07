@@ -51,10 +51,33 @@ nav .active:after { content:""; position:absolute; bottom:0; height:3px; left:0;
 .results-head { align-items:end; }.results-head h1 { margin:.35rem 0 0; font-size:clamp(1.65rem,2vw,2rem); line-height:1.05; letter-spacing:-.035em; }.results-head>p { max-width:31rem; margin:0; color:var(--muted); font-size:.74rem; line-height:1.55; text-align:right; }
 .job-grid { --columns:3; display:grid; grid-template-columns:repeat(var(--columns),minmax(0,1fr)); gap:1.25rem; margin-top:1.75rem; }
 .job-grid.list-view { grid-template-columns:1fr; gap:.65rem; }
-.job-card { --mouse-x:50%; --mouse-y:50%; position:relative; isolation:isolate; border:1px solid var(--line); border-radius:.875rem; padding:1.25rem; min-height:14.6rem; display:flex; flex-direction:column; background:var(--surface); cursor:pointer; overflow:hidden; transition:transform .2s,border-color .2s,box-shadow .2s; }
-.job-card:before { content:""; position:absolute; inset:-1px; border-radius:inherit; padding:1px; background:radial-gradient(13rem circle at var(--mouse-x) var(--mouse-y),color-mix(in srgb,var(--cyan) 95%,white),color-mix(in srgb,var(--blue) 55%,transparent) 35%,transparent 68%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; opacity:0; z-index:-1; transition:opacity .18s; }
-.job-card:after { content:""; position:absolute; width:12rem; height:12rem; left:calc(var(--mouse-x) - 6rem); top:calc(var(--mouse-y) - 6rem); background:radial-gradient(circle,color-mix(in srgb,var(--cyan) 11%,transparent),transparent 66%); opacity:0; pointer-events:none; z-index:-1; }
-.job-card:hover,.job-card:focus-visible { transform:translateY(-2px); border-color:color-mix(in srgb,var(--blue) 50%,var(--line)); box-shadow:0 .8rem 2rem color-mix(in srgb,var(--blue) 10%,transparent); }.job-card:hover:before,.job-card:hover:after,.job-card:focus-visible:before { opacity:1; }
+/* Pointer-tracking glow, shared by every card surface. `.glow-card` is the opt-in
+   class; the rest of the list wires up card families that already exist in the
+   markup. `--mouse-x/y` are written by the delegated pointermove in CardGlow.tsx.
+   Keep the four selector lists identical.
+
+   Both layers sit at `inset:0` and clip themselves, so the effect no longer
+   depends on the card's `overflow`. It used to: the ring sat at `inset:-1px`,
+   entirely outside the border box, so `.job-card`'s `overflow:hidden` clipped it
+   away — vacancy cards showed only the inner blob while dashboard cards
+   (`overflow:visible`) showed only the ring. Same rule, opposite halves. */
+:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card) { --mouse-x:50%; --mouse-y:50%; position:relative; isolation:isolate; }
+:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):before { content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; background:radial-gradient(13rem circle at var(--mouse-x) var(--mouse-y),color-mix(in srgb,var(--cyan) 95%,white),color-mix(in srgb,var(--blue) 55%,transparent) 35%,transparent 68%); -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; opacity:0; z-index:-1; transition:opacity .18s; pointer-events:none; }
+:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):after { content:""; position:absolute; inset:0; border-radius:inherit; background:radial-gradient(12rem circle at var(--mouse-x) var(--mouse-y),color-mix(in srgb,var(--cyan) 11%,transparent),transparent 66%); opacity:0; z-index:-1; transition:opacity .18s; pointer-events:none; }
+:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):hover:before,
+:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):hover:after,
+:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):focus-visible:before { opacity:1; }
+.job-card { border:1px solid var(--line); border-radius:.875rem; padding:1.25rem; min-height:14.6rem; display:flex; flex-direction:column; background:var(--surface); cursor:pointer; overflow:hidden; transition:transform .2s,border-color .2s,box-shadow .2s; }
+/* One hover treatment for every tile: the vacancy card's. The dashboard used to
+   lift 4px on a heavy black shadow and event cards only tinted their border, so
+   the same gesture felt like three different surfaces. `.ui-card` and
+   `.auth-card` stay out of the lift — they are inner rows and a page shell, not
+   tiles — but keep the glow. The two values live in custom properties because
+   `.bento .stat-card` sets border-color and box-shadow at equal specificity
+   further down and would otherwise win; that block re-applies them by name. */
+:is(.glow-card,.job-card,.event-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.exhibitor-card) { --hover-border:color-mix(in srgb,var(--blue) 50%,var(--line)); --hover-shadow:0 .8rem 2rem color-mix(in srgb,var(--blue) 10%,transparent); transition:transform .2s,border-color .2s,box-shadow .2s; }
+:is(.glow-card,.job-card,.event-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.exhibitor-card):hover,
+:is(.glow-card,.job-card,.event-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.exhibitor-card):focus-visible { transform:translateY(-2px); border-color:var(--hover-border); box-shadow:var(--hover-shadow); }
 .card-top { display:flex; justify-content:space-between; align-items:center; }.type { background:color-mix(in srgb,var(--muted) 12%,var(--surface)); color:var(--muted); font-family:var(--font-geist-mono),monospace; font-size:.62rem; letter-spacing:.05em; text-transform:uppercase; font-weight:750; padding:.36rem .5rem; border-radius:.35rem; }.type.intern { color:var(--info); background:var(--info-soft); }.vacancies { font-family:var(--font-geist-mono),monospace; font-size:.64rem; color:var(--muted); white-space:nowrap; flex:none; }
 .job-card h2 { font-size:1.08rem; line-height:1.3; margin:.95rem 0 .38rem; color:var(--navy); letter-spacing:-.02em; }.company { color:var(--blue); margin:0; font-size:.74rem; font-weight:750; }.meta { display:flex; flex-wrap:wrap; gap:.4rem .6rem; margin:.9rem 0 1rem; color:var(--muted); font-size:.68rem; }.meta span+span:before { content:"·"; margin-right:.6rem; color:color-mix(in srgb,var(--muted) 50%,transparent); }.card-foot { display:flex; align-items:end; justify-content:space-between; border-top:1px solid var(--line); padding-top:.9rem; margin-top:auto; gap:.75rem; }.card-foot small,.card-foot strong { display:block; }.card-foot small { color:var(--muted); font-family:var(--font-geist-mono),monospace; font-size:.62rem; letter-spacing:.06em; }.card-foot strong { font-size:1rem; font-weight:800; letter-spacing:-.01em; margin-top:.3rem; color:var(--ink); }.view-job { border:0; background:none; color:var(--blue); font-weight:800; font-size:.7rem; padding:.25rem 0; white-space:nowrap; }
 .job-company-line { display:flex; align-items:center; gap:.5rem; min-height:1.8rem; }
@@ -106,8 +129,8 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 @media (max-width:520px) { .back-to-top { right:.75rem; bottom:4.75rem; } }
 @media (max-width:800px) { .admin-job-filters { grid-template-columns:1fr 1fr; }.admin-job-search { grid-column:1/-1; }.reset-admin-filters { width:100%; } }
 @media (max-width:520px) { .admin-job-filters { grid-template-columns:1fr; }.admin-job-filters>* { grid-column:1; }.reset-admin-filters { margin-top:.15rem; } }
-@media (hover:none) { .job-card:before,.job-card:after { display:none; } }
-@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; }.job-card,.intern-shortcut,.icon-button,.admin-button,.assistant-button { transition:none; } }
+@media (hover:none) { :is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):before,:is(.glow-card,.job-card,.event-card,.ui-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.auth-card,.exhibitor-card):after { display:none; } }
+@media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; }:is(.glow-card,.job-card,.event-card,.stat-card,.rank-card,.trend-card,.activity-card,.market-card,.exhibitor-card),.intern-shortcut,.icon-button,.admin-button,.assistant-button { transition:none; } }
 
 /* Auth inherits QIU Industry Day surfaces and typography. */
 .auth-screen { min-height:100dvh; display:grid; place-items:center; padding:1.5rem; background:var(--bg); }
@@ -284,8 +307,7 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .presenter-qr { display:grid; place-items:center; min-height:20rem; }
 .presenter-qr img { width:min(72vw,26rem); height:auto; padding:.75rem; border-radius:.6rem; background:#fff; }
 .presenter-hint { font-weight:800; margin-top:.9rem; font-size:1.05rem; }
-.event-card { cursor:pointer; transition:border-color .15s,transform .15s; }
-.event-card:hover { border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); }
+.event-card { cursor:pointer; }
 .event-card:active { transform:scale(.99); }
 .event-card .view-job { margin-top:.6rem; }
 
@@ -297,7 +319,6 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 
 @media (max-width:600px) {
   .event-grid { grid-template-columns:1fr; }
-  .main-tabs { overflow-x:auto; flex-wrap:nowrap!important; }
   .presenter-qr img { width:min(86vw,22rem); }
   .presenter-hint { font-size:.95rem; }
 }
@@ -317,8 +338,7 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 /* ---- Home / exhibitor showcase -------------------------------------------- */
 .exhibitor-card.recommended { border-color:var(--success); box-shadow:0 0 0 2px color-mix(in srgb,var(--success) 55%,transparent); }
 .exhibitor-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1.1rem; margin-top:1.25rem; }
-.exhibitor-card { display:flex; flex-direction:column; gap:.55rem; padding:1.2rem; background:var(--surface); border:1px solid var(--line); border-radius:.9rem; box-shadow:var(--shadow); cursor:pointer; transition:border-color .15s,transform .15s; }
-.exhibitor-card:hover { border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); transform:translateY(-2px); }
+.exhibitor-card { display:flex; flex-direction:column; gap:.55rem; padding:1.2rem; background:var(--surface); border:1px solid var(--line); border-radius:.9rem; box-shadow:var(--shadow); cursor:pointer; }
 .exhibitor-card h3 { margin:.1rem 0 0; font-size:1.02rem; letter-spacing:-.02em; color:var(--navy); }
 /* Uniform 1:1 frame for every exhibitor. The logo sits INSIDE at its true
    aspect ratio (object-fit:contain) — centred, never cropped or stretched — so
@@ -730,12 +750,17 @@ textarea.ui-field { padding:.6rem .75rem; }
   .job-detail,.admin-panel,.dashboard-conversation { animation:sheet-in .26s cubic-bezier(.2,.7,.3,1); }
 }
 
-/* The tab strips scroll horizontally with no scrollbar on iOS, so the last tab
-   was undiscoverable. The fade says "there is more this way". */
+/* Main tabs: one row that scrolls, phone-first. Two earlier attempts were worse
+   — a `mask-image` fade painted a black smear (a mask makes the strip itself
+   transparent, and the page behind it is charcoal), and wrapping split five tabs
+   across two rows and ate vertical space above every screen. A partly-visible
+   next tab is the affordance; no fade, no second row. */
+.main-tabs { min-height:auto; gap:.4rem; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.main-tabs::-webkit-scrollbar { display:none; }
+.main-tabs button { flex:none; scroll-snap-align:start; }
 .main-tabs,.admin-tabs { scroll-snap-type:x proximity; }
-@media (max-width:600px) {
-  .main-tabs { -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent); mask-image:linear-gradient(90deg,#000 88%,transparent); }
-}
+/* Wide enough for every tab: stop scrolling and let them settle in one row. */
+@media (min-width:900px) { .main-tabs { flex-wrap:wrap; overflow-x:visible; } }
 
 /* Company sign-in / registration on the auth screen. The previous version put a
    bare input and a text button inline, so nobody saw it. */
@@ -757,8 +782,28 @@ textarea.ui-field { padding:.6rem .75rem; }
 .company-whatsapp-cta { width:100%; min-height:auto; padding:.9rem 1rem; font-size:1rem; font-weight:800; border-radius:.7rem; margin-top:.6rem; }
 .company-whatsapp-cta:disabled { opacity:1; background:var(--surface-2); border:1px solid var(--line); color:var(--muted); cursor:not-allowed; }
 
-.talk-chat-remove { min-width:2rem; min-height:2rem; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:.4rem; background:transparent; color:var(--danger); font-weight:800; cursor:pointer; }
+.talk-chat-remove { min-width:2.75rem; min-height:2.75rem; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:.4rem; background:transparent; color:var(--danger); font-weight:800; cursor:pointer; }
 .talk-chat-remove:hover { background:var(--danger-soft); }
+
+/* Live Q&A, written phone-first. The moderation row was one nowrap flex line of
+   10px controls: on a 390px screen the asker's name wrapped to three lines and
+   "Unapprove" ran off the card. Base styles below are the phone; the desktop
+   query tightens them back up. */
+.talk-chat-feed { max-height:60dvh; font-size:.82rem; }
+.talk-chat-head { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .6rem; }
+.talk-chat-who { display:flex; align-items:center; gap:.4rem; min-width:0; flex:1 1 auto; overflow-wrap:anywhere; }
+.talk-chat-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; width:100%; }
+.talk-chat-actions .ui-btn { min-height:2.5rem; padding:.35rem .7rem; font-size:.75rem; }
+.talk-chat-message { font-size:.9rem; line-height:1.45; overflow-wrap:anywhere; }
+.talk-chat-note { font-size:.72rem; }
+@media (min-width:600px) {
+  .talk-chat-feed { max-height:12rem; font-size:.75rem; }
+  .talk-chat-actions { width:auto; margin-left:auto; }
+  .talk-chat-remove { min-width:2rem; min-height:2rem; }
+  .talk-chat-actions .ui-btn { min-height:1.6rem; padding:.1rem .5rem; font-size:.65rem; }
+  .talk-chat-message { font-size:.78rem; }
+  .talk-chat-note { font-size:.65rem; }
+}
 
 .access-assign { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.4rem; }
 .access-assign input,.access-assign select { min-height:2.75rem; min-width:13rem; background:var(--surface); border:1px solid var(--line); border-radius:.625rem; padding:0 .75rem; font-size:max(16px,.78rem); color:var(--ink); }
@@ -787,9 +832,18 @@ textarea.ui-field { padding:.6rem .75rem; }
 
 /* Cards must read as raised on BOTH themes. On dark, a drop shadow over a
    near-black page is invisible, so the lift comes from a lighter surface + a
-   crisp border and an inner top highlight; the shadow does the work on light. */
-.bento .stat-card { display:flex; flex-direction:column; justify-content:center; height:100%; margin:0; background:var(--surface-2); border-color:color-mix(in srgb,var(--line) 60%,var(--ink)); box-shadow:var(--shadow-pop),inset 0 1px 0 color-mix(in srgb,#fff 8%,transparent); transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s,border-color .18s; }
-.bento .stat-card:hover { transform:translateY(-4px); border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); box-shadow:0 30px 70px rgba(0,0,0,.5),inset 0 1px 0 color-mix(in srgb,#fff 12%,transparent); }
+   crisp border and an inner top highlight; the shadow does the work on light.
+   `--shadow-pop` (a 60px blur at 28% black) was too heavy for a tile this small
+   and only the stat tiles carried it, so the grid read as two different depths —
+   every tile now rests on the same `--shadow`. */
+.bento>* { box-shadow:var(--shadow); }
+/* Same 1px `--line` edge as a vacancy card. The tiles used to darken the border
+   and add a white inset top highlight to fake a lift; that highlight read as a
+   white rim around every tile and made the dashboard a different material from
+   the rest of the app. */
+.bento .stat-card { display:flex; flex-direction:column; justify-content:center; height:100%; margin:0; background:var(--surface-2); border-color:var(--line); box-shadow:var(--shadow); }
+/* Same specificity as the base rule above, so the shared tile hover lands. */
+.bento .stat-card:hover,.bento .stat-card:focus-visible { border-color:var(--hover-border); box-shadow:var(--hover-shadow); }
 .bento .stat-card .stat-value { font-size:2rem; line-height:1; }
 .bento-lead.stat-card { background:var(--blue); border-color:var(--blue); color:var(--color-on-primary); justify-content:center; gap:.25rem; }
 .bento-lead.stat-card .stat-label,.bento-lead.stat-card small { color:color-mix(in srgb,var(--color-on-primary) 78%,transparent); }
@@ -798,8 +852,7 @@ textarea.ui-field { padding:.6rem .75rem; }
 
 /* A tile whose number IS a filter. Tapping it shows the records behind it in the
    activity list below, so the figure and its evidence are one gesture apart. */
-.stat-card-action { position:relative; text-align:left; cursor:pointer; font:inherit; color:inherit; transition:border-color .15s,transform .12s,box-shadow .15s; }
-.stat-card-action:hover { border-color:color-mix(in srgb,var(--blue) 45%,var(--line)); }
+.stat-card-action { position:relative; text-align:left; cursor:pointer; font:inherit; color:inherit; }
 .stat-card-action:active { transform:scale(.99); }
 .stat-card-action:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
 .stat-card-action.is-active { border-color:var(--blue); box-shadow:0 0 0 2px color-mix(in srgb,var(--blue) 35%,transparent); }
@@ -841,3 +894,51 @@ textarea.ui-field { padding:.6rem .75rem; }
 .talk-present-nav .ui-btn { min-height:3rem; padding:0 1.4rem; font-size:1rem; }
 .talk-present-font { display:inline-flex; align-items:center; gap:.35rem; }
 .talk-present-font .ui-btn { min-width:3rem; }
+
+/* ---------------------------------------------------------------------------
+   Phone floor: readable type and thumb-sized controls.
+
+   The rest of this sheet is authored desktop-first — dense 0.62–0.72rem meta
+   text and ~2rem controls, tuned for a pointer. Measured at 375px that produced
+   text down to 8.3px and hit targets down to 16px. This block is the phone
+   baseline for those two things: nothing below ~12.5px, nothing tappable below
+   44px (the iOS/Android minimum). Layout is untouched — the 375px audit found no
+   overflow — so this deliberately does not try to restyle every screen.
+   --------------------------------------------------------------------------- */
+@media (max-width:599px) {
+  /* Meta / label text. These are the recurring small classes across cards,
+     dashboard tiles, the activity list, admin rows and the guide. */
+  .detail-label,.stat-label,.vacancies,.type,.company,.meta,.activity-kind,
+  .activity-context,.activity-row time,.guide-chip,.guide-demo-label,.admin-message,
+  .card-foot small,.local-job small,.local-job b,.data-note,.filters label,
+  .stat-card small,.trend-label,.donut-center span { font-size:.78rem; }
+  /* Section headings, filter labels, badges, row actions and the activity table
+     header — the rest of the sub-12px text the 375px sweep turned up. */
+  .section-heading span,.section-heading button,.filters .field span,.salary-field b,
+  .results-head span,.results-head>p,.card-top .rounded,.applied-label,.view-job span,
+  .activity-list-head span,.activity-open,.dashboard-filter span,.local-jobs-head strong,
+  .admin-jobs-empty p,[class*="text-[10px]"],
+  /* Two classes deep, to beat `.local-job-actions button`'s own .68rem. */
+  .local-job-actions button,.local-job-actions a,.event-actions button { font-size:.78rem; }
+  .card-foot strong { font-size:1.05rem; }
+  .job-card h2 { font-size:1.12rem; }
+  small { font-size:.78rem; }
+
+  /* Anything tappable clears 44px. `.activity-open` and the filter Reset were
+     16–17px: real controls a thumb could not reliably hit. */
+  .activity-open,.edit-local,.delete-local,.local-job-actions button,.local-job-actions a,
+  .admin-search,.reset-admin-filters,.filters .section-heading button,.main-tabs button,
+  .view-toggle button,.event-actions button,.empty button,.cancel-edit,.save-job,
+  .guide-chip,select,input:not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
+    min-height:2.75rem;
+  }
+  /* A 16px-tall range track is unusable; give the thumb room without changing
+     the control's semantics. */
+  .salary-field input[type="range"] { height:2.75rem; }
+
+  /* Card head: at this width the badges wrap to a second line, which left the
+     vacancy count floating beside them and under the APPLIED stamp. Give the
+     count its own line below the badges. */
+  .job-card .card-top { flex-wrap:wrap; align-items:flex-start; }
+  .job-card .card-top .vacancies { order:3; width:100%; margin-top:.35rem; }
+}

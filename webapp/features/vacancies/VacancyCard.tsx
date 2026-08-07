@@ -1,4 +1,3 @@
-import type { PointerEvent } from "react";
 import { useState } from "react";
 import type { Company, Job } from "../../lib/data/types";
 import { useLogoBackdrop } from "../home/useLogoBackdrop";
@@ -10,7 +9,6 @@ export function VacancyCard({
   recommended = false,
   applied = false,
   showStatus = false,
-  onGlow,
   onOpen,
 }: {
   job: Job;
@@ -18,14 +16,13 @@ export function VacancyCard({
   recommended?: boolean;
   applied?: boolean;
   showStatus?: boolean;
-  onGlow: (event: PointerEvent<HTMLElement>) => void;
   onOpen: (job: Job) => void;
 }) {
   const status = showStatus ? jobStatusMeta(job) : null;
   const backdrop = useLogoBackdrop(company?.logoUrl, company?.logoBackground ?? "auto");
   const [logoOk, setLogoOk] = useState(true);
   return (
-    <article className={`job-card${recommended ? " is-recommended" : ""}${applied ? " is-applied" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${applied ? " — you have applied" : ""}${recommended ? " — recommended for your profile" : ""}`} onPointerMove={onGlow} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
+    <article className={`job-card${recommended ? " is-recommended" : ""}${applied ? " is-applied" : ""}`} tabIndex={0} role="button" aria-label={`View ${job.title} at ${job.company}${applied ? " — you have applied" : ""}${recommended ? " — recommended for your profile" : ""}`} onClick={() => onOpen(job)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(job); } }}>
       {applied && (
         <span className="applied-stamp" aria-hidden="true">
           <svg viewBox="0 0 140 84">

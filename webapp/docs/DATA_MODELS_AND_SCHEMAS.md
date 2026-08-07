@@ -158,6 +158,17 @@ export interface Attendance {
   checkOutAt?: unknown;
 }
 
+export interface TalkLiveChatMessage {
+  id: string;
+  eventId: number;
+  studentUid: string;
+  studentName: string;
+  studentEmail: string;
+  message: string;
+  approved: boolean;              // Facilitator approval flag for presentation mode
+  createdAt?: unknown;
+}
+
 export interface UserRecord {
   uid: string;
   email: string;
@@ -172,16 +183,49 @@ export interface UserRecord {
 export interface Company {
   id: number;
   name: string;
+  email?: string;
   website?: string;
   logoUrl?: string;
   videoUrl?: string;               // YouTube corporate video URL
   summary?: string;
   order?: number;                  // Sort weight
   boothNumber?: string;            // Venue booth identifier
+  whatsapp?: string;               // Digits-only WhatsApp number
+  interestedIn?: string[];         // Array of target study areas ("All students" + 12 AREAS_OF_STUDY)
   logoBackground?: "auto" | "light" | "dark";
   status?: "approved" | "pending" | "pending_edit";
   pendingEdit?: Partial<Company> | null;
   createdBy?: string;
+}
+
+export type DashboardActivityType = "application" | "view" | "attendance" | "question";
+
+export interface DashboardActivity {
+  id: string;
+  type: DashboardActivityType;
+  date: Date | null;
+  studentUid: string;
+  actor: string;
+  company: string | null;
+  subject: string;
+  context: string;
+  answer?: string;
+  jobId?: number;
+  eventId?: number;
+}
+
+export interface Programme {
+  name: string;
+  area: string;                   // Belongs to one of 12 AREAS_OF_STUDY
+  level: "Foundation" | "Diploma" | "Bachelor" | "Master" | "Doctorate";
+  faculty: string;
+}
+
+export interface ResolvedCourse {
+  code: string;
+  name: string;
+  level: "Foundation" | "Diploma" | "Bachelor" | "Master" | "Doctorate" | null;
+  faculty: string | null;
 }
 
 export interface EmployerSignup {

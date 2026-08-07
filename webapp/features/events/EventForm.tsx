@@ -128,7 +128,15 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, specializa
       await saveEvent(record, Boolean(editing), normalizeEmail(userEmail));
       notify(editing ? "Event updated." : "Event added.");
       onClose();
-    } catch { setMessage("Could not save the event."); notify("Could not save the event.", "error"); }
+    } catch (error) {
+      // Firestore's reason (permission-denied, invalid-argument, unavailable…) is
+      // the whole diagnosis; swallowing it left "Could not save the event." as the
+      // only signal, which is indistinguishable from a network blip.
+      const code = (error as { code?: string })?.code ?? "unknown";
+      console.error("saveEvent failed", error);
+      setMessage(`Could not save the event (${code}).`);
+      notify(`Could not save the event (${code}).`, "error");
+    }
   }
 
   return (

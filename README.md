@@ -47,31 +47,35 @@ QIU Industry Webapp features a visual identity built around QIU's signature bran
 
 ## Core Feature Modules Summary
 
-### 1. Home Directory & Company RAG ([HomeView.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/HomeView.tsx) & [useLogoBackdrop.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/useLogoBackdrop.ts))
+### 1. Home Directory & Company RAG ([HomeView.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/HomeView.tsx), [course-map.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/lib/data/course-map.ts) & [useLogoBackdrop.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/useLogoBackdrop.ts))
 - **Exhibitor Directory & YouTube Embeds**: Interactive directory of approved Industry Day exhibitors featuring corporate summaries, booth numbers, and embedded YouTube promotional videos.
+- **Nature of Business & Target Study Areas (`course-map.ts`)**: Maps 43 QIU academic programmes across 6 faculties into 12 broad Areas of Study (`AREAS_OF_STUDY`, e.g., *"Accounting & Finance"*, *"Computer Science & Information Technology"*, *"Engineering & Industrial Technology"*). Features automated course abbreviation resolving (`resolveCourse`) and area extraction (`courseArea`).
+- **Target Selection & Recommendation Engine (`recommendedIds`)**: Exhibitors select target study areas from a multi-select dropdown (`ALL_STUDENTS` + 12 study areas) stored as removable chips (`interestedIn`). The recommendation match engine evaluates candidate study areas against exhibitor targeting, displaying `🌟 Looking for your course` badges on matching cards and enabling "Recommended for you" line-up sorting.
 - **Automated Logo Luminance Sampling**: The `useLogoBackdrop.ts` hook samples logo image pixels via an HTML5 2D Canvas to calculate relative luminance ($Y = 0.2126R + 0.7152G + 0.0722B$). Bright logos ($Y > 170$) automatically receive dark backdrop tiles for high contrast.
 - **In-Modal Grounded Company Assistant**: Grounded typewriter streaming assistant (`CompanyAssistant`) that answers student queries strictly using the selected company's profile and vacancy data.
-- **Company Recommendations**: Suggests relevant companies based on available vacancies and matching criteria to enhance student discovery.
 
-### 2. Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx))
+### 2. Employer Self-Registration & Company Bulk Import ([ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx) & [CompanyManager.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/CompanyManager.tsx))
 - **Self-Service Employer Onboarding**: Non-QIU external partner employers can self-register via `employer_signups`.
 - **Admin Approval & Email Whitelisting**: Approving a signup automatically adds the email to `whitelisted_emails`, assigns the employer role, and creates an exhibitor profile in `companies`.
 - **Staged Edits & Bulk "Approve All"**: Employer updates to approved vacancies or profiles stage a `pendingEdit` diff without affecting live views. Admins review diffs and can execute 1-click bulk approvals (`approveAll`).
+- **Company Bulk JSON Import (`importJson`)**: Administrators can bulk-import exhibitor profiles from JSON files (`CompanyManager.tsx`), supporting both directory export schemas (`Company Name`, `Company Website`, `Nature of Business`, `Company Profile`) and standard schemas (`name`, `website`, `summary`). Automatically deduplicates incoming names against existing database records and intra-file duplicates.
 
-### 3. Admin Dashboard Architecture Rework ([AdminPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminPanel.tsx))
+### 3. Admin Dashboard Architecture & Interactive Bento Activity ([AdminPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminPanel.tsx), [AdminSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminSummary.tsx) & [TalkChatHistory.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/TalkChatHistory.tsx))
 Modular sub-tab navigation dividing administrative tasks into specialized components:
-- [AdminSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminSummary.tsx): High-level system metrics and top vacancy/event bar charts.
+- [AdminSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminSummary.tsx): System metrics, activity trends, and interactive Bento cards (`Stat`) with pop-out modal inspection (`DashboardActivityListModal.tsx` & `DashboardStudentsModal.tsx`).
 - [ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx): Pending employer signups, vacancy submissions, and staged edit diffs.
-- [CompanyManager.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/CompanyManager.tsx): Exhibitor profile manager with website logo auto-fetching.
+- [CompanyManager.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/CompanyManager.tsx): Exhibitor profile manager supporting manual form edits, multi-chip target study area selection, website logo auto-fetching, and JSON bulk import.
 - [StudentActivity.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/StudentActivity.tsx): Candidate application feeds with expandable student accordions.
 - [ResumeViewer.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ResumeViewer.tsx): Candidate resume reviewer supporting PDF, link, and generated CV views.
+- [TalkChatHistory.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/TalkChatHistory.tsx): Full admin audit trail for all live talk questions, grouped by talk session with search filtering and 1-click CSV export.
 - [SettingsPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/SettingsPanel.tsx): System-wide configuration (portal title, tagline, QR rotation speed, CCA thresholds).
-- **Data Export & CSV Integration**: 1-click CSV exports available across all admin and employer list views (applications, chat logs, event attendance).
+- **Data Export & CSV Integration**: 1-click CSV exports available across all admin and employer list views (applications, chat logs, event attendance, talk questions).
 - **Workspace Employee ID Telemetry**: Extracts directory IDs upon sign-in and stamps them on view events and chat logs for administrative accountability.
 
-### 4. Single-Company Employer Scope ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx))
-- **Employer Analytics**: Scoped overview displaying total application tallies, unique applicants, vacancies applied to, and assistant question feeds.
-- **Tenant Scope Isolation**: Strict single-company data filtering ensuring employers can only view applications and chat logs bound to their assigned organization.
+### 4. Single-Company Employer Scope & Bento Activity Pop-outs ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx), [DashboardActivityListModal.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/DashboardActivityListModal.tsx) & [DashboardStudentsModal.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/DashboardStudentsModal.tsx))
+- **Employer Analytics & Interactive Bento Cards**: Scoped metrics dashboard displaying application tallies, unique applicants, vacancies applied to, and assistant question feeds. Metric tiles double as interactive buttons opening `DashboardActivityListModal` for full event log inspection.
+- **Active Students Modal (`DashboardStudentsModal.tsx`)**: Clicking "Students active" opens a pop-out modal grouping activity by student actor, showing distinct active student counts, action tallies, and last activity timestamps.
+- **Tenant Scope Isolation & Server-Side Profile View Telemetry**: Strict single-company data filtering ensuring employers can only view applications and chat logs bound to their assigned organization. Profile visits (`countCompanyViews`) are counted server-side per student per session.
 
 ### 5. Generated CV Engine & Printable HTML Engine ([GeneratedCV.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/GeneratedCV.tsx) & [cv-download.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/cv-download.ts))
 - **Built-in HTML/PDF CV Generator**: Candidates fill structured profile fields (headline, CGPA, FYP title, education, experience, skills, links) rendered by `GeneratedCV.tsx`.
@@ -84,14 +88,22 @@ Modular sub-tab navigation dividing administrative tasks into specialized compon
 ### 7. Live Image Preview Component ([ImagePreview.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/ImagePreview.tsx))
 - **Real-Time Form Preview**: Embedded URL previewer positioned under logo and video link inputs, featuring automatic URL validation and broken-link error warnings.
 
-### 8. Events UX & 30-Second Dynamic QR Anti-Cheat Attendance ([EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx) & [SpeakerAvatar.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/SpeakerAvatar.tsx))
+### 8. Events UX, 30s Dynamic QR Anti-Cheat & Presentation Zoom ([TalkLiveChat.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/TalkLiveChat.tsx) & [EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx))
 - **Live Projector Screen**: Presenters launch a live display screen generating a dynamic 30-second rotating QR code (`REFRESH_MS = 30000`).
+- **Attendance Gating for Q&A**: Students must scan the live event QR code (`attended === true`) to unlock the live question submission form during talks.
+- **Presenter Full-Screen Presentation Mode & Font Zoom**: Facilitators and presenters can project approved student questions in full-screen presentation mode, featuring real-time text scaling controls (`A−`, `%`, `A+`, keyboard shortcuts `+`/`-`, left/right arrows, ESC).
 - **Server-Enforced Anti-Cheat**: `event_codes` collection is strictly unreadable by client queries (`allow read: if isAdmin()`). Server-side Firestore rules evaluate `eventCode(eventId)` assertions, invalidating screenshots shared over WhatsApp.
 - **Two-Step Duration Math for CCA Points**: Requires both Check-In and Check-Out. System computes elapsed time vs `sessionMinutes` (threshold: $\ge 80\%$ of session length or 45-minute floor) to assign `caEligible` status.
-- **Multi-Speaker Profiling**: Events natively support rendering profiles for multiple distinct speakers and delegated presenter access rights per event.
 
 ### 9. Multi-Criteria Vacancy Sorting ([VacancyFilters.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/vacancies/VacancyFilters.tsx))
 - **5-Mode Sorting Engine**: 5-mode dropdown supporting sorting by `default` (course recommendation fit), `newest`, `oldest`, `salary_high` (descending), and `salary_low` (ascending).
+
+### 10. Expanded Multi-Role & Super-Admin User Guide ([Guide.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/Guide.tsx))
+- **Interactive Multi-Role Documentation**: Built-in modal user guide accessible from top bar navigation across all roles:
+  - **Student (8 steps)**: Detailed walkthrough of tabs, Home company directory, resume builder options, vacancy filtering with `★ APPLIED` indicators, mock interview booking with clash detection, event QR check-in & Q&A & reviews, in-modal AI assistant, and history tracking.
+  - **Employer (5 steps)**: Complete onboarding guide covering registration & admin approval, company profile editing (staged edits), vacancy management with market salary guidance, mock interview scheduling, and applicant/chat analytics.
+  - **Admin (6 steps)**: Administrative master guide covering approvals, access control & whitelist management, vacancy operations, event QR presenter mode & Q&A moderation, Q&A audit history, and system settings.
+  - **Super-Admin (7 steps)**: Extends Admin guide with super-admin account roster oversight (accurate active student telemetry), Danger Zone full data reset (requiring `CONFIRM-RESET` text verification), and super-admin account immutability guarantees.
 
 ---
 

@@ -7,13 +7,11 @@ import { Modal } from "../../components/Modal";
 import { notify } from "../../components/toast";
 import { downloadCsv, toCsv } from "../../lib/data/csv";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
-import { BUSINESS_NATURES } from "../../lib/data/business-nature";
+import { AREAS_OF_STUDY } from "../../lib/data/course-map";
 
-// The company's nature of business. Students in a matching field see the profile
-// recommended; "All students" recommends to everyone; anything else is a custom
-// value the employer typed via "Others".
+// Areas of study to pick from in "Students you are looking for". Matched against
+// the area behind each student's programme; "All students" recommends to everyone.
 export const ALL_STUDENTS = "All students";
-const NATURE_LABELS = new Set<string>([ALL_STUDENTS, ...BUSINESS_NATURES]);
 
 type Draft = { name: string; email: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; whatsapp: string; interestedIn: string; logoBackground: "auto" | "light" | "dark" };
 const emptyDraft: Draft = { name: "", email: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", whatsapp: "", interestedIn: "", logoBackground: "auto" };
@@ -43,7 +41,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
 
   function fill(c: Company) {
     setEditingId(c.id);
-    setDraft({ name: c.name, email: c.email ?? "", website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", whatsapp: c.whatsapp ?? "", interestedIn: (c.interestedIn ?? [])[0] ?? "", logoBackground: c.logoBackground ?? "auto" });
+    setDraft({ name: c.name, email: c.email ?? "", website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", whatsapp: c.whatsapp ?? "", interestedIn: (c.interestedIn ?? []).join(", "), logoBackground: c.logoBackground ?? "auto" });
   }
 
   async function submit(event: FormEvent) {
@@ -64,8 +62,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
       boothNumber: employer ? existing?.boothNumber : (draft.boothNumber.trim() || undefined),
       // Digits only — wa.me rejects anything else, and the rules enforce it too.
       whatsapp: draft.whatsapp.replace(/\D/g, "") || undefined,
-      // Single nature of business, stored as a one-element array for backward compat.
-      interestedIn: draft.interestedIn.trim() ? [draft.interestedIn.trim()] : [],
+      interestedIn: draft.interestedIn.split(",").map((f) => f.trim()).filter(Boolean).slice(0, 30),
       logoBackground: draft.logoBackground,
       status: employer ? "pending" : "approved",
     };
@@ -113,7 +110,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
         const nature = String(r["Nature of Business"] ?? "").trim();
         const profile = String(r["Company Profile"] ?? r.summary ?? "").trim();
         const summary = [profile, nature && `Nature of business: ${nature}`].filter(Boolean).join("\n\n");
-        records.push({ id: Date.now() + i, name, website: website || undefined, summary: summary || undefined, ...(nature ? { interestedIn: [nature] } : {}), logoBackground: "auto", status: "approved" });
+        records.push({ id: Date.now() + i, name, website: website || undefined, summary: summary || undefined, logoBackground: "auto", status: "approved" });
       });
       if (!records.length) { setMessage("No new companies to import (all already exist or names missing)."); notify("Nothing new to import.", "info"); return; }
       setMessage(`Importing ${records.length} companies…`);
@@ -198,9 +195,9 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
   showBooth: boolean;
   submitLabel: string;
 }) {
-  const [othersMode, setOthersMode] = useState(false);
-  const nature = draft.interestedIn.trim();
-  const showCustomNature = othersMode || (nature !== "" && !NATURE_LABELS.has(nature));
+  // Already-picked values drop out of the dropdown — re-picking one was a no-op
+  // that still looked like a choice.
+  const chosen = new Set(draft.interestedIn.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
   return (
     <form onSubmit={onSubmit} className="admin-form">
       {showName && <label className="full">Company name<input required value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></label>}
@@ -208,18 +205,26 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
       <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
       {showBooth && <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>}
       <label>WhatsApp number<input value={draft.whatsapp} placeholder="e.g. 60123456789" inputMode="numeric" onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} /><small className="field-label">optional — country code, digits only</small></label>
-      <label className="full">Nature of business <small>students in a matching field see your profile recommended — or choose “All students”</small>
-        <select value={showCustomNature ? "__other" : nature} onChange={(e) => {
-          const v = e.target.value;
-          if (v === "__other") { setOthersMode(true); setDraft({ ...draft, interestedIn: "" }); }
-          else { setOthersMode(false); setDraft({ ...draft, interestedIn: v }); }
+      <label className="full">Students you are looking for <small>pick the areas of study whose students should see your profile recommended — or choose “All students”</small>
+        <select value="" onChange={(e) => {
+          const val = e.target.value;
+          e.target.value = "";
+          if (!val) return;
+          if (val === ALL_STUDENTS) { setDraft({ ...draft, interestedIn: ALL_STUDENTS }); return; }
+          const cur = draft.interestedIn.split(",").map((s) => s.trim()).filter((s) => s && s.toLowerCase() !== ALL_STUDENTS.toLowerCase());
+          setDraft({ ...draft, interestedIn: Array.from(new Set([...cur, val])).join(", ") });
         }}>
-          <option value="">Not specified</option>
-          <option value={ALL_STUDENTS}>⭐ All students (recommend to everyone)</option>
-          {BUSINESS_NATURES.map((n) => <option key={n} value={n}>{n}</option>)}
-          <option value="__other">Others (type your own)…</option>
+          <option value="" disabled>＋ Add an area of study…</option>
+          {!chosen.has(ALL_STUDENTS.toLowerCase()) && <option value={ALL_STUDENTS}>⭐ All students (recommend to everyone)</option>}
+          {AREAS_OF_STUDY.filter((a) => !chosen.has(a.toLowerCase())).map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        {showCustomNature && <input value={nature} placeholder="e.g. Renewable Energy" maxLength={120} onChange={(e) => setDraft({ ...draft, interestedIn: e.target.value })} />}
+        {draft.interestedIn.trim() && (
+          <div className="selected-chip-row">
+            {draft.interestedIn.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+              <span key={s} className="selected-chip">{s}<button type="button" aria-label={`Remove ${s}`} onClick={() => setDraft({ ...draft, interestedIn: draft.interestedIn.split(",").map((x) => x.trim()).filter((x) => x && x !== s).join(", ") })}>✕</button></span>
+            ))}
+          </div>
+        )}
       </label>
       <label className="full">Logo image URL
         <span className="register-logo-row"><input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /><button type="button" className="reset-admin-filters register-logo-btn" onClick={() => setDraft({ ...draft, logoUrl: logoFromWebsite(draft.website) })} disabled={!draft.website.trim()}>From website</button></span>

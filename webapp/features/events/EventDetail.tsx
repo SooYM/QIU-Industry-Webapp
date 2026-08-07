@@ -127,13 +127,13 @@ export function EventDetail({
               aria-pressed={interested}
               className={`rounded-lg text-xs font-semibold ui-btn ${interested ? "ui-btn-primary" : "ui-btn-quiet"}`}
             >
-              {interested ? "★ Interested — reminder added" : "☆ Mark as interested"} ({interestCount})
+              {interested ? "★ Interested — added to calendar" : "☆ Mark as interested"} ({interestCount})
             </button>
           )}
           <span className="text-xs ui-muted">
             {interested
               ? "This talk is in your calendar. Click again to remove your interest."
-              : "Marking interest adds this talk to your Google Calendar as a reminder."}
+              : "Marking interest adds this talk to your Google Calendar."}
           </span>
           {interestError && <p className="w-full p-2 text-xs ui-note-danger">{interestError}</p>}
         </section>

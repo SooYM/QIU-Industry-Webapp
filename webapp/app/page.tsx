@@ -1,6 +1,6 @@
 "use client";
 
-import { PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthAccount, useAuth } from "./auth-context";
 import { canManageVacancies } from "./auth-policy";
 import { usePortalData } from "./use-portal-data";
@@ -262,16 +262,6 @@ export default function Home() {
       .catch(() => notify("Could not apply. Please try again.", "error"));
   }
 
-  function glow(event: PointerEvent<HTMLElement>) {
-    // The glow itself is switched off under `@media (hover:none)`, but the handler
-    // still ran on every touch-drag — two custom-property writes and a style
-    // recalc per card while a student flick-scrolls the vacancy list.
-    if (event.pointerType !== "mouse") return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    event.currentTarget.style.setProperty("--mouse-x", `${event.clientX - rect.left}px`);
-    event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
-  }
-
   function openDashboardActivity(activity: DashboardActivity) {
     if (activity.type === "question") { setSelectedDashboardChat(activity); return; }
     if (activity.jobId) {
@@ -330,7 +320,7 @@ export default function Home() {
         </div>
       )}
 
-      <nav className="utility-bar main-tabs" aria-label="Sections" style={{ minHeight: "auto", gap: ".4rem", flexWrap: "wrap" }}>
+      <nav className="utility-bar main-tabs" aria-label="Sections">
         {visibleTabs.map(([key, label]) => (
           <button key={key} type="button" aria-current={tab === key ? "page" : undefined}
             className={`px-3.5 py-2 text-sm font-bold rounded-lg ${tab === key ? "tone-accent" : "text-accent"}`}
@@ -413,7 +403,6 @@ export default function Home() {
             appliedIds={appliedJobIds}
             columns={columns}
             view={vacancyView}
-            onGlow={glow}
             onSelect={setSelectedJob}
             onReset={resetFilters}
           />

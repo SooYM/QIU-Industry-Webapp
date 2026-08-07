@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent } from "react";
+import type { CSSProperties } from "react";
 import type { Company, Job } from "../../lib/data/types";
 import { jobMatchesCourse } from "../../lib/data/course-map";
 import type { VacancyView } from "./vacancy-utils";
@@ -12,7 +12,6 @@ export function VacancyList({
   appliedIds,
   columns,
   view,
-  onGlow,
   onSelect,
   onReset,
 }: {
@@ -23,7 +22,6 @@ export function VacancyList({
   appliedIds?: Set<number>;
   columns: number;
   view: VacancyView;
-  onGlow: (event: PointerEvent<HTMLElement>) => void;
   onSelect: (job: Job) => void;
   onReset: () => void;
 }) {
@@ -39,7 +37,6 @@ export function VacancyList({
               recommended={isStudent && jobMatchesCourse(job, course)}
               applied={isStudent && Boolean(appliedIds?.has(job.id))}
               showStatus={!isStudent}
-              onGlow={onGlow}
               onOpen={onSelect}
             />
           ))}

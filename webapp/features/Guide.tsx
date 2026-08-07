@@ -84,7 +84,7 @@ const student: GuideDoc = {
     {
       heading: "6 · Talks: interest, check-in, questions, reviews",
       points: [
-        "Mark a talk Interested and it is added to your Google Calendar as a reminder.",
+        "Mark a talk Interested and it is added to your Google Calendar.",
         "At the venue, scan the QR on the hall screen to CHECK IN, and scan again at the end to CHECK OUT.",
         "The QR changes every few seconds, so a screenshot cannot be reused — you must scan the live code.",
         "CCA credit needs enough time between the two scans, so stay for the session and remember to check out.",

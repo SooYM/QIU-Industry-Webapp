@@ -1,12 +1,11 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { Company, Job } from "../../lib/data/types";
 import { isApprovedCompany } from "../../lib/data/types";
-import { getYouTubeEmbedUrl } from "../../app/auth-policy";
+import { getYouTubeEmbedUrl, type UserRole } from "../../app/auth-policy";
 import { useAuth } from "../../app/auth-context";
 import { countCompanyViews, isApproved, logChat, subscribeCompanyChats } from "../../lib/data/firestore";
 import { estimateReplyHours, replyTimeLabel, whatsappLink } from "../../lib/data/reply-time";
-import { jobMatchesCourse } from "../../lib/data/course-map";
-import { businessNatureMatchesCourse } from "../../lib/data/business-nature";
+import { courseArea, jobMatchesCourse } from "../../lib/data/course-map";
 import { companyNamesMatch } from "../../lib/data/company-matching";
 import { AI_WARNING, withAiWarning } from "../../app/chat";
 import { RichText } from "../../app/RichText";
@@ -72,8 +71,8 @@ function answerAboutCompany(question: string, company: Company, jobs: Job[]): st
   if (has(/looking for|interested in|which course|what course|who do they want/)) {
     recognised = true;
     parts.push(company.interestedIn?.length
-      ? `Their nature of business is ${company.interestedIn[0]}${company.interestedIn[0].toLowerCase() === "all students" ? " — they welcome students from every course" : ", so students in a related field are a good fit"}.`
-      : "They have not stated their nature of business.");
+      ? `They are looking for students from: ${company.interestedIn.join(", ")}.`
+      : "They have not said which areas of study they are looking for.");
   }
   if (has(/who|about|what.*(do|they)|overview|background|tell me/)) {
     recognised = true;
@@ -93,8 +92,24 @@ function answerAboutCompany(question: string, company: Company, jobs: Job[]): st
   return `Nothing is listed for that on **${company.name}**'s profile yet.`;
 }
 
+/**
+ * The opener we pre-fill for WhatsApp. It used to say "I'm a QIU student" to
+ * everyone — including an employer looking at another exhibitor's profile, and
+ * an organiser — which put words in their mouth the moment they tapped through.
+ */
+function whatsappOpener(companyName: string, role: UserRole | null, viewerCompany: string | null) {
+  if (role === "employer") {
+    const from = viewerCompany ? ` from ${viewerCompany}` : "";
+    return `Hi ${companyName}, I'm a fellow exhibitor${from} at QIU Industry Day 2026 — I saw your profile on the portal and wanted to connect.`;
+  }
+  if (role === "admin" || role === "superadmin") {
+    return `Hi ${companyName}, I'm from the QIU Industry Day 2026 organising team — reaching out about your participation.`;
+  }
+  return `Hi ${companyName}, I'm a QIU student — I saw your profile on the Industry Day portal and wanted to ask about your opportunities.`;
+}
+
 function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) {
-  const { user, employeeId } = useAuth();
+  const { user, employeeId, role, company: viewerCompany } = useAuth();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -161,7 +176,7 @@ function CompanyAssistant({ company, jobs }: { company: Company; jobs: Job[] }) 
       {company.whatsapp ? (
         <a
           className="ui-btn ui-btn-success company-whatsapp-cta"
-          href={whatsappLink(company.whatsapp, `Hi ${company.name}, I'm a QIU student — I saw your profile on the Industry Day portal and wanted to ask about your opportunities.`)}
+          href={whatsappLink(company.whatsapp, whatsappOpener(company.name, role, viewerCompany))}
           target="_blank"
           rel="noreferrer"
         >
@@ -242,7 +257,7 @@ function CompanyDetail({ company, jobs, isStudent, course, canSeeVisits, onOpenJ
 
         {(company.interestedIn?.length ?? 0) > 0 && (
           <section>
-            <span className="detail-label">NATURE OF BUSINESS</span>
+            <span className="detail-label">LOOKING FOR</span>
             <div className="exhibitor-tags mt-1.5">
               {company.interestedIn!.map((field) => <span key={field} className="exhibitor-tag">{field}</span>)}
             </div>
@@ -364,8 +379,16 @@ export function HomeView({
   const recommendedIds = useMemo(() => {
     if (!isStudent || !course) return new Set<number>();
     const ids = new Set<number>();
+    // Companies pick areas of study, so the student's programme is resolved to
+    // its area before matching. The raw course name is still accepted so profiles
+    // saved when this field held individual programmes keep working.
+    const wanted = course.trim().toLowerCase();
+    const area = courseArea(course)?.toLowerCase();
     for (const c of companies) {
-      if (businessNatureMatchesCourse((c.interestedIn ?? [])[0], course)) ids.add(c.id);
+      if ((c.interestedIn ?? []).some((field) => {
+        const v = field.trim().toLowerCase();
+        return v === "all students" || v === wanted || (area !== undefined && v === area);
+      })) ids.add(c.id);
     }
     return ids;
   }, [companies, isStudent, course]);
