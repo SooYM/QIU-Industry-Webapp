@@ -791,9 +791,9 @@ textarea.ui-field { padding:.6rem .75rem; }
 .bento .stat-card { display:flex; flex-direction:column; justify-content:center; height:100%; margin:0; background:var(--surface-2); border-color:color-mix(in srgb,var(--line) 60%,var(--ink)); box-shadow:var(--shadow-pop),inset 0 1px 0 color-mix(in srgb,#fff 8%,transparent); transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s,border-color .18s; }
 .bento .stat-card:hover { transform:translateY(-4px); border-color:color-mix(in srgb,var(--blue) 40%,var(--line)); box-shadow:0 30px 70px rgba(0,0,0,.5),inset 0 1px 0 color-mix(in srgb,#fff 12%,transparent); }
 .bento .stat-card .stat-value { font-size:2rem; line-height:1; }
-.bento-lead.stat-card { background:var(--blue); border-color:var(--blue); color:var(--color-on-primary); justify-content:flex-end; gap:.35rem; }
+.bento-lead.stat-card { background:var(--blue); border-color:var(--blue); color:var(--color-on-primary); justify-content:center; gap:.25rem; }
 .bento-lead.stat-card .stat-label,.bento-lead.stat-card small { color:color-mix(in srgb,var(--color-on-primary) 78%,transparent); }
-.bento-lead.stat-card .stat-value { font-size:clamp(2.75rem,7vw,4rem); letter-spacing:-.04em; color:var(--color-on-primary); }
+.bento-lead.stat-card .stat-value { font-size:clamp(2.25rem,4vw,3rem); letter-spacing:-.04em; color:var(--color-on-primary); }
 .bento .trend-card,.bento .rank-card,.bento .activity-card { height:100%; margin:0; }
 
 /* A tile whose number IS a filter. Tapping it shows the records behind it in the

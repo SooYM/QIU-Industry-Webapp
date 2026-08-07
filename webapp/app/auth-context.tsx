@@ -16,6 +16,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, 
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryProfile, PEOPLE_SCOPE } from "../lib/auth/course-directory";
 import { revokeEmployerAccess, subscribeCompanies, submitSignup, subscribeMySignup } from "../lib/data/firestore";
+import { COURSE_CODES } from "../lib/data/course-map";
 import { downloadCsv, toCsv } from "../lib/data/csv";
 import type { Company, EmployerSignup } from "../lib/data/types";
 import { notify } from "../components/toast";
@@ -435,6 +436,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 }
 
 /** Non-QIU visitor: submit an employer registration, then wait for admin approval. */
+const REGISTER_ALL_STUDENTS = "All students";
+const REGISTER_COURSE_OPTIONS = [...new Set(Object.values(COURSE_CODES))].sort((a, b) => a.localeCompare(b));
+
 function RegisterGate() {
   const { user, signOut } = useAuth();
   const email = user?.email ?? "";
@@ -448,6 +452,7 @@ function RegisterGate() {
   const [contact, setContact] = useState("");
   const [website, setWebsite] = useState("");
   const [summary, setSummary] = useState("");
+  const [interestedIn, setInterestedIn] = useState(""); // comma-separated courses / "All students"
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   // Latch: once a submit is accepted by the server, stay on the pending screen
@@ -466,7 +471,7 @@ function RegisterGate() {
     if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
     setBusy(true);
     // await resolves only after the server accepts the write, so it has persisted.
-    try { await submitSignup(email, { name, company: companyName, contact, website, summary }); clearPendingSignup(); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
+    try { await submitSignup(email, { name, company: companyName, contact, website, summary, interestedIn: interestedIn.split(",").map((s) => s.trim()).filter(Boolean) }); clearPendingSignup(); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
     catch { setMessage("Could not submit your registration. Please try again."); notify("Could not submit registration.", "error"); }
     finally { setBusy(false); }
   }
@@ -495,6 +500,27 @@ function RegisterGate() {
           <label className="register-field">Company name<input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={200} placeholder="e.g. Acme Sdn Bhd" /></label>
           <label className="register-field">Website <small>optional</small><input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} maxLength={2048} placeholder="https://acme.com" /></label>
           <label className="register-field">Contact (phone / email) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
+          <label className="register-field">Students you are looking for <small>optional — these students see your profile recommended</small>
+            <select value="" onChange={(e) => {
+              const val = e.target.value;
+              e.target.value = "";
+              if (!val) return;
+              if (val === REGISTER_ALL_STUDENTS) { setInterestedIn(REGISTER_ALL_STUDENTS); return; }
+              const cur = interestedIn.split(",").map((s) => s.trim()).filter((s) => s && s.toLowerCase() !== REGISTER_ALL_STUDENTS.toLowerCase());
+              setInterestedIn(Array.from(new Set([...cur, val])).join(", "));
+            }}>
+              <option value="" disabled>＋ Add a course…</option>
+              <option value={REGISTER_ALL_STUDENTS}>⭐ All students (recommend to everyone)</option>
+              {REGISTER_COURSE_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {interestedIn.trim() && (
+              <div className="selected-chip-row">
+                {interestedIn.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+                  <span key={s} className="selected-chip">{s}<button type="button" aria-label={`Remove ${s}`} onClick={() => setInterestedIn(interestedIn.split(",").map((x) => x.trim()).filter((x) => x && x !== s).join(", "))}>✕</button></span>
+                ))}
+              </div>
+            )}
+          </label>
           <label className="register-field">Company profile / blurb <small>optional</small><textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={5000} /></label>
           {message && <p className="auth-error" role="alert">{message}</p>}
           <button className="google-sign-in" type="submit" disabled={busy}>{busy ? "Submitting…" : "Submit registration"}</button>

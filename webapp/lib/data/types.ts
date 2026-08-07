@@ -359,6 +359,7 @@ export interface EmployerSignup {
   logoUrl?: string;
   videoUrl?: string;
   summary?: string;
+  interestedIn?: string[]; // target courses (or "All students") from registration
   status: "pending" | "approved";
   createdAt?: unknown;
   updatedAt?: unknown;

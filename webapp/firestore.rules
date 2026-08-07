@@ -452,7 +452,8 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && emailId == request.auth.token.email.lower()
         && request.resource.data.email == request.auth.token.email.lower()
-        && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'website', 'logoUrl', 'videoUrl', 'summary', 'status', 'createdAt', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['email', 'name', 'company', 'contact', 'website', 'logoUrl', 'videoUrl', 'summary', 'interestedIn', 'status', 'createdAt', 'updatedAt'])
+        && (!('interestedIn' in request.resource.data) || (request.resource.data.interestedIn is list && request.resource.data.interestedIn.size() <= 30))
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 160
         && request.resource.data.company is string && request.resource.data.company.size() > 0 && request.resource.data.company.size() <= 200
         && (!('contact' in request.resource.data) || (request.resource.data.contact is string && request.resource.data.contact.size() <= 200))

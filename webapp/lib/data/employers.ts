@@ -9,7 +9,7 @@ import type { Company, EmployerSignup } from "./types";
 
 // ---- Employer self-registration --------------------------------------------
 
-type SignupInput = { name: string; company: string; contact?: string; website?: string; logoUrl?: string; videoUrl?: string; summary?: string };
+type SignupInput = { name: string; company: string; contact?: string; website?: string; logoUrl?: string; videoUrl?: string; summary?: string; interestedIn?: string[] };
 
 /** A non-QIU visitor submits their own signup (doc id = lowercased email). */
 export async function submitSignup(email: string, data: SignupInput) {
@@ -21,6 +21,7 @@ export async function submitSignup(email: string, data: SignupInput) {
     ...(data.logoUrl?.trim() ? { logoUrl: data.logoUrl.trim() } : {}),
     ...(data.videoUrl?.trim() ? { videoUrl: data.videoUrl.trim() } : {}),
     ...(data.summary?.trim() ? { summary: data.summary.trim() } : {}),
+    ...(data.interestedIn?.length ? { interestedIn: data.interestedIn.slice(0, 30) } : {}),
     status: "pending", createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   }, { merge: true });
 }
@@ -75,6 +76,7 @@ export async function approveSignup(signup: EmployerSignup, approverEmail: strin
     ...(signup.logoUrl ? { logoUrl: signup.logoUrl } : {}),
     ...(signup.videoUrl ? { videoUrl: signup.videoUrl } : {}),
     ...(signup.summary ? { summary: signup.summary } : {}),
+    ...(signup.interestedIn?.length ? { interestedIn: signup.interestedIn } : {}),
     status: "approved",
     // An update must not change createdBy — the rules reject that outright.
     createdBy: match?.createdBy ?? signup.email,
