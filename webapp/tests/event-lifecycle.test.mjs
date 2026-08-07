@@ -5,6 +5,7 @@ import test from "node:test";
 const form = await readFile(new URL("../features/events/EventForm.tsx", import.meta.url), "utf8");
 const presenter = await readFile(new URL("../features/events/EventPresenter.tsx", import.meta.url), "utf8");
 const eventsView = await readFile(new URL("../features/events/EventsView.tsx", import.meta.url), "utf8");
+const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 test("event form keeps Other in the configured list and rejects invalid time ranges", () => {
   assert.match(form, /specializationOptions\.length \? specializationOptions : \[\.\.\.PREDEFINED_SPECS, "Other"\]/);
@@ -32,4 +33,12 @@ test("events are split into live, upcoming and past sections with past actions r
   assert.match(eventsView, /canManageEvents && <button className="delete-local"/);
   assert.doesNotMatch(eventsView, /canManageEvents && st !== "ended" && <button className="delete-local"/);
   assert.match(eventsView, /canManageEvents && <button className="edit-local" onClick=\{\(\) => setViewing\(ev\)\}>Attendance/);
+});
+
+test("only live course-matched student events receive the recommendation outline", () => {
+  assert.match(eventsView, /const matchesCourse = isStudent && eventMatchesCourse\(ev, course\);/);
+  assert.match(eventsView, /const isRelevantLive = st === "live" && matchesCourse;/);
+  assert.match(eventsView, /className=\{`event-card\$\{isRelevantLive \? " is-recommended" : ""\}`\}/);
+  assert.match(eventsView, /\{matchesCourse && <span[^>]*>🌟 Relevant to you<\/span>\}/);
+  assert.match(styles, /\.job-card\.is-recommended,\.event-card\.is-recommended\s*\{[^}]*border-color:var\(--success\)/s);
 });

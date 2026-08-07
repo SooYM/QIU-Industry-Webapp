@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FilterReset } from "../../components/FilterReset";
 import { subscribeAllChats, subscribeCompanyChats } from "../../lib/data/firestore";
 import type { ChatLog } from "../../lib/data/types";
 import { csvWhen, downloadCsv, toCsv } from "../../lib/data/csv";
@@ -46,7 +47,10 @@ function AllChats() {
   return (
     <section className="local-jobs" aria-labelledby="chats-title">
       <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="chats-title">By student</h3></div><div className="flex items-center gap-2"><strong>{shown.length} from {grouped.length}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!shown.length}>⬇ Export CSV</button></div></div>
-      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, company or text…" aria-label="Search chats" />
+      <div className="admin-toolbar">
+        <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, company or text…" aria-label="Search chats" />
+        <FilterReset active={Boolean(query)} onReset={() => setQuery("")} label="Clear search" />
+      </div>
       {loading ? <p className="role-manager-state" role="status">Loading chats…</p>
         : grouped.length ? grouped.map((g) => (
           <details className="student-group" key={g.email || g.name}>
@@ -66,7 +70,7 @@ function AllChats() {
   );
 }
 
-/** Employer view: only their companies' chats, anonymized. */
+/** Employer view: only their companies' chats. */
 function CompanyChats({ companies }: { companies: string[] }) {
   const [byCompany, setByCompany] = useState<Record<string, ChatLog[]>>({});
   const [query, setQuery] = useState("");
@@ -80,22 +84,26 @@ function CompanyChats({ companies }: { companies: string[] }) {
 
   const q = query.trim().toLowerCase();
   const sorted = Object.values(byCompany).flat()
-    .filter((l) => !q || [l.company, l.question, l.answer].some((f) => (f ?? "").toLowerCase().includes(q)))
+    .filter((l) => !q || [l.studentName, l.studentEmail, l.company, l.question, l.answer].some((f) => (f ?? "").toLowerCase().includes(q)))
     .sort((a, b) => whenValue(b.createdAt) - whenValue(a.createdAt));
 
   const exportCsv = () => {
     if (!sorted.length) { notify("Nothing to export.", "error"); return; }
-    // Anonymized — employers never see student identities.
-    const rows = sorted.map((l) => [l.company, l.question, l.answer, csvWhen(l.createdAt)]);
-    downloadCsv(`company-chats-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Company", "Question", "Answer", "When"], rows));
+    const rows = sorted.map((l) => [l.studentName, l.studentEmail, l.company, l.question, l.answer, csvWhen(l.createdAt)]);
+    downloadCsv(`company-chats-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(["Student", "Email", "Company", "Question", "Answer", "When"], rows));
     notify(`Exported ${sorted.length} question${sorted.length === 1 ? "" : "s"}.`);
   };
 
   return (
     <section className="local-jobs" aria-labelledby="company-chats-title">
       <div className="local-jobs-head"><div><span className="detail-label">ASSISTANT CHATS</span><h3 id="company-chats-title">Questions about your companies</h3></div><div className="flex items-center gap-2"><strong>{sorted.length}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!sorted.length}>⬇ Export CSV</button></div></div>
-      <p className="text-[11px] text-accent">🔒 Questions are anonymized — student identities are never shown to companies.</p>
-      {companies.length > 0 && <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by company or text…" aria-label="Search chats" />}
+      <p className="text-[11px] text-accent">Questions asked about your company, with the student who asked.</p>
+      {companies.length > 0 && (
+        <div className="admin-toolbar">
+          <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, company or text…" aria-label="Search chats" />
+          <FilterReset active={Boolean(query)} onReset={() => setQuery("")} label="Clear search" />
+        </div>
+      )}
       {!companies.length ? (
         <div className="admin-jobs-empty"><strong>No companies yet</strong><p>Create a vacancy first. Chats mentioning your listed companies will appear here.</p></div>
       ) : sorted.length ? (
@@ -103,15 +111,15 @@ function CompanyChats({ companies }: { companies: string[] }) {
           {sorted.map((log) => (
             <div className="local-job" key={log.id} style={{ alignItems: "flex-start" }}>
               <span>
-                <b>{log.company}</b>
-                <small>{formatWhen(log.createdAt)}</small>
+                <b>{log.studentName || log.studentEmail || "Student"}</b>
+                <small>{log.studentEmail}{log.company ? ` · about ${log.company}` : ""} · {formatWhen(log.createdAt)}</small>
                 <span className="mt-1 block text-[11px]"><b>Q:</b> {log.question}</span>
                 <span className="block text-[11px] text-accent"><b>A:</b> {log.answer}</span>
               </span>
             </div>
           ))}
         </div>
-      ) : <div className="admin-jobs-empty"><strong>No questions yet</strong><p>Anonymized questions about your companies will appear here.</p></div>}
+      ) : <div className="admin-jobs-empty"><strong>No questions yet</strong><p>Questions students ask about your companies will appear here.</p></div>}
     </section>
   );
 }

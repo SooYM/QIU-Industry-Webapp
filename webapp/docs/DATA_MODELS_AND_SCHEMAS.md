@@ -2,7 +2,7 @@
 
 **Status:** Active Internal Testing Phase — Currently undergoing internal validation. Live deployment links and public hosting URLs are strictly withheld during testing.<br>
 **Target Audience:** Database Administrators, Backend Engineers, Frontend Developers, Data Analysts, and Security Reviewers<br>
-**Source Specifications:** [lib/data/types.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/lib/data/types.ts), [lib/data/firestore.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/lib/data/firestore.ts), and [firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules)
+**Source Specifications:** [lib/data/types.ts](../lib/data/types.ts), [lib/data/firestore.ts](../lib/data/firestore.ts), and [firestore.rules](../firestore.rules)
 
 ---
 
@@ -19,7 +19,7 @@ The **QIU Industry Webapp** operates on a NoSQL Cloud Firestore architecture. Sy
 
 ## 2. Canonical TypeScript Domain Interfaces
 
-All feature modules import canonical domain interfaces from [lib/data/types.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/lib/data/types.ts).
+All feature modules import canonical domain interfaces from [lib/data/types.ts](../lib/data/types.ts).
 
 ```ts
 // lib/data/types.ts
@@ -363,6 +363,72 @@ export interface JobStats {
 
 ---
 
+### 3.14 `event_interests/{eventId}_{uid}`
+Student marked interest in a talk. **The document id is the uniqueness rule** — pinned in the security rules, so a student can hold at most one per event and the tally can never drift. There is no counter field anywhere; the number shown is a server-side count of these documents (`countEventInterests`).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `eventId` | `number` | Must match the id prefix. |
+| `studentUid` | `string` | Must equal `request.auth.uid`. |
+| `studentEmail`, `studentName` | `string` | For admin export. |
+| `createdAt` | `timestamp` | |
+
+### 3.15 `event_live_chat/{eventId}`
+The open/closed switch for a talk's Q&A. A **separate document, not a field on the event**, because the presenter who runs the session is not an admin and cannot write the event document. Writable by an admin or the email listed in that event's `presenters`, reusing the same delegation clause as `event_codes`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `eventId` | `number` | |
+| `enabled` | `boolean` | Read live by students; the rules also `get()` it when accepting a message. |
+
+### 3.16 `talk_live_chats/{msgId}`
+One question asked during a talk. Creation is rejected unless `event_live_chat/{eventId}.enabled == true`, so a crafted client cannot post into a closed session. `studentName` is pinned to the caller's token so nobody can post as "Admin". Deletable by an admin or the event's presenter, so abuse can be removed and not merely stopped.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `eventId` | `number` | |
+| `studentUid` | `string` | Must equal `request.auth.uid`. |
+| `studentName` | `string` | Must equal the caller's token name or email. |
+| `message` | `string` | 1–500 characters, enforced in rules. |
+
+### 3.17 `event_feedbacks/{eventId}_{uid}`
+A post-talk review. Creation requires an **attendance record to exist** for that event — "the student who attended can provide feedback" is enforced by `exists(/attendance/{eventId}_{uid})` in the rules, not by the UI.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `eventId`, `eventTitle` | `number`, `string` | |
+| `studentUid` | `string` | Must equal `request.auth.uid`; id is pinned. |
+| `rating` | `int` | 1–5, enforced in rules. |
+| `comment` | `string` | ≤ 2000 characters. |
+
+### 3.18 `interview_slots/{slotId}`
+A mock interview slot opened by an employer. `slotId` is `{companySlug}_{date}_{startTime}`.
+
+**`bookedStudents` carries uids and nothing else, on purpose.** Students must be able to read a slot to see whether it is full and whether they hold it, so anything stored here is readable campus-wide. Contact details live in `interview_bookings` (3.19).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `companyName` | `string` | Slots are matched to employers by name. |
+| `date`, `startTime`, `endTime` | `string` | `YYYY-MM-DD`, `HH:mm`. |
+| `maxBookings` | `number` | Capacity, enforced in rules. |
+| `bookedStudents` | `InterviewSeat[]` | `{ studentUid, bookedAt }` only. |
+
+A student's update may touch only `bookedStudents`/`updatedAt`, must move the list by exactly one, must stay within `maxBookings`, and the entry that moved must be their own — otherwise any student could cancel another's booking.
+
+### 3.19 `interview_bookings/{slotId}_{uid}`
+The identity behind one seat. **Staff-only** (`isAdmin() || isEmployer()`). Written in the same transaction as the seat, so the two cannot diverge; deleted with the seat on cancel, and with the slot on delete.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `slotId`, `companyName`, `date`, `startTime` | `string` | Denormalised for the employer view. |
+| `studentUid` | `string` | Must equal `request.auth.uid`; id is pinned. |
+| `studentEmail`, `studentName`, `course`, `employeeId` | `string` | The PII this split exists to protect. |
+
+### 3.20 `company_views/{companyId}_{uid}_{YYYY-MM-DD}`
+One profile visit, deduplicated to once per student per company per day. **The id is pinned in the rules and the collection is create-only**, so the dedupe is enforced server-side rather than by the client, and the total cannot be inflated by re-opening a profile. Readable by staff only.
+
+There is deliberately **no counter document.** An earlier design kept `company_stats/{id}.views` incremented by the client; a field a client increments can be set to any value from the browser console, letting a student — or a rival employer — fake another company's numbers. The employer dashboard calls `countCompanyViews()` instead.
+
 ## 4. Real-Time Subscriptions & Atomic Counter Operations
 
 The webapp leverages Firestore `onSnapshot` subscriptions for reactive UI updates:
@@ -371,7 +437,7 @@ The webapp leverages Firestore `onSnapshot` subscriptions for reactive UI update
 - **`subscribeCompanies()`**: Listens to `companies` directory updates.
 - **`subscribeAttendance()`**: Listens to `attendance` records for student logs and admin dashboards.
 
-### Atomic Tally Operations ([firestore.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/lib/data/firestore.ts#L330-L335))
+### Atomic Tally Operations ([firestore.ts](../lib/data/firestore.ts#L330-L335))
 
 ```ts
 export async function bumpApplicants(jobId: number, delta: 1 | -1) {
@@ -384,7 +450,7 @@ export async function bumpApplicants(jobId: number, delta: 1 | -1) {
 
 ## 5. Offline Data Normalization & Batch Import Pipeline
 
-Private source data (`*.csv`, `*.xlsx`) is processed offline via [scripts/generate_data.py](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/scripts/generate_data.py):
+Private source data (`*.csv`, `*.xlsx`) is processed offline via [scripts/generate_data.py](../scripts/generate_data.py):
 
 ```mermaid
 flowchart LR

@@ -3,13 +3,12 @@
 import { PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AuthAccount, useAuth } from "./auth-context";
 import { canManageVacancies } from "./auth-policy";
-import { db } from "./firebase-client";
+import { usePortalData } from "./use-portal-data";
 import {
-  checkInAttendance, checkOutAttendance, deleteApplication, DEFAULT_SETTINGS, getMyAttendance, isApproved,
-  recordApplication, recordView, subscribeApplications, subscribeAttendance, subscribeCompanies,
-  subscribeEvents, subscribeJobStats, subscribeMyResume, subscribeSettings, subscribeVacancies, subscribeViews,
+  checkInAttendance, checkOutAttendance, deleteApplication, getMyAttendance, isApproved,
+  recordApplication, recordCompanyView, recordView,
 } from "../lib/data/firestore";
-import type { AppSettings, Application, Attendance, Company, EventItem, Job, Resume, ViewEvent } from "../lib/data/types";
+import type { AppSettings, Application, Company, EventItem, Job } from "../lib/data/types";
 import { hasGeneratedCV, isApprovedCompany } from "../lib/data/types";
 import { findCompanyByName } from "../lib/data/company-matching";
 import { jobMatchesCourse, resolveCourse } from "../lib/data/course-map";
@@ -22,6 +21,7 @@ import { EmployerSummary } from "../features/admin/EmployerSummary";
 import { DashboardConversationModal } from "../features/admin/DashboardConversationModal";
 import { StudentHistory } from "../features/student/StudentHistory";
 import { StudentResume } from "../features/student/StudentResume";
+import { InterviewBookingModal } from "../features/student/InterviewBookingModal";
 import { HomeView } from "../features/home/HomeView";
 import { EventsView } from "../features/events/EventsView";
 import { EventDetail } from "../features/events/EventDetail";
@@ -33,13 +33,11 @@ type Tab = "summary" | "home" | "vacancies" | "history" | "resume" | "events" | 
 
 export default function Home() {
   const { user, role, course, employeeId, company: employerCompany } = useAuth();
-  const [customJobs, setCustomJobs] = useState<Job[]>([]);
   const [tab, setTab] = useState<Tab>("home");
-  const [myApplications, setMyApplications] = useState<Application[]>([]);
-  const [myViews, setMyViews] = useState<ViewEvent[]>([]);
-  const [myResume, setMyResume] = useState<Resume | null>(null);
-  const [resumeChecked, setResumeChecked] = useState(false);
-  const [jobsLoading, setJobsLoading] = useState(true);
+  const {
+    customJobs, jobsLoading, myApplications, myViews, myResume, resumeChecked, myInterests,
+    events, myAttendance, jobStats, exhibitors, settings, interestCounts, refreshInterestCounts,
+  } = usePortalData(user, role);
   const [query, setQuery] = useState("");
   const [company, setCompany] = useState("All companies");
   const [specialization, setSpecialization] = useState("All specializations");
@@ -55,11 +53,7 @@ export default function Home() {
   const [sort, setSort] = useState<"default" | "newest" | "oldest" | "salary_high" | "salary_low">("default");
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [myAttendance, setMyAttendance] = useState<Attendance[]>([]);
-  const [jobStats, setJobStats] = useState<Record<number, number>>({});
-  const [exhibitors, setExhibitors] = useState<Company[]>([]);
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [bookingCompany, setBookingCompany] = useState<string | null>(null);
   const [scanMsg, setScanMsg] = useState("");
   const scanHandled = useRef(false);
 
@@ -73,36 +67,6 @@ export default function Home() {
       setTheme(prefs.theme ?? "light"); // default light regardless of system setting
     } catch { /* Ignore malformed device-local preferences. */ }
   }, []);
-
-  useEffect(() => {
-    if (!user || !db) return;
-    return subscribeVacancies((jobs) => {
-      setCustomJobs(jobs);
-      setJobsLoading(false);
-    }, () => {
-      setJobsLoading(false);
-    });
-  }, [user]);
-
-  // Student history + resume streams (their own records only).
-  useEffect(() => {
-    if (!user || !db || canManageVacancies(role)) return;
-    const unsubApps = subscribeApplications(setMyApplications, user.uid);
-    const unsubViews = subscribeViews(setMyViews, user.uid);
-    const unsubResume = subscribeMyResume(user.uid, (r) => { setMyResume(r); setResumeChecked(true); });
-    return () => { unsubApps(); unsubViews(); unsubResume(); };
-  }, [user, role]);
-
-  // Events, exhibitors, settings (all roles) + this account's own attendance records.
-  useEffect(() => {
-    if (!user || !db) return;
-    const unsubEvents = subscribeEvents(setEvents, () => {});
-    const unsubAtt = subscribeAttendance(setMyAttendance, user.uid);
-    const unsubStats = subscribeJobStats(setJobStats);
-    const unsubCompanies = subscribeCompanies(setExhibitors, () => {});
-    const unsubSettings = subscribeSettings(setSettings);
-    return () => { unsubEvents(); unsubAtt(); unsubStats(); unsubCompanies(); unsubSettings(); };
-  }, [user]);
 
   // Process a scanned attendance QR (?ev=&s=&c=) once the events + user are ready.
   useEffect(() => {
@@ -144,7 +108,7 @@ export default function Home() {
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setSelectedJob(null); setSelectedEvent(null); setSelectedDashboardChat(null); }
+      if (event.key === "Escape") { setSelectedJob(null); setSelectedEvent(null); setSelectedDashboardChat(null); setBookingCompany(null); }
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
@@ -155,6 +119,7 @@ export default function Home() {
     if (!selectedJob || !user || canManageVacancies(role)) return;
     recordView({
       id: `${user.uid}_${selectedJob.id}`, studentUid: user.uid,
+      studentName: user.displayName ?? "", studentEmail: user.email ?? "",
       ...(employeeId ? { studentEmployeeId: employeeId } : {}),
       jobId: selectedJob.id, jobTitle: selectedJob.title, company: selectedJob.company,
     }).catch(() => { /* View logging is best-effort. */ });
@@ -167,7 +132,15 @@ export default function Home() {
     try { if (!localStorage.getItem(k)) { setGuideOpen(true); localStorage.setItem(k, "1"); } } catch { /* ignore */ }
   }, [user, role]);
 
-  const isAnyModalOpen = Boolean(selectedJob || selectedEvent || selectedDashboardChat || guideOpen);
+  // "New company" here means: approved, but nobody has filled in the profile —
+  // an admin creating it from a registration only ever supplies the name.
+  const myCompany = employerCompany ? findCompanyByName(exhibitors, employerCompany) : null;
+  const incompleteCompany = role === "employer" && myCompany
+    && !myCompany.summary && !myCompany.website && !myCompany.boothNumber
+    ? myCompany
+    : null;
+
+  const isAnyModalOpen = Boolean(selectedJob || selectedEvent || selectedDashboardChat || bookingCompany || guideOpen);
 
   useEffect(() => {
     if (isAnyModalOpen) {
@@ -290,6 +263,10 @@ export default function Home() {
   }
 
   function glow(event: PointerEvent<HTMLElement>) {
+    // The glow itself is switched off under `@media (hover:none)`, but the handler
+    // still ran on every touch-drag — two custom-property writes and a style
+    // recalc per card while a student flick-scrolls the vacancy list.
+    if (event.pointerType !== "mouse") return;
     const rect = event.currentTarget.getBoundingClientRect();
     event.currentTarget.style.setProperty("--mouse-x", `${event.clientX - rect.left}px`);
     event.currentTarget.style.setProperty("--mouse-y", `${event.clientY - rect.top}px`);
@@ -352,8 +329,23 @@ export default function Home() {
       </nav>
 
       {tab === "summary" && !isStudent && (
-        <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          {role === "employer" ? <EmployerSummary companies={employerCompany ? [employerCompany] : []} onOpenActivity={openDashboardActivity} /> : <AdminSummary onOpenActivity={openDashboardActivity} />}
+        <section className="workspace space-y-6" style={{ gridTemplateColumns: "1fr" }}>
+          {role === "employer" ? (
+            <>
+              {incompleteCompany && (
+                <div className="scan-banner" role="status">
+                  <span>
+                    <b>{incompleteCompany.name}</b> has no profile details yet — students see an empty card on the Home
+                    page. Add a description, website and booth number so they know who you are.
+                  </span>
+                  <button type="button" className="nudge-btn" onClick={() => setTab("dashboard")}>Complete profile</button>
+                </div>
+              )}
+              <EmployerSummary companies={employerCompany ? [employerCompany] : []} onOpenActivity={openDashboardActivity} />
+            </>
+          ) : (
+            <AdminSummary onOpenActivity={openDashboardActivity} />
+          )}
         </section>
       )}
 
@@ -365,7 +357,17 @@ export default function Home() {
 
       {tab === "home" && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <HomeView companies={exhibitors} jobs={jobs} isStudent={isStudent} course={course} settings={{ portalTitle: settings.portalTitle, portalTagline: settings.portalTagline }} onOpenJob={setSelectedJob} />
+          <HomeView
+            companies={exhibitors}
+            jobs={jobs}
+            isStudent={isStudent}
+            course={course}
+            settings={{ portalTitle: settings.portalTitle, portalTagline: settings.portalTagline }}
+            onOpenJob={setSelectedJob}
+            onOpenCompany={(c) => { if (isStudent && user) recordCompanyView(c.id, c.name, user.uid); }}
+            onBookInterview={isStudent ? setBookingCompany : undefined}
+            canSeeVisits={role === "admin" || role === "superadmin" || role === "employer"}
+          />
         </section>
       )}
 
@@ -422,7 +424,7 @@ export default function Home() {
 
       {tab === "history" && isStudent && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <StudentHistory jobs={jobs} applications={myApplications} views={myViews} attendance={myAttendance} onOpen={setSelectedJob} />
+          <StudentHistory jobs={jobs} applications={myApplications} views={myViews} attendance={myAttendance} studentUid={user?.uid} onOpen={setSelectedJob} />
         </section>
       )}
 
@@ -434,7 +436,18 @@ export default function Home() {
 
       {tab === "events" && (
         <section className="workspace" style={{ gridTemplateColumns: "1fr" }}>
-          <EventsView events={events} canManageEvents={role === "admin" || role === "superadmin"} userEmail={user?.email ?? ""} myAttendance={myAttendance} settings={settings} course={course} isStudent={isStudent} onOpenEvent={setSelectedEvent} />
+          <EventsView
+            events={events}
+            canManageEvents={role === "admin" || role === "superadmin"}
+            userEmail={user?.email ?? ""}
+            myAttendance={myAttendance}
+            settings={settings}
+            course={course}
+            isStudent={isStudent}
+            myInterests={myInterests}
+            interestCounts={interestCounts}
+            onOpenEvent={setSelectedEvent}
+          />
         </section>
       )}
 
@@ -458,6 +471,7 @@ export default function Home() {
           onApply={(choice) => applyToJob(selectedJob, choice)}
           onWithdraw={() => withdrawFromJob(selectedJob)}
           onGoToResume={() => { setSelectedJob(null); setTab("resume"); }}
+          onBookInterview={(compName) => setBookingCompany(findCompanyByName(exhibitors, compName)?.name ?? compName)}
           onClose={() => setSelectedJob(null)}
         />
       )}
@@ -467,9 +481,26 @@ export default function Home() {
           event={selectedEvent}
           canManageEvents={role === "admin" || role === "superadmin"}
           userEmail={user?.email ?? ""}
+          userName={user?.displayName || user?.email || "Student"}
+          userUid={user?.uid}
           attendance={myAttendance.find((a) => a.eventId === selectedEvent.id) ?? null}
+          isInterested={Boolean(myInterests[selectedEvent.id])}
+          interestedCount={interestCounts[selectedEvent.id] ?? 0}
+          onInterestChanged={refreshInterestCounts}
           settings={settings}
           onClose={() => setSelectedEvent(null)}
+        />
+      )}
+
+      {bookingCompany && user && (
+        <InterviewBookingModal
+          companyName={bookingCompany}
+          studentUid={user.uid}
+          studentName={user.displayName || user.email || "Student"}
+          studentEmail={user.email ?? ""}
+          studentCourse={course ?? undefined}
+          studentEmployeeId={employeeId ?? undefined}
+          onClose={() => setBookingCompany(null)}
         />
       )}
 

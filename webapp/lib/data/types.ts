@@ -58,6 +58,9 @@ export interface Application {
 export interface ViewEvent {
   id: string;              // `${studentUid}_${jobId}`
   studentUid: string;
+  /** Stamped at view so admin history shows a person, not a raw uid. */
+  studentName?: string;
+  studentEmail?: string;
   studentEmployeeId?: string; // Workspace employee/student ID, stamped at view
   jobId: number;
   jobTitle: string;
@@ -111,8 +114,7 @@ export interface Resume {
 
 /**
  * A persisted assistant chat turn.
- * Admins read all with identity; employers read only their own company,
- * anonymized (studentUid/email are omitted from the employer view).
+ * Admins read all; employers read only chats about their own company.
  */
 export interface ChatLog {
   id: string;
@@ -150,6 +152,12 @@ export interface EventItem {
   specialization?: string;    // legacy single field (kept for older events)
   specializations?: string[]; // target fields, e.g. ["AI & Machine Learning", "Data Analytics"]
   createdBy?: string;
+}
+
+/** Live Q&A switch for a talk. Separate doc so a presenter (not just an admin) can flip it. */
+export interface EventLiveChatState {
+  eventId: number;
+  enabled: boolean;
 }
 
 /** An event's target fields as an array, tolerating the legacy single field. */
@@ -224,12 +232,114 @@ export interface Company {
   videoUrl?: string;       // YouTube corporate video URL
   summary?: string;
   boothNumber?: string;    // booth/stand number at the venue
+  /** Digits only, international format without "+" — e.g. 60123456789. */
+  whatsapp?: string;
+  /** Courses/fields this company wants to meet, e.g. ["Computer Science"]. */
+  interestedIn?: string[];
+  /** Median hours to reply, computed from past enquiries; absent until known. */
+  replyHours?: number;
   logoBackground?: "auto" | "light" | "dark"; // tile behind the logo; auto = detect
   /** Employer submissions are gated; admin listings publish immediately. Absent = approved. */
   status?: "approved" | "pending" | "pending_edit";
-  /** An employer's edit to an already-approved profile, staged until an admin approves. */
+  /** Employer edits to an already-approved profile, staged until an admin approves. */
   pendingEdit?: Partial<Company> | null;
   createdBy?: string;
+}
+
+/** Tracked student interest in a talk/event. */
+export interface EventInterest {
+  id: string; // `${eventId}_${studentUid}`
+  eventId: number;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  createdAt?: unknown;
+}
+
+/** Interview slot opened by a company/admin for student bookings. */
+/**
+ * A seat on a slot. Deliberately holds NOTHING but the uid: the slot document is
+ * readable by every student (they have to see whether it is full and whether they
+ * hold it), so anything stored here is public to the whole campus. The student's
+ * name, email, course and id live in InterviewBooking, which only staff can read.
+ */
+/** What a slot is offered for, and what a student booked it for. */
+export type SessionType = "interview" | "consultancy";
+
+export interface InterviewSeat {
+  studentUid: string;
+  bookedAt?: unknown;
+  /** Carried on the seat (not the staff-only booking) so a student can see on
+   *  their own history which kind of session they booked. Not personal data. */
+  sessionType?: SessionType;
+}
+
+/** The contact details behind one seat. Staff-only; written in the same transaction. */
+export interface InterviewBooking {
+  id: string; // `${slotId}_${studentUid}`
+  slotId: string;
+  sessionType?: SessionType;
+  companyName: string;
+  date: string;
+  startTime: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  course?: string;
+  employeeId?: string;
+  bookedAt?: unknown;
+}
+
+/** What the booking form hands to bookInterviewSlot. */
+export interface InterviewBookingStudent {
+  studentUid: string;
+  sessionType?: SessionType;
+  studentEmail: string;
+  studentName: string;
+  course?: string;
+  employeeId?: string;
+}
+
+export interface InterviewSlot {
+  id: string; // `${companySlug}_${date}_${startTime}`
+  companyName: string;
+  date: string; // "YYYY-MM-DD"
+  startTime: string; // "HH:mm" e.g. "10:00"
+  endTime: string; // "HH:mm" e.g. "10:30"
+  location?: string;
+  maxBookings: number;
+  /** What the employer offers in this slot. Absent = interview, for older slots. */
+  offers?: SessionType | "both";
+  bookedStudents: InterviewSeat[];
+  createdBy?: string;
+  createdAt?: unknown;
+}
+
+/** Live chat message sent by a student during a talk. */
+export interface TalkLiveChatMessage {
+  id: string;
+  eventId: number;
+  studentUid: string;
+  studentName: string;
+  studentEmail: string;
+  message: string;
+  // Questions are held until a facilitator or admin approves them; only approved
+  // questions surface to the room and to presentation mode.
+  approved?: boolean;
+  createdAt?: unknown;
+}
+
+/** Student feedback review for a talk after the event ends. */
+export interface EventFeedback {
+  id: string; // `${eventId}_${studentUid}`
+  eventId: number;
+  eventTitle: string;
+  studentUid: string;
+  studentEmail: string;
+  studentName: string;
+  rating: number; // 1-5
+  comment: string;
+  createdAt?: unknown;
 }
 
 /** Shown on Home while live: approved, legacy (no status), or an approved profile with a staged edit. */

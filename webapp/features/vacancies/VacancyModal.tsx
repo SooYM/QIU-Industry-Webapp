@@ -7,6 +7,7 @@ import { RichText } from "../../app/RichText";
 import { Modal } from "../../components/Modal";
 import { formatSalary } from "./vacancy-utils";
 import { AI_WARNING, withAiWarning } from "../../app/chat";
+import { checkToxicContent, TOXIC_REPLY } from "../../lib/toxic-filter";
 
 /** Deterministic answer grounded ONLY in this job's own fields — no cross-listing search. */
 function answerAboutJob(question: string, job: Job): string {
@@ -15,23 +16,30 @@ function answerAboutJob(question: string, job: Job): string {
   const scope = job.jobScope?.trim();
   const req = job.requirement?.trim();
   const parts: string[] = [];
+  // Same trap as the company assistant: a recognised intent with no data used to
+  // fall through to a summary of the whole listing.
+  let recognised = false;
 
   if (has(/prepare|require|qualif|skill|need|eligib|experience|criteria/)) {
+    recognised = true;
     parts.push(req ? `**Qualifications:** ${req}` : `The listing states a minimum qualification of **${job.minimumRequirement}**. No further qualifications were provided.`);
   }
   if (has(/scope|description|responsib|\bdo\b|role|task|duties|day-to-day|involve/)) {
-    if (scope) parts.push(`**Description:** ${scope}`);
+    recognised = true;
+    parts.push(scope ? `**Description:** ${scope}` : "The listing has no description of the day-to-day scope.");
   }
   if (has(/salary|pay|wage|rm|allowance|stipend/)) {
+    recognised = true;
     parts.push(job.salary ? `The listed salary is **RM ${job.salary.toLocaleString()} / ${job.payFrequency.toLowerCase()}**.` : "The salary is not stated on this listing.");
   }
-  if (has(/where|location|place|based|city|state/)) parts.push(`This role is based in **${job.location}**.`);
-  if (has(/who|company|employer|organi|about the company/)) parts.push(`This role is offered by **${job.company}**.`);
-  if (has(/apply|contact|email|reach|enquir/)) parts.push(job.email ? `To enquire or apply, contact **${job.email}**.` : "No enquiry email is listed — apply via the portal.");
-  if (has(/intern|permanent|contract|part.?time|full.?time|\btype\b/)) parts.push(`This is a **${job.type}** position.`);
-  if (has(/how many|vacan|slot|opening|positions available|places/)) parts.push(`There ${job.vacancies === 1 ? "is **1 place**" : `are **${job.vacancies} places**`} available.`);
+  if (has(/where|location|place|based|city|state/)) { recognised = true; parts.push(`This role is based in **${job.location}**.`); }
+  if (has(/who|company|employer|organi|about the company/)) { recognised = true; parts.push(`This role is offered by **${job.company}**.`); }
+  if (has(/apply|contact|email|reach|enquir/)) { recognised = true; parts.push(job.email ? `To enquire or apply, contact **${job.email}**.` : "No enquiry email is listed — apply via the portal."); }
+  if (has(/intern|permanent|contract|part.?time|full.?time|\btype\b/)) { recognised = true; parts.push(`This is a **${job.type}** position.`); }
+  if (has(/how many|vacan|slot|opening|positions available|places/)) { recognised = true; parts.push(`There ${job.vacancies === 1 ? "is **1 place**" : `are **${job.vacancies} places**`} available.`); }
 
   if (parts.length) return parts.join("\n\n");
+  if (recognised) return "That detail is not listed on this vacancy.";
 
   // No specific intent — summarise strictly from the listing's description fields.
   const summary = [scope && `**Description:** ${scope}`, req && `**Qualifications:** ${req}`].filter(Boolean).join("\n\n");
@@ -56,14 +64,20 @@ function JobAssistant({ job }: { job: Job }) {
   useEffect(() => {
     const el = boxRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-    if (open) endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (open) endRef.current?.scrollIntoView({ behavior: streaming ? "auto" : "smooth", block: "end" });
   }, [messages, open]);
 
-  function ask(event: FormEvent) {
+  async function ask(event: FormEvent) {
     event.preventDefault();
     const question = input.trim();
     if (!question || streaming) return;
     setInput("");
+
+    if ((await checkToxicContent(question)).isToxic) {
+      setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: TOXIC_REPLY }]);
+      return;
+    }
+
     const answer = answerAboutJob(question, job);
     const loggedAnswer = withAiWarning(answer);
     setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: AI_WARNING }]);
@@ -124,6 +138,7 @@ export function VacancyModal({
   onApply,
   onWithdraw,
   onGoToResume,
+  onBookInterview,
   onClose,
 }: {
   job: Job;
@@ -137,6 +152,7 @@ export function VacancyModal({
   onApply?: (choice: "generated" | "link") => void;
   onWithdraw?: () => void;
   onGoToResume?: () => void;
+  onBookInterview?: (companyName: string) => void;
   onClose: () => void;
 }) {
   const jobEmbedUrl = getYouTubeEmbedUrl(job.youtubeUrl);
@@ -191,6 +207,15 @@ export function VacancyModal({
           )}
         </div>
         <aside className="market-card"><span className="detail-label">CONTACT</span>{job.email ? <a className="enquire-main" href={`mailto:${job.email}?subject=${encodeURIComponent(`Enquiry: ${job.title}`)}`}>Email company →</a> : <p>No enquiry email supplied.</p>}
+        {isStudent && onBookInterview && (
+          <button
+            type="button"
+            className="w-full mt-2 ui-btn ui-btn-quiet company-book-cta"
+            onClick={() => onBookInterview(job.company)}
+          >
+            📅 Book mock interview or consultancy →
+          </button>
+        )}
         {isStudent && (
           <>
             <hr/>

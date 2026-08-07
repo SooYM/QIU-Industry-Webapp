@@ -2,24 +2,26 @@
 
 import { createContext, FormEvent, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import {
+  createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
+  updateProfile,
   type User,
 } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db, isFirebaseConfigured } from "./firebase-client";
 import { fetchDirectoryProfile, PEOPLE_SCOPE } from "../lib/auth/course-directory";
-import { revokeEmployerAccess, submitSignup, subscribeMySignup } from "../lib/data/firestore";
+import { revokeEmployerAccess, subscribeCompanies, submitSignup, subscribeMySignup } from "../lib/data/firestore";
 import { downloadCsv, toCsv } from "../lib/data/csv";
-import type { EmployerSignup } from "../lib/data/types";
-import { ImagePreview } from "../components/ImagePreview";
+import type { Company, EmployerSignup } from "../lib/data/types";
 import { notify } from "../components/toast";
 import {
   isAllowedAccessEmail,
   isAllowedQiuEmail,
-  logoFromWebsite,
   normalizeEmail,
   roleForEmail,
   SUPERADMIN_EMAIL,
@@ -36,6 +38,10 @@ type AuthContextValue = {
   error: string;
   needsRegistration: boolean; // signed-in non-QIU visitor who isn't whitelisted yet
   signIn: () => Promise<void>;
+  /** Company reps: create an account, then verify by email before it works. */
+  registerCompany: (input: { name: string; company: string; email: string; password: string }) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -59,6 +65,21 @@ type WhitelistedEmailRecord = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/**
+ * What the registration form collected, parked until the rep has verified their
+ * address and signed back in — at which point RegisterGate pre-fills from it.
+ * The company details cannot be written to Firestore before then: the rules
+ * require a verified account, which is what proves they own the inbox.
+ */
+const PENDING_SIGNUP_KEY = "industryday-pending-signup";
+
+export function readPendingSignup(): { name?: string; company?: string } {
+  try { return JSON.parse(window.localStorage.getItem(PENDING_SIGNUP_KEY) ?? "{}"); } catch { return {}; }
+}
+export function clearPendingSignup() {
+  try { window.localStorage.removeItem(PENDING_SIGNUP_KEY); } catch { /* private mode */ }
+}
 
 function readableAuthError(error: unknown) {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -108,7 +129,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Fallback to empty whitelist if network or access check fails.
       }
 
-      if (!nextUser.emailVerified) {
+      // Google accounts are always verified; a password account is not required
+      // to be, because admin approval is the gate (see firestore.rules).
+      const viaPassword = nextUser.providerData.some((p) => p.providerId === "password");
+      if (!nextUser.emailVerified && !viaPassword) {
         await firebaseSignOut(activeAuth);
         setUser(null);
         setRole(null);
@@ -174,13 +198,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // course resolved during the last interactive sign-in from the stored doc.
         setCourse((snapshot.data()?.course as string) ?? null);
         setEmployeeId((snapshot.data()?.employeeId as string) ?? null);
-      } catch {
-        await firebaseSignOut(activeAuth);
-        setError("Your account could not be checked. Contact the QIU Industry Day portal administrator.");
-        setUser(null);
-        setRole(null);
-        setCourse(null);
-        setCompany(null);
+      } catch (profileError: unknown) {
+        // One sentence for every possible cause used to hide which one it was —
+        // a denied write, an offline client and a real data fault all read the
+        // same, and a rules regression took a round trip to identify. Say which.
+        const code = (profileError as { code?: string })?.code ?? "";
+        console.error("[auth] could not load or create the user profile:", code || profileError);
+
+        const offline = code.includes("unavailable") || code.includes("network");
+        if (offline) {
+          // Transient: don't sign them out over a dropped connection.
+          setError("Could not reach the portal. Check your connection and reload.");
+        } else {
+          await firebaseSignOut(activeAuth);
+          setUser(null);
+          setRole(null);
+          setCourse(null);
+          setCompany(null);
+          setError(code === "permission-denied"
+            ? `Your account is signed in but not approved for this portal (${code}). If an admin has just approved you, ask them to confirm your email is on the approved list, then sign in again.`
+            : `Your account could not be checked${code ? ` (${code})` : ""}. Contact the QIU Industry Day portal administrator.`);
+        }
       } finally {
         setLoading(false);
       }
@@ -232,6 +270,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(readableAuthError(nextError));
       }
     },
+    registerCompany: async ({ name, company, email, password }) => {
+      if (!auth || !isFirebaseConfigured) throw new Error("Firebase has not been configured for this deployment.");
+      // Students and staff stay on Google. A qiu.edu.my address arriving through
+      // email/password would be indistinguishable from a real student account,
+      // and firestore.rules enforces the same split.
+      if (isAllowedQiuEmail(email)) throw new Error("QIU accounts must use the Google button above.");
+
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() }).catch(() => {});
+
+      // The registration request goes in HERE, in the same step. Asking again on
+      // the next screen made a rep state their company twice for one action.
+      // The admin fills in the logo, video and blurb when approving.
+      await submitSignup(email, { name, company });
+
+      // Kept only as a fallback: if the request above failed, RegisterGate shows
+      // its form pre-filled instead of losing what they typed.
+      try { window.localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({ name, company })); } catch { /* private mode */ }
+
+      // No verification email: Firebase's mail does not reach several of the
+      // providers these companies use, which locked every rep out. Admin
+      // approval is the gate — the account can read nothing until an admin
+      // whitelists it. firestore.rules carries the same note.
+    },
+    signInWithPassword: async (email: string, password: string) => {
+      if (!auth || !isFirebaseConfigured) throw new Error("Firebase has not been configured for this deployment.");
+      // An unverified account is routed to the verification gate by the
+      // auth-state handler; it is not an error worth throwing at the form.
+      await signInWithEmailAndPassword(auth, email, password);
+    },
+    resetPassword: async (email: string) => {
+      if (!auth || !isFirebaseConfigured) throw new Error("Firebase has not been configured for this deployment.");
+      await sendPasswordResetEmail(auth, email);
+    },
     signOut: async () => {
       if (auth) await firebaseSignOut(auth);
     },
@@ -246,6 +318,102 @@ export function useAuth() {
   return context;
 }
 
+/**
+ * Company representatives register with an email address and a password. They
+ * are NOT put on Google: many companies run their own mail server and have no
+ * Google account at all.
+ *
+ * Registering does not grant access. It creates a verified identity; the
+ * company details then go to an admin, who approves and links the account to a
+ * company (see RegisterGate and the Access control panel).
+ */
+function CompanyAuth() {
+  const { registerCompany, signInWithPassword, resetPassword } = useAuth();
+  const [mode, setMode] = useState<"signin" | "register">("register");
+  const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const [done, setDone] = useState("");
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setProblem("");
+    setDone("");
+
+    if (mode === "register" && password !== confirm) { setProblem("The two passwords do not match."); return; }
+    if (mode === "register" && password.length < 8) { setProblem("Use at least 8 characters for your password."); return; }
+
+    setBusy(true);
+    try {
+      if (mode === "register") {
+        await registerCompany({ name, company, email: email.trim().toLowerCase(), password });
+        // The auth-state handler takes over and shows the registration form,
+        // pre-filled with the company entered above.
+      } else {
+        await signInWithPassword(email.trim().toLowerCase(), password);
+      }
+    } catch (err: unknown) {
+      setProblem(err instanceof Error ? err.message : readableAuthError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forgot = async () => {
+    if (!email.trim()) { setProblem("Enter your email address first, then choose Forgot password."); return; }
+    setProblem("");
+    try {
+      await resetPassword(email.trim().toLowerCase());
+      setDone(`Password reset link sent to ${email.trim().toLowerCase()}.`);
+    } catch (err: unknown) {
+      setProblem(err instanceof Error ? err.message : readableAuthError(err));
+    }
+  };
+
+  return (
+    <div className="company-auth">
+      <div className="company-auth-switch" role="tablist" aria-label="Company account">
+        <button type="button" role="tab" aria-selected={mode === "register"} className={mode === "register" ? "is-active" : ""} onClick={() => { setMode("register"); setProblem(""); }}>Register</button>
+        <button type="button" role="tab" aria-selected={mode === "signin"} className={mode === "signin" ? "is-active" : ""} onClick={() => { setMode("signin"); setProblem(""); }}>Sign in</button>
+      </div>
+
+      <form className="company-auth-form" onSubmit={submit}>
+        {mode === "register" && (
+          <>
+            <label className="register-field">Your name<input value={name} onChange={(e) => setName(e.target.value)} required maxLength={160} autoComplete="name" /></label>
+            <label className="register-field">Company you represent<input value={company} onChange={(e) => setCompany(e.target.value)} required maxLength={200} placeholder="e.g. Acme Sdn Bhd" autoComplete="organization" /></label>
+          </>
+        )}
+        <label className="register-field">Work email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@yourcompany.com" autoComplete="email" /></label>
+        <label className="register-field">Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} autoComplete={mode === "register" ? "new-password" : "current-password"} /></label>
+        {mode === "register" && (
+          <label className="register-field">Confirm password<input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required minLength={8} autoComplete="new-password" /></label>
+        )}
+
+        {problem && <p className="auth-error" role="alert">{problem}</p>}
+        {done && <p className="auth-note" role="status">{done}</p>}
+
+        <button className="google-sign-in" type="submit" disabled={busy || !isFirebaseConfigured}>
+          {busy ? "Working…" : mode === "register" ? "Create company account" : "Sign in"}
+        </button>
+        {mode === "signin" && (
+          <button className="auth-secondary" type="button" onClick={forgot}>Forgot password</button>
+        )}
+        <small className="auth-boundary">
+          {mode === "register"
+            ? "That is the whole registration. An admin reviews your request, sets up the company profile, and grants you access to add and edit vacancies."
+            : "New here? Choose Register above."}
+        </small>
+      </form>
+    </div>
+  );
+}
+
 export function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading, error, needsRegistration, signIn } = useAuth();
 
@@ -254,12 +422,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
         <a className="brand auth-brand" href="#" aria-label="QIU Industry Day 2026"><img className="brand-logo" src="/qiu-logo.png" alt="QIU" /><span>Industry <span>Day 2026</span></span><small>PORTAL</small></a>
-        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Students and staff use their QIU Google account. Company representatives can register separately for admin approval.</p></div>
+        <div className="auth-copy"><span className="detail-label">PORTAL ACCESS</span><h1 id="auth-title">Sign in to the Industry Day portal</h1><p>Students and staff sign in with their QIU Google account. Company representatives register below with an email address and a password.</p></div>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="google-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured}><GoogleMark />Continue with QIU Google</button>
         <div className="auth-choice" aria-hidden="true"><span>Company representative</span></div>
-        <button className="company-register-sign-in" type="button" onClick={signIn} disabled={!isFirebaseConfigured} aria-describedby="company-registration-help"><GoogleMark />Register a company account with a Google account</button>
-        <small className="auth-boundary" id="company-registration-help">No company-domain email needed. Use the representative&apos;s personal Google account. No Google account? Contact the Industry Day organiser.</small>
+        <CompanyAuth />
       </section>
     </main>;
   }
@@ -273,12 +440,13 @@ function RegisterGate() {
   const email = user?.email ?? "";
   const [signup, setSignup] = useState<EmployerSignup | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [name, setName] = useState(user?.displayName ?? "");
-  const [companyName, setCompanyName] = useState("");
+  // Pre-filled from what they typed at registration — they should not have to
+  // state their company twice just because verification happened in between.
+  const draft = typeof window === "undefined" ? {} : readPendingSignup();
+  const [name, setName] = useState(user?.displayName ?? draft.name ?? "");
+  const [companyName, setCompanyName] = useState(draft.company ?? "");
   const [contact, setContact] = useState("");
   const [website, setWebsite] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
   const [summary, setSummary] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -298,7 +466,7 @@ function RegisterGate() {
     if (!name.trim() || !companyName.trim()) { setMessage("Your name and company are required."); return; }
     setBusy(true);
     // await resolves only after the server accepts the write, so it has persisted.
-    try { await submitSignup(email, { name, company: companyName, contact, website, logoUrl, videoUrl, summary }); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
+    try { await submitSignup(email, { name, company: companyName, contact, website, summary }); clearPendingSignup(); setSubmitted(true); setMessage(""); notify("Registration submitted for admin approval.", "info"); }
     catch { setMessage("Could not submit your registration. Please try again."); notify("Could not submit registration.", "error"); }
     finally { setBusy(false); }
   }
@@ -314,7 +482,7 @@ function RegisterGate() {
         <div className="auth-copy">
           <span className="detail-label">⏳ WAITING FOR APPROVAL</span>
           <h1 id="register-title">Thanks, {pendingName} — you&apos;re in the queue</h1>
-          <p>We&apos;ve received your registration{pendingCompany ? <> for <b>{pendingCompany}</b></> : ""}. Its status is <b>Pending</b> — an admin will review and approve it shortly. You&apos;ll get company access on your next sign-in after approval.</p>
+          <p>We&apos;ve received your registration{pendingCompany ? <> for <b>{pendingCompany}</b></> : ""}. Its status is <b>Pending</b>. An admin will set up the company profile and approve your access — sign in again after that and you can add and edit vacancies. Nothing else is needed from you now.</p>
           <p style={{ marginTop: ".5rem" }}><span className="rounded px-1.5 py-0.5 text-[11px] font-bold tone-neutral">Pending approval</span></p>
           <button className="google-sign-in" type="button" onClick={signOut} style={{ marginTop: "1rem" }}>Sign out</button>
         </div>
@@ -322,15 +490,10 @@ function RegisterGate() {
         <form onSubmit={submit} className="auth-copy">
           <span className="detail-label">COMPANY REGISTRATION</span>
           <h1 id="register-title">Register your company</h1>
-          <p>Signed in as <b>{email}</b>. Fill in your company profile — once an admin approves, it appears on the Home page and you can add vacancies.</p>
+          <p>Signed in as <b>{email}</b>. Confirm your company details. An admin reviews them, adds your logo and corporate video, and approves — after that you can add and edit vacancies.</p>
           <label className="register-field">Your name<input value={name} onChange={(e) => setName(e.target.value)} required maxLength={160} /></label>
           <label className="register-field">Company name<input value={companyName} onChange={(e) => setCompanyName(e.target.value)} required maxLength={200} placeholder="e.g. Acme Sdn Bhd" /></label>
           <label className="register-field">Website <small>optional</small><input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} maxLength={2048} placeholder="https://acme.com" /></label>
-          <label className="register-field">Logo image URL <small>optional</small>
-            <span className="register-logo-row"><input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} maxLength={2048} placeholder="https://…/logo.png" /><button type="button" className="auth-secondary register-logo-btn" onClick={() => setLogoUrl(logoFromWebsite(website))} disabled={!website.trim()}>From website</button></span>
-          </label>
-          <ImagePreview url={logoUrl} label="Logo preview" />
-          <label className="register-field">Corporate video (YouTube) <small>optional</small><input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} maxLength={2048} placeholder="https://youtube.com/watch?v=…" /></label>
           <label className="register-field">Contact (phone / email) <small>optional</small><input value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200} /></label>
           <label className="register-field">Company profile / blurb <small>optional</small><textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={5000} /></label>
           {message && <p className="auth-error" role="alert">{message}</p>}
@@ -375,6 +538,10 @@ export function RoleManager() {
   const [newRole, setNewRole] = useState<UserRole>("employer");
   const [newCompany, setNewCompany] = useState("");
   const [userQuery, setUserQuery] = useState("");
+  // Which approved row is being re-assigned, and to what.
+  const [editingEmail, setEditingEmail] = useState("");
+  const [editingCompany, setEditingCompany] = useState("");
+  const [companies, setCompanies] = useState<Company[]>([]);
 
   const canManageRoles = role === "superadmin" || role === "admin";
   useEffect(() => {
@@ -394,19 +561,26 @@ export function RoleManager() {
       })).sort((a, b) => a.email.localeCompare(b.email)))
     );
 
-    const loadWhitelist = getDocs(collection(activeDb, "whitelisted_emails")).then((snapshot) =>
+    // Live, not a one-shot read: changing a role elsewhere on this screen left
+    // these rows showing the old value until a reload.
+    const unsubWhitelist = onSnapshot(collection(activeDb, "whitelisted_emails"), (snapshot) => {
       setWhitelistedEmails(snapshot.docs.filter((entry) => entry.data().active !== false).map((entry) => ({
         id: entry.id,
         email: entry.data().email ?? entry.id,
         role: (entry.data().role as UserRole) || "employer",
         company: entry.data().company ?? "",
         addedBy: entry.data().addedBy ?? "",
-      })))
-    );
+      })));
+      setLoading(false);
+    }, () => setMessage("Could not load the approved account list."));
 
-    Promise.all([loadUsers, loadWhitelist])
+    const unsubCompanies = subscribeCompanies(setCompanies, () => {});
+
+    loadUsers
       .catch(() => setMessage("Could not load account management data."))
       .finally(() => setLoading(false));
+
+    return () => { unsubWhitelist(); unsubCompanies(); };
   }, [canManageRoles]);
 
   if (!canManageRoles) return null;
@@ -417,6 +591,12 @@ export function RoleManager() {
     try {
       await updateDoc(doc(db, "users", record.uid), { role: nextRole, updatedAt: serverTimestamp() });
       setUsers((current) => current.map((item) => item.uid === record.uid ? { ...item, role: nextRole } : item));
+      // Whitelisted accounts read their role from the whitelist on a fresh sign-in,
+      // so leaving it behind would silently revert the change.
+      const listed = whitelistedEmails.find((w) => w.id === normalizeEmail(record.email));
+      if (listed) {
+        await setDoc(doc(db, "whitelisted_emails", listed.id), { role: nextRole, updatedAt: serverTimestamp() }, { merge: true });
+      }
       setMessage(`${record.email} is now ${nextRole}.`);
       notify(`${record.email} is now ${nextRole}.`);
     } catch {
@@ -451,6 +631,41 @@ export function RoleManager() {
     }
   }
 
+  /**
+   * Re-assigns which company an approved account represents.
+   *
+   * Writes both the whitelist entry (the source of truth an admin edits) and the
+   * account's own user document, so the change takes effect on their next page
+   * load rather than waiting for a fresh sign-in to copy it across.
+   */
+  async function assignCompany(record: WhitelistedEmailRecord) {
+    if (!db) return;
+    const company = editingCompany.trim();
+    if (!company) { setMessage("Enter a company name first."); return; }
+    setMessage("");
+    try {
+      await setDoc(doc(db, "whitelisted_emails", record.id), {
+        company, role: "employer", active: true, updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      const account = users.find((u) => normalizeEmail(u.email) === record.id);
+      if (account) {
+        await updateDoc(doc(db, "users", account.uid), { company, role: "employer", updatedAt: serverTimestamp() });
+        setUsers((current) => current.map((u) => u.uid === account.uid ? { ...u, role: "employer" } : u));
+      }
+
+      setWhitelistedEmails((prev) => prev.map((item) => item.id === record.id ? { ...item, company, role: "employer" } : item));
+      setEditingEmail("");
+      setEditingCompany("");
+      setMessage(`${record.email} now represents ${company}.`);
+      notify(`${record.email} assigned to ${company}.`);
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? "";
+      setMessage(`Could not assign a company to ${record.email}${code ? ` (${code})` : ""}.`);
+      notify("Could not assign the company.", "error");
+    }
+  }
+
   async function removeWhitelistedEmail(record: WhitelistedEmailRecord) {
     if (!db) return;
     const scope = record.company ? ` This permanently deletes ${record.company}'s company profile and every vacancy listing.` : " This permanently deletes company profiles and vacancy listings owned by this account.";
@@ -466,6 +681,14 @@ export function RoleManager() {
       notify(`Could not revoke ${record.email}.`, "error");
     }
   }
+
+  // Assignments must point at a company that actually exists, otherwise the rep
+  // gets employer access with no profile to edit. An already-assigned name that
+  // is no longer in the list is kept so it is not silently dropped.
+  const companyOptions = [...new Set([
+    ...companies.map((c) => c.name).filter(Boolean),
+    ...whitelistedEmails.map((w) => w.company).filter((name): name is string => Boolean(name)),
+  ])].sort((a, b) => a.localeCompare(b));
 
   return (
     <section className="role-manager space-y-6" aria-labelledby="role-manager-title">
@@ -509,8 +732,29 @@ export function RoleManager() {
                 <span className="detail-label">Approved external accounts ({whitelistedEmails.length})</span>
                 {whitelistedEmails.map((item) => (
                   <div key={item.id} className="access-approved-row">
-                    <span>{item.email} <span className="role-pill">{item.role}</span>{item.company ? <small> · {item.company}</small> : null}</span>
-                    <button type="button" className="access-revoke" onClick={() => removeWhitelistedEmail(item)}>Revoke and delete company</button>
+                    <span>{item.email} <span className="role-pill">{item.role}</span>{item.company ? <small> · {item.company}</small> : <small> · no company assigned</small>}</span>
+                    {editingEmail === item.id ? (
+                      <span className="access-assign">
+                        <select
+                          value={editingCompany}
+                          onChange={(e) => setEditingCompany(e.target.value)}
+                          aria-label={`Company for ${item.email}`}
+                          autoFocus
+                        >
+                          <option value="">Select a company…</option>
+                          {companyOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                        </select>
+                        <button type="button" className="save-job" onClick={() => assignCompany(item)}>Save</button>
+                        <button type="button" className="auth-secondary" onClick={() => setEditingEmail("")}>Cancel</button>
+                      </span>
+                    ) : (
+                      <span className="access-assign">
+                        <button type="button" className="admin-button" onClick={() => { setEditingEmail(item.id); setEditingCompany(item.company ?? ""); }}>
+                          {item.company ? "Change company" : "Assign company"}
+                        </button>
+                        <button type="button" className="access-revoke" onClick={() => removeWhitelistedEmail(item)}>Revoke and delete company</button>
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

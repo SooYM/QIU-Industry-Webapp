@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { isApprovedCompany, type Company } from "../../lib/data/types";
 import { useAuth } from "../../app/auth-context";
 import { logoFromWebsite, normalizeEmail } from "../../app/auth-policy";
@@ -8,8 +8,8 @@ import { notify } from "../../components/toast";
 import { downloadCsv, toCsv } from "../../lib/data/csv";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
 
-type Draft = { name: string; email: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; logoBackground: "auto" | "light" | "dark" };
-const emptyDraft: Draft = { name: "", email: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", logoBackground: "auto" };
+type Draft = { name: string; email: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; whatsapp: string; interestedIn: string; logoBackground: "auto" | "light" | "dark" };
+const emptyDraft: Draft = { name: "", email: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", whatsapp: "", interestedIn: "", logoBackground: "auto" };
 
 /**
  * Company editor. Admins manage every company (edit / delete / clear all;
@@ -36,7 +36,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
 
   function fill(c: Company) {
     setEditingId(c.id);
-    setDraft({ name: c.name, email: c.email ?? "", website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", logoBackground: c.logoBackground ?? "auto" });
+    setDraft({ name: c.name, email: c.email ?? "", website: c.website ?? "", logoUrl: c.logoUrl ?? "", videoUrl: c.videoUrl ?? "", summary: c.summary ?? "", boothNumber: c.boothNumber ?? "", whatsapp: c.whatsapp ?? "", interestedIn: (c.interestedIn ?? []).join(", "), logoBackground: c.logoBackground ?? "auto" });
   }
 
   async function submit(event: FormEvent) {
@@ -55,6 +55,9 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
       summary: draft.summary.trim() || undefined,
       // Booth is a venue/organiser concern — admins set it; employers keep any existing value.
       boothNumber: employer ? existing?.boothNumber : (draft.boothNumber.trim() || undefined),
+      // Digits only — wa.me rejects anything else, and the rules enforce it too.
+      whatsapp: draft.whatsapp.replace(/\D/g, "") || undefined,
+      interestedIn: draft.interestedIn.split(",").map((f) => f.trim()).filter(Boolean).slice(0, 30),
       logoBackground: draft.logoBackground,
       status: employer ? "pending" : "approved",
     };
@@ -67,6 +70,7 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
         await stageCompanyEdit(existing!.id, {
           website: record.website, logoUrl: record.logoUrl, videoUrl: record.videoUrl,
           summary: record.summary, logoBackground: record.logoBackground,
+          whatsapp: record.whatsapp, interestedIn: record.interestedIn,
         });
         msg = "Changes submitted for admin approval."; kind = "info";
       } else {
@@ -81,6 +85,34 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
 
   function edit(c: Company) { fill(c); setMessage("Editing company. Save to apply changes."); }
   function cancelEdit() { setEditingId(null); setDraft(emptyDraft); setMessage(""); }
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  // Bulk import from a JSON array. Accepts the exported directory shape
+  // ("Company Name"/"Company Website"/"Nature of Business"/"Company Profile") and
+  // a plain {name,website,summary} shape. New names only — existing are skipped.
+  async function importJson(file: File) {
+    setMessage("Reading file…");
+    try {
+      const data = JSON.parse(await file.text());
+      if (!Array.isArray(data)) { setMessage("JSON must be an array of companies."); notify("JSON must be an array.", "error"); return; }
+      const existing = new Set(companies.map((c) => c.name.trim().toLowerCase()));
+      const records: Company[] = [];
+      data.forEach((r, i) => {
+        const name = String(r["Company Name"] ?? r.name ?? "").trim();
+        if (!name || existing.has(name.toLowerCase())) return;
+        existing.add(name.toLowerCase()); // guard against duplicates within the file too
+        const website = String(r["Company Website"] ?? r.website ?? "").trim();
+        const nature = String(r["Nature of Business"] ?? "").trim();
+        const profile = String(r["Company Profile"] ?? r.summary ?? "").trim();
+        const summary = [profile, nature && `Nature of business: ${nature}`].filter(Boolean).join("\n\n");
+        records.push({ id: Date.now() + i, name, website: website || undefined, summary: summary || undefined, logoBackground: "auto", status: "approved" });
+      });
+      if (!records.length) { setMessage("No new companies to import (all already exist or names missing)."); notify("Nothing new to import.", "info"); return; }
+      setMessage(`Importing ${records.length} companies…`);
+      await Promise.all(records.map((rec) => saveCompany(rec, false, normalizeEmail(user?.email))));
+      setMessage(`Imported ${records.length} companies. They are live on Home.`); notify(`Imported ${records.length} companies.`);
+    } catch { setMessage("Import failed — check the file is valid JSON."); notify("Could not read that JSON file.", "error"); }
+  }
 
   // ---- Employer mode: a single self-service profile form --------------------
   if (employer) {
@@ -104,7 +136,12 @@ export function CompanyManager({ employer, view = "both" }: { employer?: { email
   const showList = view !== "add";
   return (
     <section className="local-jobs" aria-labelledby="company-manager-title">
-      <div className="local-jobs-head"><div><span className="detail-label">COMPANIES</span><h3 id="company-manager-title">{showAddForm && !showList ? "Add a company" : showList && !showAddForm ? "Manage companies" : "Companies"}</h3></div><strong>{companies.length}</strong></div>
+      <div className="local-jobs-head"><div><span className="detail-label">COMPANIES</span><h3 id="company-manager-title">{showAddForm && !showList ? "Add a company" : showList && !showAddForm ? "Manage companies" : "Companies"}</h3></div><div className="flex items-center gap-2">
+        <strong>{companies.length}</strong>
+        <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importJson(f); e.target.value = ""; }} />
+        <button type="button" className="admin-button" onClick={() => fileRef.current?.click()}>⬆ Import JSON</button>
+      </div></div>
+      {showAddForm && <p className="admin-intro">Bulk-add companies with <b>Import JSON</b> — an array of <code>{`{ "Company Name", "Company Website", "Nature of Business", "Company Profile" }`}</code>. Existing names are skipped.</p>}
 
       {showAddForm && <>
         <CompanyForm draft={draft} setDraft={setDraft} onSubmit={submit} showName showBooth submitLabel="Add company" />
@@ -159,6 +196,8 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
       {showName && <label>Company email<input type="email" required value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></label>}
       <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
       {showBooth && <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>}
+      <label>WhatsApp number<input value={draft.whatsapp} placeholder="e.g. 60123456789" inputMode="numeric" onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} /><small className="field-label">optional — country code, digits only</small></label>
+      <label className="full">Students you are looking for <small>comma-separated courses, e.g. Computer Science, Data Analytics — these students see your profile recommended</small><input value={draft.interestedIn} placeholder="Computer Science, Software Engineering" onChange={(e) => setDraft({ ...draft, interestedIn: e.target.value })} /></label>
       <label className="full">Logo image URL
         <span className="register-logo-row"><input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /><button type="button" className="reset-admin-filters register-logo-btn" onClick={() => setDraft({ ...draft, logoUrl: logoFromWebsite(draft.website) })} disabled={!draft.website.trim()}>From website</button></span>
         <small className="field-label">Auto-fetches the brand logo from the website — or paste your own link.</small>

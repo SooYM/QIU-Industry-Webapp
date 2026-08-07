@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { dataLayerSource } from "./helpers/data-layer.mjs";
 
 const [panel, helpers, firestore] = await Promise.all([
   readFile(new URL("../features/admin/AdminPanel.tsx", import.meta.url), "utf8"),
   readFile(new URL("../features/vacancies/vacancy-utils.ts", import.meta.url), "utf8"),
-  readFile(new URL("../lib/data/firestore.ts", import.meta.url), "utf8"),
+  dataLayerSource(),
 ]);
 const saveVacancy = panel.slice(panel.indexOf("async function saveVacancy"), panel.indexOf("async function removeCustomJob"));
 

@@ -177,13 +177,13 @@ export function EventForm({ editing, userEmail, defaultRotateSeconds, specializa
           ))}
           <button type="button" className="admin-button self-start" onClick={() => setSpeakers([...speakers, { ...blankSpeaker }])}>＋ Add speaker</button>
         </fieldset>
-        <fieldset className="full presenter-editor"><legend className="field-label">QR presenters <small>Optional — add each portal-approved account separately</small></legend>
+        <fieldset className="full presenter-editor"><legend className="field-label">Presenters &amp; Q&amp;A facilitators <small>Optional — these accounts can present this talk&apos;s QR and open or close its live Q&amp;A. Add each portal-approved account separately.</small></legend>
           <div className="presenter-add-row">
             <input type="email" value={presenterEmail} placeholder="presenter@qiu.edu.my" aria-label="Presenter email" onChange={(e) => { setPresenterEmail(e.target.value); setPresenterMessage(""); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPresenter(); } }} />
             <button type="button" className="presenter-add-button" onClick={addPresenter}>Add presenter</button>
           </div>
           {presenterMessage && <p className="presenter-message" role="status">{presenterMessage}</p>}
-          {presenters.length > 0 ? <ul className="presenter-list">{presenters.map((email) => <li key={email}><span>{email}</span><button type="button" onClick={() => setPresenters(presenters.filter((item) => item !== email))} aria-label={`Remove ${email}`}>Remove</button></li>)}</ul> : <p className="presenter-empty">No additional presenters assigned.</p>}
+          {presenters.length > 0 ? <ul className="presenter-list">{presenters.map((email) => <li key={email}><span>{email}</span><button type="button" onClick={() => setPresenters(presenters.filter((item) => item !== email))} aria-label={`Remove ${email}`}>Remove</button></li>)}</ul> : <p className="presenter-empty">No additional presenters assigned — only admins can open this talk&apos;s Q&amp;A.</p>}
         </fieldset>
         <div className="admin-form-footer full">
           {message && <p className="admin-message error" role="status">{message}</p>}

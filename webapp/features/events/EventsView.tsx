@@ -46,6 +46,8 @@ export function EventsView({
   settings,
   course,
   isStudent,
+  myInterests,
+  interestCounts,
   onOpenEvent,
 }: {
   events: EventItem[];
@@ -55,6 +57,8 @@ export function EventsView({
   settings: AppSettings;
   course: string | null;
   isStudent: boolean;
+  myInterests?: Record<number, boolean>;
+  interestCounts?: Record<number, number>;
   onOpenEvent: (event: EventItem) => void;
 }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -103,15 +107,19 @@ export function EventsView({
             const st = eventStatus(ev);
             const meta = statusMeta[st];
             const att = attendanceByEvent.get(ev.id);
+            const matchesCourse = isStudent && eventMatchesCourse(ev, course);
+            const isRelevantLive = st === "live" && matchesCourse;
             const canPresent = st !== "ended" && (canManageEvents || (ev.presenters ?? []).includes(myLower));
             const speakers = eventSpeakers(ev);
             return (
-              <article className="event-card" key={ev.id} role="button" tabIndex={0}
+              <article className={`event-card${isRelevantLive ? " is-recommended" : ""}`} key={ev.id} role="button" tabIndex={0}
                 aria-label={`View ${ev.title}`}
                 onClick={() => onOpenEvent(ev)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenEvent(ev); } }}>
                 <div className="card-top">
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${meta.tone}`}>{meta.label}</span>
+                  {Boolean(myInterests?.[ev.id]) && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-accent">★ Interested</span>}
+                  {(interestCounts?.[ev.id] ?? 0) > 0 && <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold tone-accent">⭐ {interestCounts?.[ev.id]} interested</span>}
                   {att && <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${att.caEligible ? "tone-success" : att.checkOutMs ? "tone-danger" : "tone-neutral"}`}>
                     {att.caEligible ? "✓ CCA eligible" : att.checkOutMs ? "Below threshold" : "Checked in"}
                   </span>}
@@ -137,7 +145,7 @@ export function EventsView({
                 {eventSpecializations(ev).length > 0 && (
                   <div className="event-specs">
                     {eventSpecializations(ev).map((s) => <span key={s} className="exhibitor-tag">{s}</span>)}
-                    {isStudent && eventMatchesCourse(ev, course) && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Relevant to you</span>}
+                    {matchesCourse && <span className="rounded px-1.5 py-0.5 text-[10px] font-bold tone-success">🌟 Relevant to you</span>}
                   </div>
                 )}
                 <p className="view-job mt-2">View details <span>→</span></p>

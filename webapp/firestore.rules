@@ -2,17 +2,37 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
-      // Google sign-in only. The app configures Firebase Auth to offer just the
-      // Google provider, but we defend in depth here too: a token minted via any
-      // other provider (e.g. email/password) is rejected even if email_verified.
+    function isGoogleSignIn() {
       return request.auth != null
         && request.auth.token.email_verified == true
         && request.auth.token.firebase.sign_in_provider == 'google.com';
     }
 
+    // Email + password, for company representatives whose employer runs its own
+    // mail server and who therefore have no Google account.
+    //
+    // DELIBERATELY does NOT require email_verified. Firebase's verification mail
+    // does not reach several providers used by these companies, which locked
+    // every rep out. The gate is instead the admin approval that already exists:
+    // registering grants NOTHING until an admin whitelists the address (see
+    // isWhitelisted and approveSignup). The consequence, accepted knowingly: an
+    // admin approving a request is the only thing proving that rep owns the
+    // inbox, so they must recognise the company before approving.
+    function isEmailPasswordSignIn() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'password';
+    }
+
+    function isAuthenticated() {
+      return isGoogleSignIn() || isEmailPasswordSignIn();
+    }
+
+    // NOTE: students and staff are pinned to Google deliberately. If a qiu.edu.my
+    // address could arrive through the password provider, anyone able to receive
+    // mail at such an address would be indistinguishable from a real student —
+    // so the QIU check requires Google specifically, not merely isAuthenticated().
     function isQiuUser() {
-      return isAuthenticated()
+      return isGoogleSignIn()
         && request.auth.token.email is string
         && request.auth.token.email.matches('^[^@]+@qiu[.]edu[.]my$');
     }
@@ -29,8 +49,28 @@ service cloud.firestore {
       return isQiuUser() || isWhitelisted();
     }
 
+    /**
+     * The role an admin has ALREADY granted this email on the whitelist.
+     *
+     * A first sign-in has to create its own users/{uid} document, and for an
+     * approved employer that document carries role 'employer'. Without this the
+     * create was denied and the app reported "Your account could not be checked",
+     * locking out every rep the moment they were approved. Reading the admin's
+     * own whitelist entry is not an escalation: a student is not on it, so this
+     * resolves to 'user' for them.
+     */
+    function grantedRole() {
+      return isAuthenticated()
+        && request.auth.token.email is string
+        && exists(/databases/$(database)/documents/whitelisted_emails/$(request.auth.token.email.lower()))
+        ? get(/databases/$(database)/documents/whitelisted_emails/$(request.auth.token.email.lower())).data.get('role', 'user')
+        : 'user';
+    }
+
+    // Google specifically, for the same reason as isQiuUser: the superadmin
+    // address is a QIU one, and email-link sign-in must never be able to claim it.
     function isSuperAdmin() {
-      return isAuthenticated() && request.auth.token.email == 'ai@qiu.edu.my';
+      return isGoogleSignIn() && request.auth.token.email == 'ai@qiu.edu.my';
     }
 
     function getUserRole() {
@@ -136,7 +176,7 @@ service cloud.firestore {
 
     function validCompany(data) {
       return data.keys().hasAll(['id', 'name', 'createdBy', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'name', 'email', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'boothNumber', 'logoBackground', 'status', 'pendingEdit', 'createdBy', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'email', 'website', 'logoUrl', 'videoUrl', 'summary', 'order', 'boothNumber', 'whatsapp', 'interestedIn', 'replyHours', 'logoBackground', 'status', 'pendingEdit', 'createdBy', 'createdAt', 'updatedAt'])
         && data.id is int && data.id > 0
         && data.name is string && data.name.size() > 0 && data.name.size() <= 200
         && (!('email' in data) || (data.email is string && data.email.size() > 3 && data.email.size() <= 254))
@@ -146,6 +186,9 @@ service cloud.firestore {
         && (!('summary' in data) || (data.summary is string && data.summary.size() <= 5000))
         && (!('order' in data) || (data.order is number))
         && (!('boothNumber' in data) || (data.boothNumber is string && data.boothNumber.size() <= 40))
+        && (!('whatsapp' in data) || (data.whatsapp is string && data.whatsapp.matches('^[0-9]{6,15}$')))
+        && (!('interestedIn' in data) || (data.interestedIn is list && data.interestedIn.size() <= 30))
+        && (!('replyHours' in data) || (data.replyHours is number && data.replyHours >= 0))
         && (!('logoBackground' in data) || data.logoBackground in ['auto', 'light', 'dark'])
         && (!('status' in data) || data.status in ['approved', 'pending', 'pending_edit'])
         && (!('pendingEdit' in data) || data.pendingEdit is map || data.pendingEdit == null)
@@ -204,7 +247,11 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isAllowedUser() && (request.auth.uid == uid || isSuperAdmin());
-      allow create: if isAuthenticated() && validUser(request.resource.data, uid);
+      allow create: if isAuthenticated()
+        && validUser(request.resource.data, uid)
+        && (isAdmin()
+          || (uid == request.auth.uid
+            && request.resource.data.role in ['user', 'superadmin', grantedRole()]));
       // A regular user may edit their own profile (displayName/photoURL/course/
       // updatedAt via merge) but may NOT change their own role. Admins & superadmin
       // may reassign roles; validUser still blocks minting a superadmin (only the
@@ -440,6 +487,128 @@ service cloud.firestore {
         && request.resource.data.message.text is string
         && request.resource.data.message.text.size() <= 5000
         && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // "I'm interested in this talk". One doc per student per event; the doc id is
+    // pinned so a student can only ever hold one, which keeps the counter honest.
+    match /event_interests/{interestId} {
+      allow read: if isAllowedUser();
+      allow create: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.eventId is int
+        && interestId == string(request.resource.data.eventId) + '_' + request.auth.uid;
+      allow update: if false;
+      allow delete: if isAllowedUser() && resource.data.studentUid == request.auth.uid;
+    }
+
+    // Live Q&A open/closed switch — admins, or the presenter assigned to THIS event
+    // (same trust model as event_codes). Students read it to know if the box is open.
+    match /event_live_chat/{eventId} {
+      allow read: if isAllowedUser();
+      allow write: if isAdmin()
+        || (isAllowedUser()
+          && exists(/databases/$(database)/documents/events/$(eventId))
+          && (request.auth.token.email.lower() in get(/databases/$(database)/documents/events/$(eventId)).data.presenters));
+    }
+
+    match /interview_slots/{slotId} {
+      // Readable by every student — they must see whether a slot is full and
+      // whether they hold it. That is exactly why `bookedStudents` carries uids
+      // and nothing else: names, emails, courses and employee ids live in
+      // /interview_bookings below, which students cannot read at all.
+      allow read: if isAllowedUser();
+      allow create, delete: if isAdmin() || isEmployer();
+      // A student booking or cancelling may touch ONLY the booking list, may not
+      // change the slot's capacity or time, and may only add or remove THEMSELF —
+      // without the identity checks any student could delete another's booking.
+      allow update: if isAdmin() || isEmployer()
+        || (isAllowedUser()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bookedStudents', 'updatedAt'])
+          && request.resource.data.bookedStudents is list
+          && (
+            // Booking: exactly one entry appears, and it is the caller's own.
+            (request.resource.data.bookedStudents.size() == resource.data.bookedStudents.size() + 1
+              && request.resource.data.bookedStudents.size() <= resource.data.maxBookings
+              && request.resource.data.bookedStudents.removeAll(resource.data.bookedStudents).size() == 1
+              && request.resource.data.bookedStudents.removeAll(resource.data.bookedStudents)[0].studentUid == request.auth.uid)
+            // Cancelling: exactly one entry disappears, and it is the caller's own.
+            || (request.resource.data.bookedStudents.size() == resource.data.bookedStudents.size() - 1
+              && resource.data.bookedStudents.removeAll(request.resource.data.bookedStudents).size() == 1
+              && resource.data.bookedStudents.removeAll(request.resource.data.bookedStudents)[0].studentUid == request.auth.uid)
+          ));
+    }
+
+    // The identity behind each seat. Staff-only: this is the collection that
+    // keeps student contact details off the publicly-readable slot document.
+    // Written in the same transaction as the seat, so the two cannot diverge.
+    match /interview_bookings/{bookingId} {
+      allow read: if isAdmin() || isEmployer();
+      allow create: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.slotId is string
+        && bookingId == request.resource.data.slotId + '_' + request.auth.uid;
+      allow update: if false;
+      allow delete: if isAdmin() || isEmployer() || resource.data.studentUid == request.auth.uid;
+    }
+
+    // Questions asked during a talk. Accepted only while the facilitator has the
+    // box open, so a closed session can't be written to by a crafted client.
+    match /talk_live_chats/{chatId} {
+      allow read: if isAllowedUser();
+      allow create: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.eventId is int
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 500
+        && (request.resource.data.studentName == request.auth.token.email
+          || ('name' in request.auth.token && request.resource.data.studentName == request.auth.token.name))
+        && request.resource.data.approved == false
+        && exists(/databases/$(database)/documents/event_live_chat/$(string(request.resource.data.eventId)))
+        && get(/databases/$(database)/documents/event_live_chat/$(string(request.resource.data.eventId))).data.enabled == true
+        // Only a student who checked in to this talk may ask — attendance doc exists.
+        && exists(/databases/$(database)/documents/attendance/$(string(request.resource.data.eventId) + '_' + request.auth.uid));
+      // Moderation: an admin or the talk's presenter may toggle `approved`, and
+      // nothing else — the message text itself can never be edited after posting.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved'])
+        && request.resource.data.approved is bool
+        && (isAdmin()
+          || (isAllowedUser()
+            && exists(/databases/$(database)/documents/events/$(string(resource.data.eventId)))
+            && (request.auth.token.email.lower() in get(/databases/$(database)/documents/events/$(string(resource.data.eventId))).data.presenters)));
+      allow delete: if isAdmin()
+        || (isAllowedUser()
+          && exists(/databases/$(database)/documents/events/$(string(resource.data.eventId)))
+          && (request.auth.token.email.lower() in get(/databases/$(database)/documents/events/$(string(resource.data.eventId))).data.presenters));
+    }
+
+    // Post-talk reviews. Only students with an attendance record for that event —
+    // "the student who attended can provide feedback".
+    match /event_feedbacks/{feedbackId} {
+      allow read: if isAllowedUser();
+      allow create, update: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.eventId is int
+        && feedbackId == string(request.resource.data.eventId) + '_' + request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() <= 2000
+        && exists(/databases/$(database)/documents/attendance/$(string(request.resource.data.eventId) + '_' + request.auth.uid));
+      allow delete: if isAdmin();
+    }
+
+    // One visit doc per student per company per browser session. The id is pinned and the
+    // collection is create-only, so the dedupe is enforced here rather than by
+    // the client — and the total is COUNTED from these docs. A counter field a
+    // client increments directly can be pumped to any value from the console.
+    match /company_views/{viewId} {
+      allow read: if isAdmin() || isEmployer();
+      allow create: if isAllowedUser()
+        && request.resource.data.studentUid == request.auth.uid
+        && request.resource.data.companyId is int
+        && viewId.matches('^' + string(request.resource.data.companyId) + '_' + request.auth.uid + '_[a-z0-9]{12}$');
       allow update, delete: if false;
     }
 

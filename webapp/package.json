@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "npx serve out",
-    "test": "npm run build && node --test tests/chat-retrieval.test.mjs tests/admin-form-regression.test.mjs tests/company-matching.test.mjs tests/dashboard-charts.test.mjs tests/employer-lifecycle.test.mjs tests/event-form-ui.test.mjs tests/event-lifecycle.test.mjs tests/map-tooltip-regression.test.mjs tests/salary-reference.test.mjs tests/student-recommendation.test.mjs tests/ui-polish-regression.test.mjs tests/vacancy-company-workflow.test.mjs",
+    "test": "npm run build && node --test tests/chat-retrieval.test.mjs tests/admin-form-regression.test.mjs tests/company-matching.test.mjs tests/dashboard-charts.test.mjs tests/employer-lifecycle.test.mjs tests/event-form-ui.test.mjs tests/event-lifecycle.test.mjs tests/map-tooltip-regression.test.mjs tests/salary-reference.test.mjs tests/ui-polish-regression.test.mjs tests/vacancy-company-workflow.test.mjs tests/toxic-filter.test.mjs tests/event-features.test.mjs tests/interview-booking.test.mjs",
     "test:rules": "npx firebase-tools@15.24.0 emulators:exec --only firestore --project demo-vacancyportal \"node --test tests/firestore-rules.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },

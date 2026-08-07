@@ -2,7 +2,7 @@
 
 **Status:** Active Internal Testing Phase — Currently undergoing internal validation. Live deployment links and public hosting URLs are strictly withheld during testing.<br>
 **Target Audience:** Security Auditors, System Administrators, Cloud Infrastructure Engineers, and Backend Developers<br>
-**Security Enforcement Layer:** Server-Side Cloud Firestore Security Rules ([firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules)) and Firebase Storage Rules ([storage.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/storage.rules))
+**Security Enforcement Layer:** Server-Side Cloud Firestore Security Rules ([firestore.rules](../firestore.rules)) and Firebase Storage Rules ([storage.rules](../storage.rules))
 
 ---
 
@@ -46,7 +46,7 @@ flowchart TD
 
 ## 2. Authentication Gate & Claims Engine
 
-Every protected database request evaluated by [firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules) requires four cryptographic claims:
+Every protected database request evaluated by [firestore.rules](../firestore.rules) requires four cryptographic claims:
 
 ```javascript
 // firestore.rules lines 5-28
@@ -97,7 +97,7 @@ The system enforces a 4-role Role-Based Access Control (RBAC) model (`user`, `em
 
 ## 4. Firestore Security Rules Deep Dive
 
-The complete database policy is defined in [firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules).
+The complete database policy is defined in [firestore.rules](../firestore.rules).
 
 ### 4.1 Optimization against Firestore Expression Limits
 Firestore Security Rules enforce a strict **1,000 expression-evaluation limit** per request. Routing helper functions (such as `isAdmin()` or `isEmployer()`) that re-evaluate `isAllowedUser()` multiple times per document check can cause complex `create` or `update` rules to exceed this limit.
@@ -197,6 +197,39 @@ match /vacancies/{vacancyId} {
 - **Create**: Unwhitelisted visitors submit registration requests with `status: 'pending'` under their own email.
 - **Update / Delete**: `isAdmin()` or applicant resubmitting a pending request.
 
+#### 15. `event_interests/{eventId}_{uid}`
+- **Read**: `isAllowedUser()`.
+- **Create**: Own uid only, and `interestId` must equal `{eventId}_{uid}` — the pinned id is what caps a student at one interest per talk, so the count cannot be inflated.
+- **Update**: Never. **Delete**: Owner only.
+
+#### 16. `event_live_chat/{eventId}`
+- **Read**: `isAllowedUser()`.
+- **Write**: `isAdmin()`, **or** the email listed in that event's `presenters` — the same delegation clause as `event_codes`. A presenter for event 7 has no authority over event 8.
+
+#### 17. `talk_live_chats/{chatId}`
+- **Read**: `isAllowedUser()`.
+- **Create**: Own uid; `message` 1–500 chars; `studentName` must equal the caller's token name or email (otherwise a student could post as "Admin"); **and** `event_live_chat/{eventId}.enabled == true`, checked with a server-side `get()` rather than trusting the client's view of the toggle.
+- **Delete**: `isAdmin()` or that event's presenter, so abuse can be removed rather than only stopped.
+
+#### 18. `event_feedbacks/{eventId}_{uid}`
+- **Read**: `isAllowedUser()`.
+- **Create / Update**: Own uid, pinned id, `rating` an int 1–5, `comment` ≤ 2000 chars, **and** `exists(/attendance/{eventId}_{uid})` — attendance is the proof behind "only students who attended may review".
+- **Delete**: `isAdmin()`.
+
+#### 19. `interview_slots/{slotId}`
+- **Read**: `isAllowedUser()`. Students need to see whether a slot is full and whether they hold it; this is precisely why the seat list holds uids only.
+- **Create / Delete**: `isAdmin() || isEmployer()`.
+- **Update**: Staff freely; a student may touch only `bookedStudents`/`updatedAt`, must move the list by exactly ±1, must stay within `maxBookings`, and **the entry that moved must be their own** (checked with `removeAll()`). Without the identity check any student could delete another student's booking.
+
+#### 20. `interview_bookings/{slotId}_{uid}`
+- **Read**: `isAdmin() || isEmployer()` — **staff only**. This collection exists so student names, emails, courses and employee ids stay off the campus-readable slot document.
+- **Create**: Own uid, id pinned to `{slotId}_{uid}`. **Update**: Never. **Delete**: Owner or staff.
+
+#### 21. `company_views/{companyId}_{uid}_{date}`
+- **Read**: `isAdmin() || isEmployer()`.
+- **Create**: Own uid, and the id must match `^{companyId}_{uid}_YYYY-MM-DD$`.
+- **Update / Delete**: Never. Create-only plus a pinned id is what makes the once-per-day dedupe a server-side guarantee rather than a client convention, and is why the visit total is a `getCountFromServer()` query and not a stored counter.
+
 ---
 
 ## 5. 30-Second Dynamic QR TOTP Anti-Cheat Engine Math
@@ -263,7 +296,7 @@ $$\text{caEligible} = \begin{cases}
 
 ---
 
-## 7. Storage Security Rules ([storage.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/storage.rules))
+## 7. Storage Security Rules ([storage.rules](../storage.rules))
 
 Optional PDF resume uploads to Firebase Storage are secured by user ownership rules:
 

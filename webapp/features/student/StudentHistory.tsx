@@ -1,6 +1,7 @@
-import { useState } from "react";
-import type { Application, Attendance, Job, ViewEvent } from "../../lib/data/types";
-import { deleteApplication } from "../../lib/data/firestore";
+import { useEffect, useState } from "react";
+import type { Application, Attendance, InterviewSlot, Job, ViewEvent } from "../../lib/data/types";
+import { cancelInterviewBooking, deleteApplication, subscribeMyInterviewBookings } from "../../lib/data/firestore";
+import { offerLabel } from "../admin/MockInterviews";
 
 /** Firestore Timestamp → readable date, tolerant of the pending serverTimestamp. */
 function formatWhen(ts: unknown): string {
@@ -20,15 +21,37 @@ export function StudentHistory({
   applications,
   views,
   attendance = [],
+  studentUid,
   onOpen,
 }: {
   jobs: Job[];
   applications: Application[];
   views: ViewEvent[];
   attendance?: Attendance[];
+  studentUid?: string;
   onOpen: (job: Job) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [myBookings, setMyBookings] = useState<InterviewSlot[]>([]);
+  const [bookingMessage, setBookingMessage] = useState("");
+
+  useEffect(() => {
+    if (!studentUid) return;
+    return subscribeMyInterviewBookings(studentUid, setMyBookings);
+  }, [studentUid]);
+
+  const withdraw = async (slot: InterviewSlot) => {
+    if (!studentUid) return;
+    if (!window.confirm(`Withdraw from the ${slot.startTime}–${slot.endTime} session with ${slot.companyName} on ${slot.date}?`)) return;
+    setBookingMessage("");
+    try {
+      await cancelInterviewBooking(slot.id, studentUid);
+      setBookingMessage("Booking withdrawn.");
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code ?? "";
+      setBookingMessage(`Could not withdraw${code ? ` (${code})` : ""}. Please try again.`);
+    }
+  };
   const q = query.trim().toLowerCase();
   const matchJob = (title: string, company: string) => !q || title.toLowerCase().includes(q) || company.toLowerCase().includes(q);
   const attended = [...attendance]
@@ -81,6 +104,40 @@ export function StudentHistory({
         {sortedViews.length
           ? <div className="local-job-list">{sortedViews.map((v) => row(`view-${v.id}`, v.jobId, v.jobTitle, v.company, v.viewedAt))}</div>
           : <div className="admin-jobs-empty"><strong>Nothing viewed yet</strong><p>Vacancies you open will appear here.</p></div>}
+      </section>
+
+      <section className="local-jobs" aria-labelledby="history-sessions-title">
+        <div className="local-jobs-head">
+          <div><span className="detail-label">SESSIONS BOOKED</span><h3 id="history-sessions-title">Your mock interviews &amp; consultancies</h3></div>
+          <strong>{myBookings.length}</strong>
+        </div>
+        {bookingMessage && <div className="p-3 text-sm ui-note-success">{bookingMessage}</div>}
+        {myBookings.length ? (
+          <div className="local-job-list">
+            {[...myBookings]
+              .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
+              .map((slot) => {
+                const seat = (slot.bookedStudents ?? []).find((b) => b.studentUid === studentUid);
+                const kind = seat?.sessionType === "consultancy" ? "Consultancy" : seat?.sessionType === "interview" ? "Mock interview" : offerLabel(slot.offers);
+                return (
+                  <div className="local-job" key={slot.id}>
+                    <span>
+                      <b>{slot.companyName}</b>
+                      <small>{kind} · {slot.date} at {slot.startTime}–{slot.endTime}{slot.location ? ` · ${slot.location}` : ""}</small>
+                    </span>
+                    <div className="local-job-actions">
+                      <button className="delete-local" onClick={() => withdraw(slot)}>Withdraw</button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <div className="admin-jobs-empty">
+            <strong>No sessions booked</strong>
+            <p>Open a company profile and choose &ldquo;Book mock interview or consultancy&rdquo;.</p>
+          </div>
+        )}
       </section>
 
       <section className="local-jobs" aria-labelledby="history-events-title">

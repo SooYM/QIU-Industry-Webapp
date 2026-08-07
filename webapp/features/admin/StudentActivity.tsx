@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { subscribeApplications, subscribeViews } from "../../lib/data/firestore";
-import type { Application, ViewEvent } from "../../lib/data/types";
+import { FilterReset } from "../../components/FilterReset";
+import { subscribeAllInterviewBookings, subscribeApplications, subscribeViews } from "../../lib/data/firestore";
+import type { Application, InterviewBooking, ViewEvent } from "../../lib/data/types";
 import { csvWhen, downloadCsv, toCsv } from "../../lib/data/csv";
 import { notify } from "../../components/toast";
 import { companyListIncludes } from "../../lib/data/company-matching";
@@ -25,15 +26,23 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
   const [views, setViews] = useState<ViewEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [bookings, setBookings] = useState<InterviewBooking[]>([]);
 
   useEffect(() => subscribeApplications((rows) => { setApps(rows); setLoading(false); }), []);
+  // Session bookings are staff-only; admins see every company's.
+  useEffect(() => (mode === "all" ? subscribeAllInterviewBookings(setBookings) : undefined), [mode]);
   // Views are admin-only (never surfaced to employers, for student privacy).
   useEffect(() => (mode === "all" ? subscribeViews(setViews) : undefined), [mode]);
 
   const q = query.trim().toLowerCase();
   const base = mode === "all" ? apps : apps.filter((a) => companyListIncludes(companies, a.company));
   const scoped = q ? base.filter((a) => [a.studentName, a.studentEmail, a.jobTitle, a.company].some((f) => (f ?? "").toLowerCase().includes(q))) : base;
-  const search = <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, email, job or company…" aria-label="Search activity" />;
+  const search = (
+    <div className="admin-toolbar">
+      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by student, email, job or company…" aria-label="Search activity" />
+      <FilterReset active={Boolean(query)} onReset={() => setQuery("")} label="Clear search" />
+    </div>
+  );
 
   if (mode === "company") {
     const sorted = [...scoped].sort((a, b) => whenValue(b.appliedAt) - whenValue(a.appliedAt));
@@ -76,21 +85,46 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
     .map((g) => ({ ...g, items: g.items.sort((x, y) => whenValue(y.appliedAt) - whenValue(x.appliedAt)) }))
     .sort((a, b) => whenValue(b.items[0]?.appliedAt) - whenValue(a.items[0]?.appliedAt));
 
-  // View events carry only a uid — label them with the name/email seen in
-  // applications where possible so admins can tell who viewed what.
+  // Newer view events carry the student's name and email; older ones predate
+  // those fields, so fall back to whatever an application tells us before
+  // resorting to the raw uid — which is unreadable in the admin history.
   const nameByUid = new Map(apps.map((a) => [a.studentUid, { name: a.studentName, email: a.studentEmail, employeeId: a.studentEmployeeId }]));
+  const labelFor = (v: ViewEvent) => {
+    const fallback = nameByUid.get(v.studentUid);
+    return {
+      name: v.studentName || fallback?.name || "",
+      email: v.studentEmail || fallback?.email || "",
+    };
+  };
   const viewsScoped = q
-    ? views.filter((v) => [v.jobTitle, v.company, nameByUid.get(v.studentUid)?.name, nameByUid.get(v.studentUid)?.email].some((f) => (f ?? "").toLowerCase().includes(q)))
+    ? views.filter((v) => [v.jobTitle, v.company, labelFor(v).name, labelFor(v).email].some((f) => (f ?? "").toLowerCase().includes(q)))
     : views;
   const viewGroups = new Map<string, { label: string; email: string; items: ViewEvent[] }>();
   for (const v of viewsScoped) {
-    const who = nameByUid.get(v.studentUid);
-    if (!viewGroups.has(v.studentUid)) viewGroups.set(v.studentUid, { label: who?.name || who?.email || v.studentUid, email: who?.email || "", items: [] });
+    const who = labelFor(v);
+    if (!viewGroups.has(v.studentUid)) {
+      viewGroups.set(v.studentUid, { label: who.name || who.email || "Unknown student", email: who.email, items: [] });
+    }
     viewGroups.get(v.studentUid)!.items.push(v);
   }
   const viewGrouped = [...viewGroups.values()]
     .map((g) => ({ ...g, items: g.items.sort((x, y) => whenValue(y.viewedAt) - whenValue(x.viewedAt)) }))
     .sort((a, b) => whenValue(b.items[0]?.viewedAt) - whenValue(a.items[0]?.viewedAt));
+
+  const bookingsScoped = bookings.filter((b) =>
+    !q || [b.studentName, b.studentEmail, b.companyName, b.course].some((f) => (f ?? "").toLowerCase().includes(q)));
+
+  function exportBookings() {
+    if (!bookingsScoped.length) { notify("Nothing to export.", "error"); return; }
+    const rows = bookingsScoped.map((b) => [
+      b.studentName, b.studentEmail, b.course ?? "", b.employeeId ?? "",
+      b.sessionType === "consultancy" ? "Consultancy" : "Mock interview",
+      b.companyName, b.date, b.startTime,
+    ]);
+    downloadCsv(`session-bookings-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv(["Student", "Email", "Course", "ID", "Session", "Company", "Date", "Time"], rows));
+    notify(`Exported ${bookingsScoped.length} booking${bookingsScoped.length === 1 ? "" : "s"}.`);
+  }
 
   function exportApps() {
     if (!scoped.length) { notify("Nothing to export.", "error"); return; }
@@ -132,6 +166,32 @@ export function StudentActivity({ mode, companies = [] }: { mode: "all" | "compa
           ))}
         </details>
       )) : <div className="admin-jobs-empty"><strong>No views yet</strong><p>Jobs students open will appear here.</p></div>}
+      {mode === "all" && (
+        <>
+          <div className="local-jobs-head mt-6">
+            <div><span className="detail-label">SESSIONS BOOKED</span><h3>Mock interviews &amp; consultancies</h3></div>
+            <div className="flex items-center gap-2">
+              <strong>{bookingsScoped.length}</strong>
+              <button type="button" className="admin-button" onClick={exportBookings} disabled={!bookingsScoped.length}>⬇ Export CSV</button>
+            </div>
+          </div>
+          {bookingsScoped.length ? (
+            <div className="local-job-list">
+              {bookingsScoped.map((b) => (
+                <div className="local-job" key={b.id}>
+                  <span>
+                    <b>{b.studentName || b.studentEmail || "Student"}</b>
+                    <small>
+                      {b.studentEmail}{b.course ? ` · ${b.course}` : ""} · {b.sessionType === "consultancy" ? "Consultancy" : "Mock interview"}
+                      {" with "}<b>{b.companyName}</b> · {b.date} at {b.startTime}
+                    </small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : <div className="admin-jobs-empty"><strong>No sessions booked yet</strong><p>Student bookings for mock interviews and consultancies will appear here.</p></div>}
+        </>
+      )}
     </section>
   );
 }

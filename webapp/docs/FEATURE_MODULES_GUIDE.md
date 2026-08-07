@@ -2,7 +2,7 @@
 
 **Status:** Active Internal Testing Phase — Currently undergoing internal validation. Live deployment links and public hosting URLs are strictly withheld during testing.<br>
 **Target Audience:** Frontend Developers, System Integrators, UI/UX Engineers, and Technical Reviewers<br>
-**Source Implementation Directory:** [webapp/features/](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/) and [webapp/components/](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/)
+**Source Implementation Directory:** [webapp/features/](../features/) and [webapp/components/](../components/)
 
 ---
 
@@ -49,7 +49,7 @@ webapp/
 
 ## 2. Deep Dive Technical Feature Specifications
 
-### Module 1: Home Directory & Company RAG ([HomeView.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/HomeView.tsx) & [useLogoBackdrop.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/home/useLogoBackdrop.ts))
+### Module 1: Home Directory & Company RAG ([HomeView.tsx](../features/home/HomeView.tsx) & [useLogoBackdrop.ts](../features/home/useLogoBackdrop.ts))
 
 #### Overview
 Renders the primary Industry Day exhibitor directory page displaying participating company cards, corporate summaries, booth tags, embedded YouTube videos, and a grounded per-company RAG assistant.
@@ -106,7 +106,7 @@ Suggests relevant companies dynamically based on available vacancies and match c
 ---
 
 
-### Module 2: Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/ApprovalQueue.tsx))
+### Module 2: Employer Self-Registration & Approval Queue ([ApprovalQueue.tsx](../features/admin/ApprovalQueue.tsx))
 
 #### Overview
 Enables external partner employers to self-register for Industry Day access without requiring manual upfront email entry by administrators.
@@ -139,7 +139,7 @@ sequenceDiagram
 
 ---
 
-### Module 3: Admin Dashboard Architecture Rework ([AdminPanel.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/AdminPanel.tsx))
+### Module 3: Admin Dashboard Architecture Rework ([AdminPanel.tsx](../features/admin/AdminPanel.tsx))
 
 #### Sub-Tab Navigation Model
 The admin dashboard features modular sub-tabs partitioned by administrative responsibility:
@@ -168,7 +168,7 @@ Automatically extracts the user's Employee ID from the Google Workspace Director
 
 ---
 
-### Module 4: Employer Summary & Scoped Analytics ([EmployerSummary.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/admin/EmployerSummary.tsx))
+### Module 4: Employer Summary & Scoped Analytics ([EmployerSummary.tsx](../features/admin/EmployerSummary.tsx))
 
 #### Overview
 Provides a dedicated metrics landing dashboard for employers signed into the portal.
@@ -193,7 +193,7 @@ flowchart TD
 
 ---
 
-### Module 5: Generated CV Engine & Printable HTML Engine ([GeneratedCV.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/GeneratedCV.tsx) & [cv-download.ts](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/student/cv-download.ts))
+### Module 5: Generated CV Engine & Printable HTML Engine ([GeneratedCV.tsx](../features/student/GeneratedCV.tsx) & [cv-download.ts](../features/student/cv-download.ts))
 
 #### Overview
 Allows candidates to build a structured curriculum vitae directly within the webapp without hosting PDF files on paid cloud storage buckets.
@@ -239,7 +239,7 @@ To maintain absolute data integrity and prevent broken application references, i
 ---
 
 
-### Module 6: Global Toast Notification System ([toast.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/toast.tsx))
+### Module 6: Global Toast Notification System ([toast.tsx](../components/toast.tsx))
 
 #### Overview
 A lightweight, event-driven notification engine delivering non-blocking visual user feedback across save, edit, delete, apply, check-in, check-out, and withdrawal operations.
@@ -259,7 +259,7 @@ export function notify(message: string, kind: Kind = "success") {
 
 ---
 
-### Module 7: Live Image Preview Component ([ImagePreview.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/components/ImagePreview.tsx))
+### Module 7: Live Image Preview Component ([ImagePreview.tsx](../components/ImagePreview.tsx))
 
 #### Overview
 Positioned directly under form text inputs for company logos, speaker headshots, and video links to allow instant visual confirmation before saving records.
@@ -269,7 +269,7 @@ Positioned directly under form text inputs for company logos, speaker headshots,
 
 ---
 
-### Module 8: Events UX & 30-Second Dynamic QR Anti-Cheat Attendance ([EventPresenter.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/EventPresenter.tsx) & [SpeakerAvatar.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/events/SpeakerAvatar.tsx))
+### Module 8: Events UX & 30-Second Dynamic QR Anti-Cheat Attendance ([EventPresenter.tsx](../features/events/EventPresenter.tsx) & [SpeakerAvatar.tsx](../features/events/SpeakerAvatar.tsx))
 
 #### Target Specializations & Event Matches
 Events utilize a single `specialization` string selected from a predefined list (shared with Vacancies, plus an "Other" custom option). If a student's course matches this specialization via regex pattern, the event card displays a "🌟 Relevant to you" badge in `EventsView.tsx`.
@@ -302,7 +302,7 @@ useEffect(() => {
 ---
 
 
-### Module 9: Multi-Criteria Vacancy Sorting & QIU-Red Design Tokens ([VacancyFilters.tsx](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/features/vacancies/VacancyFilters.tsx))
+### Module 9: Multi-Criteria Vacancy Sorting & QIU-Red Design Tokens ([VacancyFilters.tsx](../features/vacancies/VacancyFilters.tsx))
 
 #### 5-Mode Vacancy Sorting Dropdown
 Integrated directly into the reactive vacancy search sidebar, supporting instant client-side re-ordering across five modes:
@@ -316,7 +316,7 @@ Integrated directly into the reactive vacancy search sidebar, supporting instant
 | `salary_low` | Sorts vacancies by monthly RM salary ascending (`a.salary - b.salary`). | Comparative wage analysis |
 
 #### Signature QIU-Red Visual Identity
-Configured via CSS custom properties in [tokens.css](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/lib/theme/tokens.css):
+Configured via CSS custom properties in [tokens.css](../lib/theme/tokens.css):
 - Core brand red: `#ba1a1a` / `#900010` (`--color-primary: #d12a32`).
 - Dark mode adjustment: `#ef5a60` for optimal contrast on dark surfaces.
 - Logo inversion filter: `filter: invert(1) brightness(1.9)` applied to dark headers.
@@ -325,6 +325,6 @@ Configured via CSS custom properties in [tokens.css](file:///Users/sooyauming/De
 
 ## 3. Related Multi-Page Documentation Links
 
-- **[SOFTWARE_DOCUMENTATION.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SOFTWARE_DOCUMENTATION.md)**: Comprehensive System Architecture Specification
-- **[SECURITY_AND_RULES.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SECURITY_AND_RULES.md)**: Security Model, Firestore Security Rules & 30s Dynamic QR Math
-- **[DATA_MODELS_AND_SCHEMAS.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md)**: Data Dictionary, TypeScript Interfaces & Firestore Collections
+- **[SOFTWARE_DOCUMENTATION.md](../docs/SOFTWARE_DOCUMENTATION.md)**: Comprehensive System Architecture Specification
+- **[SECURITY_AND_RULES.md](../docs/SECURITY_AND_RULES.md)**: Security Model, Firestore Security Rules & 30s Dynamic QR Math
+- **[DATA_MODELS_AND_SCHEMAS.md](../docs/DATA_MODELS_AND_SCHEMAS.md)**: Data Dictionary, TypeScript Interfaces & Firestore Collections

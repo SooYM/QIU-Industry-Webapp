@@ -58,7 +58,9 @@ test("dashboards expose visible trend buckets and recent filtered activity", () 
   assert.match(admin, /Recent filtered activity/);
   assert.match(admin, /Date unavailable/);
   assert.match(employer, /Recent filtered activity/);
-  assert.match(employer, /Anonymous student/);
+  // Employers see the student who asked — the old "Anonymous student" label is gone.
+  assert.doesNotMatch(employer, /Anonymous student/);
+  assert.match(employer, /log\.studentName \|\| log\.studentEmail/);
   assert.match(employer, /companyListIncludes\(companies, a\.company\)/);
 });
 
@@ -74,12 +76,28 @@ test("recent activity opens real vacancy, event, and conversation details", () =
   assert.match(admin, /jobId: row\.jobId/);
   assert.match(admin, /eventId: row\.eventId/);
   assert.match(employer, /jobId: app\.jobId/);
+  assert.match(employer, /studentUid: log\.studentUid/);
   assert.match(page, /openDashboardActivity/);
   assert.match(page, /setSelectedJob\(job\)/);
   assert.match(page, /setSelectedEvent\(event\)/);
   assert.match(page, /setSelectedDashboardChat\(activity\)/);
   assert.match(conversation, /Assistant answer/);
-  assert.match(conversation, /Student identity remains hidden/);
   assert.match(styles, /\.activity-row:hover/);
   assert.match(styles, /\.activity-row:focus-visible/);
+});
+
+// Seven identically-weighted stat cards looked tidy and answered nothing. The
+// bento gives the numbers an organiser actually watches more of the grid.
+test("dashboards use a bento layout that leads with the decisive metric", async () => {
+  assert.match(styles, /\.bento \{ display:grid; grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(styles, /\.bento-lead \{ grid-column:span 2; grid-row:span 2/);
+  // One column on a phone, and the lead tile stops claiming two rows earlier.
+  assert.match(styles, /@media \(max-width:560px\)[\s\S]{0,200}grid-template-columns:1fr/);
+  assert.match(styles, /@media \(max-width:900px\)[\s\S]{0,160}\.bento-lead \{ grid-row:span 1/);
+
+  // Check-ins lead the admin view; applications lead the employer view.
+  assert.match(admin, /className="bento-lead"\s*\n\s*label="Event check-ins"/);
+  assert.match(employer, /className="bento-lead" label="Applications"/);
+  assert.doesNotMatch(admin, /className="summary-grid"/);
+  assert.doesNotMatch(employer, /className="summary-grid"/);
 });

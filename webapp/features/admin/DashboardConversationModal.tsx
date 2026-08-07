@@ -17,7 +17,6 @@ export function DashboardConversationModal({ activity, onClose }: { activity: Da
         <section className="conversation-turn question"><span>Question</span><p>{activity.subject}</p></section>
         <section className="conversation-turn answer"><span>Assistant answer</span><p>{activity.answer || "No recorded answer is available for this question."}</p></section>
       </div>
-      {activity.actor === "Anonymous student" && <p className="conversation-privacy">Student identity remains hidden from company accounts.</p>}
     </Modal>
   );
 }

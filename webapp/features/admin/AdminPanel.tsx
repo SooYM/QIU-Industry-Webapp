@@ -18,6 +18,9 @@ import { ApprovalQueue } from "./ApprovalQueue";
 import { ResumeViewer } from "./ResumeViewer";
 import { ChatHistory } from "./ChatHistory";
 import { StudentActivity } from "./StudentActivity";
+import { TalkChatHistory } from "./TalkChatHistory";
+import { MockInterviewForm, MockInterviewList } from "./MockInterviews";
+import { CompanyImport } from "./CompanyImport";
 import { SettingsPanel } from "./SettingsPanel";
 import { CompanyManager } from "./CompanyManager";
 
@@ -44,7 +47,7 @@ export function AdminPanel({
   const canManageJobs = canManageVacancies(role);
   const isApprover = role === "admin" || role === "superadmin";
   const isEmployer = role === "employer";
-  const [adminView, setAdminView] = useState<"manage" | "manageVac" | "addVac" | "manageExhibitor" | "addExhibitor" | "approvals" | "resumes" | "chats" | "activity" | "access" | "settings" | "company">(role === "employer" ? "company" : "access");
+  const [adminView, setAdminView] = useState<"manage" | "manageVac" | "addVac" | "manageExhibitor" | "addExhibitor" | "approvals" | "resumes" | "chats" | "talkChats" | "activity" | "access" | "settings" | "company" | "addInterview" | "manageInterview" | "importCompanies">(role === "employer" ? "company" : "access");
   const [draft, setDraft] = useState<AdminDraft>(emptyDraft);
   const [titleCommitted, setTitleCommitted] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -304,6 +307,8 @@ export function AdminPanel({
         { key: "company", label: "Company profile" },
         { key: "addVac", label: "Add vacancy" },
         { key: "manageVac", label: "Manage vacancies" },
+        { key: "addInterview", label: "Add mock interview" },
+        { key: "manageInterview", label: "Manage mock interviews" },
         { key: "resumes", label: "View applicants" },
         { key: "activity", label: "Activity" },
         { key: "chats", label: "Chats" },
@@ -313,11 +318,13 @@ export function AdminPanel({
         { key: "approvals", label: "Approvals" },
         { key: "manageExhibitor", label: "Manage companies" },
         { key: "addExhibitor", label: "Add company" },
+        { key: "importCompanies", label: "Import companies" },
         { key: "manageVac", label: "Manage vacancies" },
         { key: "addVac", label: "Add vacancy" },
         { key: "activity", label: "Activity" },
         { key: "resumes", label: "Resumes" },
         { key: "chats", label: "Chats" },
+        { key: "talkChats", label: "Talk Q&A" },
         { key: "settings", label: "Settings" },
       ];
   const viewTitle = adminView === "manage" ? (editingId ? "Edit vacancy" : "Vacancies")
@@ -329,6 +336,10 @@ export function AdminPanel({
     : adminView === "company" ? "Company profile"
     : adminView === "resumes" ? (isEmployer ? "View applicants" : "Student resumes")
     : adminView === "activity" ? "Student activity"
+    : adminView === "talkChats" ? "Talk Q&A history"
+    : adminView === "importCompanies" ? "Import company profiles"
+    : adminView === "addInterview" ? "Add mock interview session"
+    : adminView === "manageInterview" ? "Manage mock interview sessions"
     : adminView === "access" ? "Access control"
     : adminView === "settings" ? "Portal settings"
     : "Assistant chats";
@@ -337,7 +348,7 @@ export function AdminPanel({
     <section className="admin-panel admin-inline" aria-labelledby="admin-title">
       <span className="detail-label">{isEmployer ? "COMPANY" : "ADMIN"}</span><h2 id="admin-title">{viewTitle}</h2><p className="admin-intro">Changes are shared with signed-in QIU Industry Day 2026 users.</p>
 
-      <div className="flex flex-wrap gap-1 border-b border-token my-3" role="tablist" aria-label="Admin sections">
+      <div className="admin-tabs border-b border-token my-3" role="tablist" aria-label="Admin sections">
         {tabs.map((tab) => (
           <button key={tab.key} type="button" role="tab" aria-selected={adminView === tab.key}
             className={`px-3 py-2 text-xs font-bold rounded-t-md ${adminView === tab.key ? "tone-accent" : "text-accent"}`}
@@ -349,6 +360,10 @@ export function AdminPanel({
       {adminView === "resumes" && <ResumeViewer employer={isEmployer ? { companies: employerCompanies } : undefined} />}
       {adminView === "activity" && (isApprover ? <StudentActivity mode="all" /> : <StudentActivity mode="company" companies={employerCompanies} />)}
       {adminView === "chats" && (isApprover ? <ChatHistory mode="all" /> : <ChatHistory mode="company" companies={employerCompanies} />)}
+      {adminView === "talkChats" && isApprover && <TalkChatHistory />}
+      {adminView === "importCompanies" && isApprover && <CompanyImport adminEmail={user?.email ?? ""} />}
+      {adminView === "addInterview" && employerCompanies[0] && <MockInterviewForm companyName={employerCompanies[0]} userEmail={user?.email ?? ""} />}
+      {adminView === "manageInterview" && employerCompanies[0] && <MockInterviewList companyName={employerCompanies[0]} />}
       {adminView === "access" && isApprover && <RoleManager />}
       {adminView === "manageExhibitor" && isApprover && <CompanyManager view="manage" />}
       {adminView === "addExhibitor" && isApprover && <CompanyManager view="add" />}

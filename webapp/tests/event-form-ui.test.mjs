@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { dataLayerSource } from "./helpers/data-layer.mjs";
 
 const form = await readFile(new URL("../features/events/EventForm.tsx", import.meta.url), "utf8");
 const settings = await readFile(new URL("../features/admin/SettingsPanel.tsx", import.meta.url), "utf8");
-const firestore = await readFile(new URL("../lib/data/firestore.ts", import.meta.url), "utf8");
+const firestore = await dataLayerSource();
 const types = await readFile(new URL("../lib/data/types.ts", import.meta.url), "utf8");
 const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 

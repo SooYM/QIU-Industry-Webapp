@@ -6,7 +6,7 @@
 **QIU Industry Webapp** (`webapp/`) is the static-exported Next.js 16 web application powering the QIU Industry career, event discovery, exhibitor showcase, and anti-cheat attendance portal. Built with **Next.js 16 (App Router)**, **React 19**, **TypeScript 5.9**, **Tailwind CSS v4.2**, **Cloud Firestore**, and **Firebase Authentication**.
 
 > [!IMPORTANT]
-> **Security & Privacy Boundary:** Application code operates entirely on static client-side rendering (`output: "export"`). Security guarantees rely strictly on server-enforced Cloud Firestore Security Rules ([firestore.rules](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/firestore.rules)). Raw CSV/XLSX source files and intermediate JSON datasets (`data/jobs.json`) are excluded from Git and static build bundles.
+> **Security & Privacy Boundary:** Application code operates entirely on static client-side rendering (`output: "export"`). Security guarantees rely strictly on server-enforced Cloud Firestore Security Rules ([firestore.rules](firestore.rules)). Raw CSV/XLSX source files and intermediate JSON datasets (`data/jobs.json`) are excluded from Git and static build bundles.
 
 ---
 
@@ -14,19 +14,19 @@
 
 For detailed system specs, security architecture, schemas, and feature guides, consult the sub-documents in `webapp/docs/`:
 
-1. **[SOFTWARE_DOCUMENTATION.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SOFTWARE_DOCUMENTATION.md)** *(Comprehensive System Architecture Specification)*  
+1. **[SOFTWARE_DOCUMENTATION.md](docs/SOFTWARE_DOCUMENTATION.md)** *(Comprehensive System Architecture Specification)*  
    Complete system context, architectural design decisions, component design hierarchy, sequence diagrams, technology stack, and production procedures.
 
-2. **[SECURITY_AND_RULES.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/SECURITY_AND_RULES.md)** *(Security Model, Firestore Security Rules & 30s Dynamic QR Math)*  
+2. **[SECURITY_AND_RULES.md](docs/SECURITY_AND_RULES.md)** *(Security Model, Firestore Security Rules & 30s Dynamic QR Math)*  
    Deep dive into authentication gates, the 4-role RBAC matrix, line-by-line Firestore security rules, 30-second TOTP-style dynamic QR anti-cheat logic, and CCA duration algorithms.
 
-3. **[DATA_MODELS_AND_SCHEMAS.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/DATA_MODELS_AND_SCHEMAS.md)** *(Data Dictionary, TypeScript Interfaces & Firestore Collections)*  
+3. **[DATA_MODELS_AND_SCHEMAS.md](docs/DATA_MODELS_AND_SCHEMAS.md)** *(Data Dictionary, TypeScript Interfaces & Firestore Collections)*  
    Exhaustive data dictionary, canonical TypeScript interfaces, Firestore collection specifications (`job_stats`, `companies`, `events`, `event_codes`, `attendance`, `employer_signups`, `app_settings`, etc.), real-time subscriptions, and batch import pipeline.
 
-4. **[FEATURE_MODULES_GUIDE.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/FEATURE_MODULES_GUIDE.md)** *(Feature Modules Technical Specification)*  
+4. **[FEATURE_MODULES_GUIDE.md](docs/FEATURE_MODULES_GUIDE.md)** *(Feature Modules Technical Specification)*  
    Detailed technical guide covering Home Directory RAG, logo luminance analysis (`useLogoBackdrop.ts`), employer self-registration queue, admin sub-tabs, generated CV engine (`cv-download.ts`), global toast system, image preview component, and events anti-cheat module.
 
-5. **[CODEBASE_FILE_MAP.md](file:///Users/sooyauming/Desktop/Intern/Vacancy%20Portal/webapp/docs/CODEBASE_FILE_MAP.md)** *(Exhaustive File-by-File Technical Code Map)*  
+5. **[CODEBASE_FILE_MAP.md](docs/CODEBASE_FILE_MAP.md)** *(Exhaustive File-by-File Technical Code Map)*  
    Comprehensive file-by-file code map documenting every source, component, domain model, security rule, configuration, script, and test suite file with detailed section-by-section code block breakdowns.
 
 ---

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FilterReset } from "../../components/FilterReset";
 import {
   applyCompanyEdit, approveCompany, approveJob, approveSignup, deleteCompany, deleteSignup,
   rejectCompanyEdit, rejectJob, subscribeCompanies, subscribeSignups,
@@ -72,7 +73,18 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
   const pendingSignups = signups.filter((s) => s.status === "pending").filter((s) => match(s.company, s.name, s.email));
   const companyCount = pendingCompanies.length + pendingSignups.length;
 
-  const run = async (fn: () => Promise<void>, ok: string, err: string) => { setMessage(""); try { await fn(); setMessage(ok); notify(ok); } catch { setMessage(err); notify(err, "error"); } };
+  const run = async (fn: () => Promise<void>, ok: string, err: string) => {
+    setMessage("");
+    try { await fn(); setMessage(ok); notify(ok); }
+    catch (error: unknown) {
+      // A bare catch here hid a permanent approval failure behind "Could not
+      // approve." for long enough that it took a bug report to find.
+      const code = (error as { code?: string })?.code ?? "";
+      console.error("[approvals]", code || error);
+      const detail = `${err}${code ? ` (${code})` : ""}`;
+      setMessage(detail); notify(detail, "error");
+    }
+  };
 
   const exportCsv = () => {
     const rows = [
@@ -88,7 +100,10 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
   return (
     <section aria-labelledby="approval-title">
       <div className="local-jobs-head"><div><span className="detail-label">APPROVAL QUEUE</span><h3 id="approval-title">Awaiting review</h3></div><div className="flex items-center gap-2"><strong aria-live="polite">{pendingJobs.length + companyCount}</strong><button type="button" className="admin-button" onClick={exportCsv} disabled={!(pendingJobs.length + companyCount)}>⬇ Export CSV</button></div></div>
-      <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pending registrations, vacancies and companies…" aria-label="Search approvals" />
+      <div className="admin-toolbar">
+        <input type="search" className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search pending registrations, vacancies and companies…" aria-label="Search approvals" />
+        <FilterReset active={Boolean(query)} onReset={() => setQuery("")} label="Clear search" />
+      </div>
       {message && <p className="admin-message" role="status" aria-live="polite">{message}</p>}
 
       {/* Vacancies */}
@@ -131,7 +146,7 @@ export function ApprovalQueue({ jobs }: { jobs: Job[] }) {
                 <div className="local-job-actions">
                   <a className="edit-local" href={`mailto:${s.email}?subject=${encodeURIComponent(`QIU Industry Day 2026 — ${s.company} registration`)}&body=${encodeURIComponent(`Hi ${s.name},\n\nThank you for registering ${s.company} for QIU Industry Day 2026.\n\n`)}`}>✉ Contact</a>
                   <button className="edit-local" onClick={() => setPreview({ name: s.company, website: s.website, logoUrl: s.logoUrl, videoUrl: s.videoUrl, summary: s.summary })}>View</button>
-                  <button className="edit-local" onClick={() => run(() => approveSignup(s, normalizeEmail(user?.email)), `Approved ${s.company} — added to companies.`, "Could not approve.")}>Approve</button>
+                  <button className="edit-local" onClick={() => run(() => approveSignup(s, normalizeEmail(user?.email), companies), `Approved ${s.company} — added to companies.`, "Could not approve.")}>Approve</button>
                   <button className="delete-local" onClick={() => { if (confirm(`Reject ${s.company}'s registration?`)) deleteSignup(s.email).then(() => notify(`Rejected ${s.company}.`)); }}>Reject</button>
                 </div>
               </div>
