@@ -6,6 +6,7 @@ import {
 } from "../../lib/data/firestore";
 import type { Application, Attendance, ChatLog, Company, EventItem, ViewEvent } from "../../lib/data/types";
 import { DashboardActivityListModal } from "./DashboardActivityListModal";
+import { DashboardStudentsModal } from "./DashboardStudentsModal";
 
 export type DashboardRange = "7" | "30" | "90" | "all";
 export type DashboardActivityType = "application" | "view" | "attendance" | "question";
@@ -253,7 +254,7 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
   const [dashboardNow] = useState(() => Date.now());
   const [profileViews, setProfileViews] = useState<number | null>(null);
   // The bento tile the admin tapped — opens a pop-out listing its records.
-  const [list, setList] = useState<{ type: DashboardActivityType | "all"; label: string } | null>(null);
+  const [list, setList] = useState<{ type: DashboardActivityType | "all" | "students"; label: string } | null>(null);
 
   // Counted server-side: the visit docs carry student ids, so they are never
   // streamed into the browser just to produce a total.
@@ -290,7 +291,7 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
   // For the tile pop-out: same company + time scope, but not narrowed by the
   // activity-type dropdown, so tapping a tile always shows that tile's records.
   const rangeScoped = companyScoped.filter((entry) => activityInRange(entry.date, range, dashboardNow));
-  const listEntries = !list ? [] : list.type === "all" ? rangeScoped : rangeScoped.filter((entry) => entry.type === list.type);
+  const listEntries = !list ? [] : (list.type === "all" || list.type === "students") ? rangeScoped : rangeScoped.filter((entry) => entry.type === list.type);
   const companyOptions = [...new Set([...companies.map((item) => item.name), ...allActivity.map((entry) => entry.company).filter((name): name is string => Boolean(name))])].sort((a, b) => a.localeCompare(b));
   const count = (type: DashboardActivityType) => filtered.filter((entry) => entry.type === type).length;
   const activeStudents = new Set(filtered.map((entry) => entry.studentUid).filter(Boolean)).size;
@@ -332,7 +333,7 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
         />
         {/* "Students active" says what it counts. "Active students" was ambiguous:
             it is the number of distinct people who did ANYTHING in scope. */}
-        <Stat className="bento-wide" label="Students active" value={activeStudents} hint="distinct students with any activity in scope" />
+        <Stat className="bento-wide" label="Students active" value={activeStudents} hint="distinct students with any activity in scope" onClick={() => setList({ type: "students", label: "Active students" })} />
         <Stat
           label="Applications"
           value={count("application")}
@@ -363,7 +364,14 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
         <div className="bento-full"><RecentActivity entries={filtered} onOpen={onOpenActivity} /></div>
       </div>
 
-      {list && (
+      {list && list.type === "students" && (
+        <DashboardStudentsModal
+          title={`${list.label} · ${RANGE_LABELS[range]}${company !== "all" ? ` · ${company}` : ""}`}
+          entries={listEntries}
+          onClose={() => setList(null)}
+        />
+      )}
+      {list && list.type !== "students" && (
         <DashboardActivityListModal
           title={`${list.label} · ${RANGE_LABELS[range]}${company !== "all" ? ` · ${company}` : ""}`}
           entries={listEntries}
