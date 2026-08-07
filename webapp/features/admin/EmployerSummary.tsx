@@ -7,11 +7,14 @@ import {
 import type { Application, ChatLog, InterviewBooking, Job } from "../../lib/data/types";
 import { companyListIncludes } from "../../lib/data/company-matching";
 import { ActivityTrend, activityInRange, BarChart, DonutChart, RecentActivity, TimeRangeControl, timestampToDate, type DashboardActivity, type DashboardRange } from "./AdminSummary";
+import { DashboardActivityListModal } from "./DashboardActivityListModal";
 
 type EmployerActivityType = "application" | "question";
 
-function Stat({ label, value, hint, className = "" }: { label: string; value: string | number; hint?: string; className?: string }) {
-  return <div className={`stat-card ${className}`.trim()}><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong>{hint && <small>{hint}</small>}</div>;
+function Stat({ label, value, hint, className = "", onClick }: { label: string; value: string | number; hint?: string; className?: string; onClick?: () => void }) {
+  const body = <><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong>{hint && <small>{hint}</small>}</>;
+  if (!onClick) return <div className={`stat-card ${className}`.trim()}>{body}</div>;
+  return <button type="button" onClick={onClick} className={`stat-card stat-card-action ${className}`.trim()}>{body}<span className="stat-card-cue">Open activity →</span></button>;
 }
 
 /** Employer landing: activity limited to companies assigned by an admin. */
@@ -26,6 +29,7 @@ export function EmployerSummary({ companies, onOpenActivity }: { companies: stri
   const [viewsError, setViewsError] = useState("");
   const [bookings, setBookings] = useState<InterviewBooking[]>([]);
   const [dashboardNow] = useState(() => Date.now());
+  const [list, setList] = useState<{ type: "application" | "question" | "all"; label: string } | null>(null);
 
   useEffect(() => subscribeApplications(setApps), []);
   useEffect(() => {
@@ -76,6 +80,12 @@ export function EmployerSummary({ companies, onOpenActivity }: { companies: stri
   });
   const undatedInScope = activityScoped.filter((entry) => !entry.date).length;
   const filtered = activityScoped.filter((entry) => activityInRange(entry.date, range, dashboardNow));
+  // Tile pop-out scope: vacancy + time, but not the activity-type dropdown.
+  const listScoped = allActivity.filter((entry) => {
+    if (vacancy !== "all" && (entry.type !== "application" || mine.find((app) => app.id === entry.id)?.jobId !== Number(vacancy))) return false;
+    return activityInRange(entry.date, range, dashboardNow);
+  });
+  const listEntries = !list ? [] : list.type === "all" ? listScoped : listScoped.filter((entry) => entry.type === list.type);
   const filteredApps = filtered.filter((entry) => entry.type === "application");
   const filteredQuestions = filtered.filter((entry) => entry.type === "question");
   const vacancyName = vacancy === "all" ? "All assigned vacancies" : jobById.get(Number(vacancy))?.title ?? "Selected vacancy";
@@ -111,10 +121,10 @@ export function EmployerSummary({ companies, onOpenActivity }: { companies: stri
 
           <div className="bento">
             {/* Applications are what a company came for, so they lead. */}
-            <Stat className="bento-lead" label="Applications" value={filteredApps.length} hint={`${new Set(filteredApps.map((entry) => entry.studentUid).filter(Boolean)).size} unique applicants`} />
+            <Stat className="bento-lead" label="Applications" value={filteredApps.length} hint={`${new Set(filteredApps.map((entry) => entry.studentUid).filter(Boolean)).size} unique applicants`} onClick={() => setList({ type: "application", label: "Applications" })} />
             <Stat className="bento-wide" label="Profile visits" value={profileViews ?? "—"} hint="once per student per session" />
             <Stat label="Sessions booked" value={bookings.length} hint="interviews & consultancies" />
-            <Stat label="Assistant questions" value={filteredQuestions.length} />
+            <Stat label="Assistant questions" value={filteredQuestions.length} onClick={() => setList({ type: "question", label: "Assistant questions" })} />
 
             <div className="bento-wide"><ActivityTrend entries={filtered} range={range} now={dashboardNow} /></div>
             <div className="bento-wide"><DonutChart title="Candidate activity mix" rows={[
@@ -123,7 +133,7 @@ export function EmployerSummary({ companies, onOpenActivity }: { companies: stri
             ]} /></div>
 
             <Stat className="bento-wide" label="Vacancies with applications" value={new Set(filteredApps.map((entry) => entry.subject)).size} />
-            <Stat className="bento-wide" label="Recorded activity" value={filtered.length} hint={`${filtered.filter((entry) => entry.date).length} dated`} />
+            <Stat className="bento-wide" label="Recorded activity" value={filtered.length} hint={`${filtered.filter((entry) => entry.date).length} dated`} onClick={() => setList({ type: "all", label: "All recorded activity" })} />
 
             <div className="bento-full"><BarChart title="Applications by vacancy" rows={ranked} /></div>
           </div>
@@ -160,6 +170,15 @@ export function EmployerSummary({ companies, onOpenActivity }: { companies: stri
           <RecentActivity entries={filtered} title="Recent filtered activity" onOpen={onOpenActivity} />
           {viewsError && <p className="dashboard-note">{viewsError}</p>}
           <p className="dashboard-note">Profile visits count students who opened one of your listings, deduplicated to once per student per day. Unlike the other totals they are all-time and ignore the range and vacancy filters.</p>
+
+          {list && (
+            <DashboardActivityListModal
+              title={list.label}
+              entries={listEntries}
+              onOpen={(entry) => onOpenActivity?.(entry)}
+              onClose={() => setList(null)}
+            />
+          )}
         </>
       )}
     </section>

@@ -5,6 +5,7 @@ import {
   subscribeCompanies, subscribeEvents, subscribeViews,
 } from "../../lib/data/firestore";
 import type { Application, Attendance, ChatLog, Company, EventItem, ViewEvent } from "../../lib/data/types";
+import { DashboardActivityListModal } from "./DashboardActivityListModal";
 
 export type DashboardRange = "7" | "30" | "90" | "all";
 export type DashboardActivityType = "application" | "view" | "attendance" | "question";
@@ -65,25 +66,20 @@ function topBy<T>(items: T[], key: (item: T) => string): { label: string; count:
 }
 
 /**
- * A bento tile. When `onClick` is supplied the tile becomes a filter control —
- * the number and the records behind it are the same thing, so tapping the
- * number should show you those records rather than making you find the dropdown.
+ * A bento tile. When `onClick` is supplied the tile becomes a button that opens
+ * a pop-out listing the records behind the number — the number and those records
+ * are the same thing, so tapping the number should show them.
  */
-function Stat({ label, value, hint, className = "", onClick, active }: {
+export function Stat({ label, value, hint, className = "", onClick }: {
   label: string; value: string | number; hint?: string; className?: string;
-  onClick?: () => void; active?: boolean;
+  onClick?: () => void;
 }) {
   const body = <><span className="stat-label">{label}</span><strong className="stat-value">{value}</strong>{hint && <small>{hint}</small>}</>;
   if (!onClick) return <div className={`stat-card ${className}`.trim()}>{body}</div>;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={Boolean(active)}
-      className={`stat-card stat-card-action ${active ? "is-active" : ""} ${className}`.trim()}
-    >
+    <button type="button" onClick={onClick} className={`stat-card stat-card-action ${className}`.trim()}>
       {body}
-      <span className="stat-card-cue">{active ? "Showing below" : "Show activity →"}</span>
+      <span className="stat-card-cue">Open activity →</span>
     </button>
   );
 }
@@ -256,6 +252,8 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
   const [activityType, setActivityType] = useState<DashboardActivityType | "all">("all");
   const [dashboardNow] = useState(() => Date.now());
   const [profileViews, setProfileViews] = useState<number | null>(null);
+  // The bento tile the admin tapped — opens a pop-out listing its records.
+  const [list, setList] = useState<{ type: DashboardActivityType | "all"; label: string } | null>(null);
 
   // Counted server-side: the visit docs carry student ids, so they are never
   // streamed into the browser just to produce a total.
@@ -289,6 +287,10 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
   const companyScoped = allActivity.filter((entry) => company === "all" || entry.company === company);
   const undatedInScope = companyScoped.filter((entry) => !entry.date && (activityType === "all" || entry.type === activityType)).length;
   const filtered = companyScoped.filter((entry) => (activityType === "all" || entry.type === activityType) && activityInRange(entry.date, range, dashboardNow));
+  // For the tile pop-out: same company + time scope, but not narrowed by the
+  // activity-type dropdown, so tapping a tile always shows that tile's records.
+  const rangeScoped = companyScoped.filter((entry) => activityInRange(entry.date, range, dashboardNow));
+  const listEntries = !list ? [] : list.type === "all" ? rangeScoped : rangeScoped.filter((entry) => entry.type === list.type);
   const companyOptions = [...new Set([...companies.map((item) => item.name), ...allActivity.map((entry) => entry.company).filter((name): name is string => Boolean(name))])].sort((a, b) => a.localeCompare(b));
   const count = (type: DashboardActivityType) => filtered.filter((entry) => entry.type === type).length;
   const activeStudents = new Set(filtered.map((entry) => entry.studentUid).filter(Boolean)).size;
@@ -326,8 +328,7 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
           label="Event check-ins"
           value={count("attendance")}
           hint={`${scopedAttendance.filter((entry) => attendance.find((row) => row.id === entry.id)?.caEligible).length} CCA-eligible`}
-          active={activityType === "attendance"}
-          onClick={() => setActivityType(activityType === "attendance" ? "all" : "attendance")}
+          onClick={() => setList({ type: "attendance", label: "Event check-ins" })}
         />
         {/* "Students active" says what it counts. "Active students" was ambiguous:
             it is the number of distinct people who did ANYTHING in scope. */}
@@ -336,8 +337,7 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
           label="Applications"
           value={count("application")}
           hint={`${new Set(scopedApps.map((entry) => entry.subject)).size} vacancies`}
-          active={activityType === "application"}
-          onClick={() => setActivityType(activityType === "application" ? "all" : "application")}
+          onClick={() => setList({ type: "application", label: "Applications" })}
         />
         <Stat label="Profile visits" value={profileViews ?? "—"} hint="once per student per session" />
 
@@ -349,21 +349,28 @@ export function AdminSummary({ onOpenActivity }: { onOpenActivity?: (entry: Dash
         <Stat
           label="Assistant questions"
           value={count("question")}
-          active={activityType === "question"}
-          onClick={() => setActivityType(activityType === "question" ? "all" : "question")}
+          onClick={() => setList({ type: "question", label: "Assistant questions" })}
         />
         <Stat
           label="Recorded activity"
           value={filtered.length}
           hint={`${datedCount} dated`}
-          active={activityType === "all"}
-          onClick={() => setActivityType("all")}
+          onClick={() => setList({ type: "all", label: "All recorded activity" })}
         />
 
         <div className="bento-wide"><BarChart title="Most-applied companies" rows={topBy(scopedApps, (entry) => entry.company ?? "")} /></div>
         <div className="bento-wide"><BarChart title="Most-applied vacancies" rows={topBy(scopedApps, (entry) => entry.subject)} /></div>
         <div className="bento-full"><RecentActivity entries={filtered} onOpen={onOpenActivity} /></div>
       </div>
+
+      {list && (
+        <DashboardActivityListModal
+          title={`${list.label} · ${RANGE_LABELS[range]}${company !== "all" ? ` · ${company}` : ""}`}
+          entries={listEntries}
+          onOpen={(entry) => onOpenActivity?.(entry)}
+          onClose={() => setList(null)}
+        />
+      )}
     </section>
   );
 }
