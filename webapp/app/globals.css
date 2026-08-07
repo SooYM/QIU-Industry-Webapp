@@ -173,6 +173,10 @@ footer { display:flex; align-items:center; gap:1.8rem; padding:1.3rem clamp(1.25
 .job-assistant-toggle>span { color:var(--color-on-primary); }
 .job-assistant-messages { margin-top:.85rem; max-height:24rem; overflow-y:auto; display:flex; flex-direction:column; gap:.6rem; padding-right:.25rem; }
 .chat-disclaimer { margin-top:.5rem; text-align:center; color:var(--muted); font-size:.66rem; }
+/* Chosen "students you are looking for" courses, shown as removable chips. */
+.selected-chip-row { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.55rem; }
+.selected-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.28rem .55rem; border-radius:.5rem; background:var(--blue-soft); color:var(--blue-on-soft,var(--blue)); font-size:.72rem; font-weight:700; }
+.selected-chip button { border:0; background:none; color:inherit; cursor:pointer; font-size:.78rem; line-height:1; padding:0; }
 /* Bento tile pop-out: keep long activity lists scrolling inside the modal. */
 .dashboard-activity-list .activity-list { max-height:min(60vh,32rem); overflow-y:auto; }
 /* Multi-speaker editor (event form) */
@@ -777,7 +781,7 @@ textarea.ui-field { padding:.6rem .75rem; }
    --------------------------------------------------------------------------- */
 .bento { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.85rem; margin-top:1.25rem; align-items:stretch; }
 .bento>* { min-width:0; }
-.bento-lead { grid-column:span 2; grid-row:span 2; }
+.bento-lead { grid-column:span 2; }
 .bento-wide { grid-column:span 2; }
 .bento-full { grid-column:1/-1; }
 

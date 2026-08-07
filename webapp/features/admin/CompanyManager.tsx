@@ -7,6 +7,12 @@ import { Modal } from "../../components/Modal";
 import { notify } from "../../components/toast";
 import { downloadCsv, toCsv } from "../../lib/data/csv";
 import { clearCompanies, deleteCompany, saveCompany, stageCompanyEdit, subscribeCompanies } from "../../lib/data/firestore";
+import { COURSE_CODES } from "../../lib/data/course-map";
+
+// Courses to pick from in "Students you are looking for". Matched against each
+// student's resolved course; "All students" recommends the profile to everyone.
+export const ALL_STUDENTS = "All students";
+const COURSE_OPTIONS = [...new Set(Object.values(COURSE_CODES))].sort((a, b) => a.localeCompare(b));
 
 type Draft = { name: string; email: string; website: string; logoUrl: string; videoUrl: string; summary: string; boothNumber: string; whatsapp: string; interestedIn: string; logoBackground: "auto" | "light" | "dark" };
 const emptyDraft: Draft = { name: "", email: "", website: "", logoUrl: "", videoUrl: "", summary: "", boothNumber: "", whatsapp: "", interestedIn: "", logoBackground: "auto" };
@@ -197,7 +203,27 @@ function CompanyForm({ draft, setDraft, onSubmit, onCancel, showName, showBooth,
       <label>Website URL<input type="url" value={draft.website} placeholder="https://…" onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></label>
       {showBooth && <label>Booth number<input value={draft.boothNumber} placeholder="e.g. A12" onChange={(e) => setDraft({ ...draft, boothNumber: e.target.value })} /></label>}
       <label>WhatsApp number<input value={draft.whatsapp} placeholder="e.g. 60123456789" inputMode="numeric" onChange={(e) => setDraft({ ...draft, whatsapp: e.target.value })} /><small className="field-label">optional — country code, digits only</small></label>
-      <label className="full">Students you are looking for <small>comma-separated courses, e.g. Computer Science, Data Analytics — these students see your profile recommended</small><input value={draft.interestedIn} placeholder="Computer Science, Software Engineering" onChange={(e) => setDraft({ ...draft, interestedIn: e.target.value })} /></label>
+      <label className="full">Students you are looking for <small>pick the courses whose students should see your profile recommended — or choose “All students”</small>
+        <select value="" onChange={(e) => {
+          const val = e.target.value;
+          e.target.value = "";
+          if (!val) return;
+          if (val === ALL_STUDENTS) { setDraft({ ...draft, interestedIn: ALL_STUDENTS }); return; }
+          const cur = draft.interestedIn.split(",").map((s) => s.trim()).filter((s) => s && s.toLowerCase() !== ALL_STUDENTS.toLowerCase());
+          setDraft({ ...draft, interestedIn: Array.from(new Set([...cur, val])).join(", ") });
+        }}>
+          <option value="" disabled>＋ Add a course…</option>
+          <option value={ALL_STUDENTS}>⭐ All students (recommend to everyone)</option>
+          {COURSE_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        {draft.interestedIn.trim() && (
+          <div className="selected-chip-row">
+            {draft.interestedIn.split(",").map((s) => s.trim()).filter(Boolean).map((s) => (
+              <span key={s} className="selected-chip">{s}<button type="button" aria-label={`Remove ${s}`} onClick={() => setDraft({ ...draft, interestedIn: draft.interestedIn.split(",").map((x) => x.trim()).filter((x) => x && x !== s).join(", ") })}>✕</button></span>
+            ))}
+          </div>
+        )}
+      </label>
       <label className="full">Logo image URL
         <span className="register-logo-row"><input type="url" value={draft.logoUrl} placeholder="https://…/logo.png" onChange={(e) => setDraft({ ...draft, logoUrl: e.target.value })} /><button type="button" className="reset-admin-filters register-logo-btn" onClick={() => setDraft({ ...draft, logoUrl: logoFromWebsite(draft.website) })} disabled={!draft.website.trim()}>From website</button></span>
         <small className="field-label">Auto-fetches the brand logo from the website — or paste your own link.</small>

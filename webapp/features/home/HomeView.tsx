@@ -365,7 +365,10 @@ export function HomeView({
     const wanted = course.trim().toLowerCase();
     const ids = new Set<number>();
     for (const c of companies) {
-      if ((c.interestedIn ?? []).some((field) => field.trim().toLowerCase() === wanted)) ids.add(c.id);
+      if ((c.interestedIn ?? []).some((field) => {
+        const v = field.trim().toLowerCase();
+        return v === "all students" || v === wanted;
+      })) ids.add(c.id);
     }
     return ids;
   }, [companies, isStudent, course]);
